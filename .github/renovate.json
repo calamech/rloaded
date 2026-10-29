@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits", "helpers:pinGitHubActionDigests"],
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "prConcurrentLimit": 5,
+  "dependencyDashboard": true,
+  "packageRules": [
+    {
+      "description": "Kotlin, its plugins and the libraries released with it move together.",
+      "matchPackageNames": ["org.jetbrains.kotlin:**", "org.jetbrains.kotlin.**"],
+      "groupName": "Kotlin"
+    },
+    {
+      "description": "Stable releases only.",
+      "matchDatasources": ["maven", "gradle-version"],
+      "allowedVersions": "!/(alpha|beta|rc|RC|M\\d|eap|dev|SNAPSHOT)/"
+    }
+  ]
+}
