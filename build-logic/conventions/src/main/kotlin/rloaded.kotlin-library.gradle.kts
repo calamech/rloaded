@@ -83,7 +83,7 @@ val detekt =
     tasks.register<JavaExec>("detekt") {
         description = "Runs detekt on the Kotlin sources, failing on any finding."
         group = LifecycleBasePlugin.VERIFICATION_GROUP
-        val sources = files("src/main/kotlin", "src/test/kotlin")
+        val sources = files("src/main/kotlin", "src/test/kotlin", "src/testFixtures/kotlin")
         val config = rootProject.file("config/detekt/detekt.yml")
         val report = layout.buildDirectory.file("reports/detekt/detekt.txt")
         inputs.files(sources).withPathSensitivity(PathSensitivity.RELATIVE).skipWhenEmpty()
