@@ -1,9 +1,13 @@
+import com.diffplug.spotless.LineEnding
+
 plugins {
     base
     alias(libs.plugins.spotless)
 }
 
 spotless {
+    // Same as .gitattributes, so Windows checkouts and generated files agree.
+    lineEndings = LineEnding.UNIX
     kotlinGradle {
         target("*.gradle.kts", "*/*.gradle.kts", "conventions/src/**/*.gradle.kts")
         ktlint(libs.versions.ktlint.get())

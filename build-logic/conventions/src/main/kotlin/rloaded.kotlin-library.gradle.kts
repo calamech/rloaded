@@ -1,4 +1,5 @@
 // Conventions for pure Kotlin library modules: no Minecraft or Fabric classes, unit tested.
+import com.diffplug.spotless.LineEnding
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -45,6 +46,8 @@ tasks.test {
 }
 
 spotless {
+    // Same as .gitattributes, so Windows checkouts and generated files agree.
+    lineEndings = LineEnding.UNIX
     kotlin {
         ktlint(libs.findVersion("ktlint").get().requiredVersion)
     }
