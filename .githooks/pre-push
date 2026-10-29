@@ -1,0 +1,3 @@
+#!/bin/sh
+# Refuses a push unless every commit and the push credential belong to Calamech.
+exec "$(git rev-parse --show-toplevel)/scripts/check-git-identity.sh" pre-push "$@"
