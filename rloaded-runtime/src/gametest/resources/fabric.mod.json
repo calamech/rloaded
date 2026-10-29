@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "rloaded-gametest",
+  "version": "${version}",
+  "name": "Rloaded game tests",
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["io.github.calamech.rloaded.gametest.LateMixinGameTest"]
+  },
+  "depends": {
+    "rloaded": "*",
+    "fabric-gametest-api-v1": "*"
+  }
+}

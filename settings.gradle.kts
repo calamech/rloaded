@@ -14,6 +14,12 @@ dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         mavenCentral()
+        // Fabric's game test module, which the release of Fabric API on Modrinth leaves out.
+        maven("https://maven.fabricmc.net/") {
+            content {
+                includeModule("net.fabricmc.fabric-api", "fabric-gametest-api-v1")
+            }
+        }
         // Compose for Desktop depends on a few AndroidX libraries, published on Google's repository only.
         google {
             content {
@@ -31,6 +37,7 @@ includeBuild("rloaded-runtime")
 
 include("rloaded-agent")
 include("rloaded-core")
+include("rloaded-game-tests")
 include("rloaded-launcher:launcher-app")
 include("rloaded-launcher:launcher-core")
 include("rloaded-server-bootstrap")
