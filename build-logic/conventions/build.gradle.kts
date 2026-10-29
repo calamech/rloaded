@@ -6,6 +6,7 @@ plugins {
 }
 
 dependencies {
+    implementation(libs.errorprone.gradle.plugin)
     implementation(libs.kotlin.gradle.plugin)
     implementation(libs.kotlin.serialization.plugin)
     implementation(libs.kover.gradle.plugin)
