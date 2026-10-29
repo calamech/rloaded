@@ -33,4 +33,4 @@ Repository settings (2026-10-29):
 ## Enforcement
 
 - Repository settings and the `main` ruleset listed above.
-- Branch names and pull request titles: review until a CI check exists.
+- Branch names and pull request titles: CI job `hygiene`, added on 2026-10-29 with ADR 0003.
