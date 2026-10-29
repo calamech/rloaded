@@ -55,7 +55,8 @@ public class RuntimePins private constructor(
             parse(text)
         }
 
-        internal fun parse(text: String): RuntimePins {
+        /** Reads a pins file. A file that does not match the format is a defect and throws. */
+        public fun parse(text: String): RuntimePins {
             val file = Json.decodeFromString<PinsFile>(text)
             val platforms = OperatingSystem.entries.flatMap { os -> Architecture.entries.map { Platform(os, it) } }
             return RuntimePins(

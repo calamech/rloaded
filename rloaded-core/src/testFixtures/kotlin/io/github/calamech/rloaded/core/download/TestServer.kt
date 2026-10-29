@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class TestServer : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
     private val hits = ConcurrentHashMap<String, AtomicInteger>()
+    private val routes = ConcurrentHashMap.newKeySet<String>()
 
     val origin: Origin get() = Origin("http", "127.0.0.1", server.address.port)
 
@@ -22,11 +23,12 @@ class TestServer : AutoCloseable {
 
     fun url(path: String): String = "http://127.0.0.1:${server.address.port}$path"
 
-    /** Answers [path] with [handler], which receives the 1-based number of the request. */
+    /** Answers [path] with [handler], which receives the 1-based number of the request. Replaces an earlier route. */
     fun route(
         path: String,
         handler: (HttpExchange, Int) -> Unit,
     ) {
+        if (!routes.add(path)) server.removeContext(path)
         server.createContext(path) { exchange ->
             val count = hits.computeIfAbsent(path) { AtomicInteger() }.incrementAndGet()
             exchange.use { handler(it, count) }
@@ -56,5 +58,7 @@ fun HttpExchange.respond(
 
 fun HttpExchange.redirect(location: String) {
     responseHeaders.add("Location", location)
-    sendResponseHeaders(302, -1)
+    sendResponseHeaders(FOUND, -1)
 }
+
+private const val FOUND = 302
