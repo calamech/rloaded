@@ -49,6 +49,8 @@ spotless {
     // Same as .gitattributes, so Windows checkouts and generated files agree.
     lineEndings = LineEnding.UNIX
     kotlin {
+        // Generated code, such as Compose resource accessors, is left alone.
+        targetExclude("build/**")
         ktlint(libs.findVersion("ktlint").get().requiredVersion)
     }
     kotlinGradle {

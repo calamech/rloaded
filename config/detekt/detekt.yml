@@ -15,3 +15,8 @@ style:
   ReturnCount:
     # Early returns on a failed Outcome are the usual pattern here.
     excludeGuardClauses: true
+
+naming:
+  FunctionNaming:
+    # Composable functions are named like types, as Compose requires.
+    ignoreAnnotated: ['Composable']

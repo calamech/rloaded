@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_title">Rloaded</string>
+    <string name="player_name">Player name</string>
+    <string name="player_name_hint">Offline profile for development</string>
+    <string name="server_address">Server address</string>
+    <string name="server_address_hint">host or host:port, empty for the title screen</string>
+    <string name="play">Play</string>
+    <string name="status_ready">Ready.</string>
+    <string name="status_installing">Installing the game: %1$d of %2$d files.</string>
+    <string name="status_playing">The game is running.</string>
+    <string name="status_stopped">The game stopped with code %1$d.</string>
+    <string name="failure_player_name">Player names have 3 to 16 letters, digits or underscores.</string>
+    <string name="failure_server_address">Enter a server as host or host:port.</string>
+    <string name="failure_downloads">Some game files could not be downloaded. Check your connection and try again.</string>
+    <string name="failure_runtime">The Java runtime could not be installed. Try again; if it keeps failing, check the free disk space.</string>
+    <string name="failure_metadata">The game version information could not be read. Try again later.</string>
+    <string name="failure_storage">A file could not be written to the data folder. Check the free disk space and its permissions.</string>
+    <string name="failure_launch">The game could not start. The launcher log has the details.</string>
+</resources>
