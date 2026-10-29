@@ -30,3 +30,22 @@ public inline fun <T, E, R> Outcome<T, E>.flatMap(transform: (T) -> Outcome<R, E
         is Outcome.Ok -> transform(value)
         is Outcome.Err -> this
     }
+
+/** Applies [transform] to an error and keeps successful values as they are. */
+public inline fun <T, E, F> Outcome<T, E>.mapError(transform: (E) -> F): Outcome<T, F> =
+    when (this) {
+        is Outcome.Ok -> this
+        is Outcome.Err -> Outcome.Err(transform(error))
+    }
+
+/** Applies [transform] to every element, stopping at the first error. */
+public inline fun <T, R, E> Iterable<T>.traverse(transform: (T) -> Outcome<R, E>): Outcome<List<R>, E> {
+    val values = mutableListOf<R>()
+    for (element in this) {
+        when (val outcome = transform(element)) {
+            is Outcome.Ok -> values += outcome.value
+            is Outcome.Err -> return outcome
+        }
+    }
+    return Outcome.Ok(values)
+}
