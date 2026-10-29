@@ -28,12 +28,13 @@ class KotlinLibraryConventionTest {
     ) {
         root = dir
         val repository = File(System.getProperty("rloaded.repositoryDir"))
-        repository.resolve("build-logic").copyRecursively(root.resolve("build-logic"))
-        root
-            .resolve("build-logic")
+        // Sources only: build outputs may be locked by the running build, on Windows in particular.
+        val buildLogic = repository.resolve("build-logic")
+        buildLogic
             .walkTopDown()
-            .filter { it.isDirectory && it.name in BUILD_OUTPUTS }
-            .forEach { it.deleteRecursively() }
+            .onEnter { it.name !in BUILD_OUTPUTS }
+            .filter { it.isFile }
+            .forEach { it.copyTo(root.resolve("build-logic").resolve(it.relativeTo(buildLogic))) }
         repository.resolve("gradle/libs.versions.toml").copyTo(root.resolve("gradle/libs.versions.toml"))
         repository.resolve("config/detekt/detekt.yml").copyTo(root.resolve("config/detekt/detekt.yml"))
         root.resolve("settings.gradle.kts").writeText(
