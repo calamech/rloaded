@@ -1,4 +1,6 @@
 // Conventions for pure Kotlin library modules: no Minecraft or Fabric classes, unit tested.
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -36,6 +38,10 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    testLogging {
+        events(TestLogEvent.FAILED)
+        exceptionFormat = TestExceptionFormat.FULL
+    }
 }
 
 spotless {

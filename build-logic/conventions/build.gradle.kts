@@ -1,3 +1,6 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
+
 plugins {
     `kotlin-dsl`
 }
@@ -20,6 +23,10 @@ val repositoryDir = rootDir.parentFile
 
 tasks.test {
     useJUnitPlatform()
+    testLogging {
+        events(TestLogEvent.FAILED)
+        exceptionFormat = TestExceptionFormat.FULL
+    }
     val jdks =
         listOf(25, 21).map { version ->
             javaToolchains
