@@ -21,3 +21,5 @@ rootProject.name = "rloaded"
 
 // Also included as a regular build so the detekt rules it builds can be used as a dependency.
 includeBuild("build-logic")
+
+include("rloaded-core")
