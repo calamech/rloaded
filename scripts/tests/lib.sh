@@ -2,6 +2,7 @@
 # Shared helpers for the script tests. Sourced by each *.test.sh file.
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+# shellcheck disable=SC2034 # Used by the test files that source this one.
 readonly repo_root
 tests_run=0
 tests_failed=0
