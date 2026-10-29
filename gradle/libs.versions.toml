@@ -1,4 +1,5 @@
 [versions]
+compose = "1.12.2"
 commons-compress = "1.28.0"
 coroutines = "1.11.0"
 detekt = "1.23.8"
@@ -18,6 +19,8 @@ spotless = "8.10.4"
 
 [libraries]
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
+compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "compose" }
 detekt-api = { module = "io.gitlab.arturbosch.detekt:detekt-api", version.ref = "detekt" }
 detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
@@ -28,6 +31,7 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-serialization-plugin = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 kover-gradle-plugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version.ref = "kover" }
 ktoml-core = { module = "com.akuleshov7:ktoml-core", version.ref = "ktoml" }
