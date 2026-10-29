@@ -6,6 +6,16 @@ Rloaded lets friends play on a Minecraft server where the admin adds Fabric mods
 
 Design decisions are recorded in [docs/adr](docs/adr/).
 
+## Development
+
+You need a JDK 17 or newer to start Gradle. Gradle then downloads the JetBrains Runtime versions the build uses.
+
+```sh
+./gradlew check
+```
+
+Before the first push, set up the Git identity and the pre-push hook as described in [ADR 0003](docs/adr/0003-git-identity.md).
+
 ## License
 
 [MIT](LICENSE)

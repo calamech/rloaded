@@ -1,0 +1,6 @@
+# Overrides on top of the detekt default configuration.
+rloaded:
+  active: true
+  NoNotNullAssertion:
+    active: true
+    excludes: ['**/test/**', '**/testFixtures/**']
