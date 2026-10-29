@@ -24,3 +24,4 @@ includeBuild("build-logic")
 
 include("rloaded-agent")
 include("rloaded-core")
+include("rloaded-launcher:launcher-core")
