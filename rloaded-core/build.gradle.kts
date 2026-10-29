@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     api(libs.kotlinx.coroutines.core)
+    implementation(libs.commons.compress)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.core)
