@@ -4,3 +4,14 @@ rloaded:
   NoNotNullAssertion:
     active: true
     excludes: ['**/test/**', '**/testFixtures/**']
+
+style:
+  MaxLineLength:
+    # Same limit as ktlint's official code style, so the two tools agree.
+    maxLineLength: 140
+  MagicNumber:
+    # Enum entries name their arguments already.
+    ignoreEnums: true
+  ReturnCount:
+    # Early returns on a failed Outcome are the usual pattern here.
+    excludeGuardClauses: true
