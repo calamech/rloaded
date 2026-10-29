@@ -86,7 +86,8 @@ class GameInstallerTest {
         runBlocking {
             val installed = install(mac, setOf(LaunchFeatures.QUICK_PLAY_MULTIPLAYER))
             val gameDirectory = directories.profile("local")
-            val settings = LaunchSettings(profile, gameDirectory, ServerAddress("localhost"), Path.of("/agent.jar"), "0.1.0")
+            val settings =
+                LaunchSettings(profile, gameDirectory, ServerAddress("localhost"), Path.of("/agent.jar"), Path.of("/rloaded.jar"), "0.1.0")
 
             val command =
                 (
@@ -105,7 +106,7 @@ class GameInstallerTest {
                     "-Xmx4096M",
                     "-XX:+AllowEnhancedClassRedefinition",
                     "-javaagent:${Path.of("/agent.jar")}",
-                    "-Dfabric.addMods=${installed.mods.single()}",
+                    "-Dfabric.addMods=${installed.mods.single()}${File.pathSeparator}${Path.of("/rloaded.jar")}",
                     "-XstartOnFirstThread",
                     "-Djava.library.path=${gameDirectory.resolve("natives")}",
                     "-cp",
@@ -135,7 +136,15 @@ class GameInstallerTest {
     fun `refuses to fill a placeholder it has no value for`() =
         runBlocking {
             val installed = install(mac, setOf(LaunchFeatures.QUICK_PLAY_MULTIPLAYER))
-            val settings = LaunchSettings(profile, directories.profile("local"), server = null, Path.of("/agent.jar"), "0.1.0")
+            val settings =
+                LaunchSettings(
+                    profile,
+                    directories.profile("local"),
+                    server = null,
+                    Path.of("/agent.jar"),
+                    Path.of("/rloaded.jar"),
+                    "0.1.0",
+                )
 
             assertEquals(
                 Outcome.Err(UnknownPlaceholder("quickPlayMultiplayer")),

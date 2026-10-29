@@ -20,4 +20,5 @@ spotless {
 
 tasks.check {
     dependsOn(gradle.includedBuild("build-logic").task(":check"))
+    dependsOn(gradle.includedBuild("rloaded-runtime").task(":check"))
 }

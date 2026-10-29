@@ -1,18 +1,22 @@
 [versions]
-compose = "1.12.2"
 commons-compress = "1.28.0"
+compose = "1.12.2"
 coroutines = "1.11.0"
 detekt = "1.23.8"
 errorprone = "2.51.0"
 errorprone-plugin = "5.1.1"
+fabric-api = "0.165.0+26.3"
+fabric-loader = "0.20.1"
 google-java-format = "1.36.1"
 jacoco = "0.8.15"
 junit = "6.1.3"
 kotlin = "2.4.21"
 kover = "0.9.11"
+ktlint = "1.8.0"
 ktoml = "0.7.1"
 ktor = "3.6.0"
-ktlint = "1.8.0"
+loom = "1.19.3"
+minecraft = "26.3"
 serialization = "1.12.0"
 slf4j = "2.0.19"
 spotless = "8.10.4"
@@ -25,6 +29,8 @@ detekt-api = { module = "io.gitlab.arturbosch.detekt:detekt-api", version.ref = 
 detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
 errorprone-gradle-plugin = { module = "net.ltgt.gradle:gradle-errorprone-plugin", version.ref = "errorprone-plugin" }
+fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
+fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
@@ -41,4 +47,5 @@ slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
 spotless-gradle-plugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
 
 [plugins]
+fabric-loom = { id = "net.fabricmc.fabric-loom", version.ref = "loom" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

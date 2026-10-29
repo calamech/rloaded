@@ -124,6 +124,21 @@ class BootstrapTest {
             )
             assertEquals(listOf("loader", "server"), classpath)
             assertEquals(listOf(RuntimePins.FABRIC_SERVER_MAIN_CLASS, "nogui"), command.takeLast(2))
+            val mods = command.single { it.startsWith("-Dfabric.addMods=") }.removePrefix("-Dfabric.addMods=").split(File.pathSeparator)
+            assertEquals(
+                listOf("fabric api", "rloaded"),
+                mods.map {
+                    Path.of(it).let { mod ->
+                        if (mod.fileName.toString() ==
+                            "rloaded-runtime.jar"
+                        ) {
+                            "rloaded"
+                        } else {
+                            mod.readText()
+                        }
+                    }
+                },
+            )
         }
 
     @Test
