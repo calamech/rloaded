@@ -61,8 +61,9 @@ public class UrlPolicy(
                     // Modrinth: API and mod files.
                     "api.modrinth.com",
                     "cdn.modrinth.com",
-                    // JetBrains: the Java runtime.
+                    // JetBrains: the Java runtime, and the CDN cache-redirector sends it from (seen 2026-10-29).
                     "cache-redirector.jetbrains.com",
+                    "d2xrhe97vsfxuc.cloudfront.net",
                 ).map { Origin("https", it, HTTPS_PORT) }.toSet(),
             )
 

@@ -1,4 +1,5 @@
 [versions]
+commons-compress = "1.28.0"
 coroutines = "1.11.0"
 detekt = "1.23.8"
 google-java-format = "1.36.1"
@@ -11,6 +12,7 @@ serialization = "1.12.0"
 spotless = "8.10.4"
 
 [libraries]
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 detekt-api = { module = "io.gitlab.arturbosch.detekt:detekt-api", version.ref = "detekt" }
 detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
