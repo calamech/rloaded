@@ -1,4 +1,4 @@
-package io.github.calamech.rloaded.launcher
+package io.github.calamech.rloaded.core.runtime
 
 import io.github.calamech.rloaded.core.download.TestServer
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry

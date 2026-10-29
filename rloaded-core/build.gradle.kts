@@ -10,4 +10,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.core)
+
+    testFixturesImplementation(libs.commons.compress)
 }

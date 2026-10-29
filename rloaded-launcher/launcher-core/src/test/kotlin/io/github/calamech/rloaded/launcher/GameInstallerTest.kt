@@ -7,8 +7,10 @@ import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.TestServer
 import io.github.calamech.rloaded.core.mojang.Architecture
 import io.github.calamech.rloaded.core.mojang.LaunchFeatures
+import io.github.calamech.rloaded.core.mojang.MojangEndpoints
 import io.github.calamech.rloaded.core.mojang.OperatingSystem
 import io.github.calamech.rloaded.core.mojang.Platform
+import io.github.calamech.rloaded.core.runtime.FakeDistribution
 import io.github.calamech.rloaded.core.runtime.RuntimePins
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
