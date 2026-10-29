@@ -9,6 +9,7 @@ plugins {
 
 val libs = versionCatalogs.named("libs")
 
+// Libraries compile to Java 21 bytecode: the server bootstrap uses them and starts on any Java 21+.
 kotlin {
     explicitApi()
     jvmToolchain {
@@ -16,9 +17,14 @@ kotlin {
         vendor = JvmVendorSpec.JETBRAINS
     }
     compilerOptions {
-        jvmTarget = JvmTarget.JVM_25
+        jvmTarget = JvmTarget.JVM_21
+        freeCompilerArgs.add("-Xjdk-release=21")
         allWarningsAsErrors = true
     }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release = 21
 }
 
 dependencies {

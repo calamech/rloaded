@@ -5,7 +5,7 @@
 
 ## Context
 
-Rloaded is a Gradle multi-module build in Kotlin and Java. The game runs on JetBrains Runtime 25, so the build compiles for Java 25. The quality gates must fail the build, not print warnings.
+Rloaded is a Gradle multi-module build in Kotlin and Java. The game runs on JetBrains Runtime 25. The server bootstrap must start on any Java 21 or newer, and it reuses the pure libraries. The quality gates must fail the build, not print warnings.
 
 Versions below are the latest stable releases on 2026-10-29, checked on Maven Central, the Gradle Plugin Portal and services.gradle.org.
 
@@ -14,7 +14,7 @@ Versions below are the latest stable releases on 2026-10-29, checked on Maven Ce
 - **Gradle 9.8.2** through the wrapper, with the distribution SHA-256 pinned in `gradle-wrapper.properties`.
 - **JetBrains Runtime 25** runs the Gradle daemon (`gradle/gradle-daemon-jvm.properties`) and compiles the code (Java toolchains). The foojay resolver downloads it when missing.
 - **Kotlin 2.4.21**. Every version lives in `gradle/libs.versions.toml`.
-- **Convention plugins** in `build-logic/conventions`. `rloaded.kotlin-library` applies to pure Kotlin modules: `explicitApi()`, warnings as errors, JUnit, Spotless, detekt and Kover.
+- **Convention plugins** in `build-logic/conventions`. `rloaded.kotlin-library` applies to pure Kotlin modules: Java 21 bytecode (`-Xjdk-release=21`), `explicitApi()`, warnings as errors, JUnit, Spotless, detekt and Kover.
 - **Spotless** 8.10.4 with ktlint 1.8.0 for Kotlin and google-java-format 1.36.1 for Java.
 - **detekt** 1.23.8, from its command line tool on JetBrains Runtime 21, with the default rules and zero findings allowed.
 - **NoNotNullAssertion**, a detekt rule in `build-logic/detekt-rules`, refuses `!!` outside tests.
@@ -33,11 +33,11 @@ Versions below are the latest stable releases on 2026-10-29, checked on Maven Ce
 
 - Builds download two runtimes: JetBrains Runtime 25 and 21.
 - google-java-format runs in the daemon, which needs `--add-exports` for the `jdk.compiler` packages (`gradle.properties`).
-- Adding or updating a dependency means regenerating the checksums: `./gradlew --write-verification-metadata sha256 check`. A Renovate pull request that does not do it fails CI until someone does.
+- Adding or updating a dependency means regenerating the checksums from an empty Gradle cache, because a warm cache can skip metadata files that a fresh CI runner downloads: `GRADLE_USER_HOME=$(mktemp -d) ./gradlew --write-verification-metadata sha256 check`. A Renovate pull request that does not do it fails CI until someone does.
 - Revisit when detekt 2.0 is stable: it can then run in the daemon with type resolution, and `NoNotNullAssertion` can go.
 
 ## Enforcement
 
 - `./gradlew check` in the CI job `check` on three operating systems.
-- `build-logic/conventions` functional tests (Gradle TestKit) build a fixture library and check that each gate passes on clean code and fails on its defect: formatting, `!!`, a default detekt rule, coverage, explicit API and compiler warnings.
+- `build-logic/conventions` functional tests (Gradle TestKit) build a fixture library and check that each gate passes on clean code and fails on its defect: formatting, `!!`, a default detekt rule, coverage, explicit API and compiler warnings. They also check the Java 21 class file version.
 - Dependency verification fails the build on any unknown or changed artifact.

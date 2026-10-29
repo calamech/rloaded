@@ -74,6 +74,8 @@ class KotlinLibraryConventionTest {
         for (task in listOf(":lib:spotlessCheck", ":lib:detekt", ":lib:test", ":lib:koverVerify")) {
             assertEquals(TaskOutcome.SUCCESS, result.task(task)?.outcome, task)
         }
+        val classFile = root.resolve("lib/build/classes/kotlin/main/fixture/Greeter.class").readBytes()
+        assertEquals(JAVA_21_CLASS_FILE_VERSION, (classFile[6].toInt() shl 8) or classFile[7].toInt())
     }
 
     @Test
@@ -205,6 +207,7 @@ class KotlinLibraryConventionTest {
 
     private companion object {
         val BUILD_OUTPUTS = setOf("build", ".gradle", ".kotlin")
+        const val JAVA_21_CLASS_FILE_VERSION = 65
 
         val GREETER =
             """
