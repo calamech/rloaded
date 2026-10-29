@@ -22,6 +22,15 @@ class OfflineProfileTest {
     }
 
     @Test
+    fun `reads a typed server address`() {
+        assertEquals(Outcome.Ok(ServerAddress("play.example.com")), ServerAddress.parse(" play.example.com "))
+        assertEquals(Outcome.Ok(ServerAddress("127.0.0.1", 25566)), ServerAddress.parse("127.0.0.1:25566"))
+        for (text in listOf("", "host:", "host:0", "host:70000", "host:abc", "two words")) {
+            assertEquals(Outcome.Err(InvalidServerAddress(text)), ServerAddress.parse(text))
+        }
+    }
+
+    @Test
     fun `prints a server address without the default port`() {
         assertEquals("localhost", ServerAddress("localhost").toString())
         assertEquals("localhost:25566", ServerAddress("localhost", 25566).toString())

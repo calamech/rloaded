@@ -42,7 +42,26 @@ public data class ServerAddress(
 ) {
     override fun toString(): String = if (port == DEFAULT_PORT) host else "$host:$port"
 
-    private companion object {
-        const val DEFAULT_PORT = 25565
+    /** Reading addresses typed by the player. */
+    public companion object {
+        private const val DEFAULT_PORT = 25565
+        private val PORTS = 1..65_535
+        private val HOST = Regex("[A-Za-z0-9.-]+")
+
+        /** Reads `host` or `host:port`. */
+        public fun parse(text: String): Outcome<ServerAddress, InvalidServerAddress> {
+            val host = text.trim().substringBeforeLast(':')
+            val port = if (':' in text) text.trim().substringAfterLast(':').toIntOrNull() else DEFAULT_PORT
+            return if (HOST.matches(host) && port != null && port in PORTS) {
+                Outcome.Ok(ServerAddress(host, port))
+            } else {
+                Outcome.Err(InvalidServerAddress(text))
+            }
+        }
     }
 }
+
+/** A server address that is not `host` or `host:port`. */
+public data class InvalidServerAddress(
+    val text: String,
+)
