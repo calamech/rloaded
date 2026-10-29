@@ -114,7 +114,7 @@ class BootstrapTest {
             val command = process.commands.single()
             val agent = Path.of(command.single { it.startsWith("-javaagent:") }.removePrefix("-javaagent:"))
             val classpath = command[command.indexOf("-cp") + 1].split(File.pathSeparator).map { Path.of(it).readText() }
-            assertTrue(command.first().endsWith("jbr/Contents/Home/bin/java"))
+            assertTrue(Path.of(command.first()).endsWith(Path.of("jbr", "Contents", "Home", "bin", "java")))
             assertEquals(listOf("-Xmx4096M", "-XX:+AllowEnhancedClassRedefinition"), command.subList(1, 3))
             assertEquals(
                 "io.github.calamech.rloaded.agent.RloadedAgent",
