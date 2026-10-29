@@ -12,6 +12,7 @@ import io.github.calamech.rloaded.core.mapError
 import io.github.calamech.rloaded.core.mojang.Asset
 import io.github.calamech.rloaded.core.mojang.GameVersion
 import io.github.calamech.rloaded.core.mojang.MetadataError
+import io.github.calamech.rloaded.core.mojang.MojangEndpoints
 import io.github.calamech.rloaded.core.mojang.MojangMetadata
 import io.github.calamech.rloaded.core.mojang.Platform
 import io.github.calamech.rloaded.core.runtime.InstallError
@@ -63,12 +64,6 @@ public sealed interface InstallFailure {
     ) : InstallFailure
 }
 
-/** Where Mojang's metadata and assets are downloaded from. */
-public data class MojangEndpoints(
-    val manifestUrl: String = MojangMetadata.MANIFEST_URL,
-    val resourcesUrl: String = MojangMetadata.RESOURCES_URL,
-)
-
 /** Installs the pinned runtime and the game files into a [ClientDirectories] layout. */
 public class GameInstaller(
     private val http: Http,
@@ -82,7 +77,7 @@ public class GameInstaller(
     private val libraries = ArtifactStore(directories.libraries, http)
     private val mods = ArtifactStore(directories.mods, http)
     private val assets = ArtifactStore(directories.assets.resolve("objects"), http)
-    private val mojang = MojangMetadata(http, metadataStore, endpoints.manifestUrl, endpoints.resourcesUrl)
+    private val mojang = MojangMetadata(http, metadataStore, endpoints)
     private val runtime = JetBrainsRuntimeInstaller(ArtifactStore(directories.runtimeArchives, http), directories.runtimes, platform.os)
 
     /**

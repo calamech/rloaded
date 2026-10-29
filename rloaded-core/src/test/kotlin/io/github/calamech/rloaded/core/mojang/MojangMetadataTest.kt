@@ -120,7 +120,8 @@ class MojangMetadataTest {
             )
         }
 
-    private fun metadata() = MojangMetadata(http, ArtifactStore(root, http), server.url("/manifest.json"), server.url("/resources"))
+    private fun metadata() =
+        MojangMetadata(http, ArtifactStore(root, http), MojangEndpoints(server.url("/manifest.json"), server.url("/resources")))
 
     private fun serveManifest(versionSha1: String) {
         val manifest = """{"versions":[{"id":"26.3","type":"release","url":"${server.url("/v1/26.3.json")}","sha1":"$versionSha1"}]}"""

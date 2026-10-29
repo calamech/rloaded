@@ -13,6 +13,12 @@ import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.readText
 
+/** Where Mojang's metadata and assets are downloaded from. */
+public data class MojangEndpoints(
+    val manifestUrl: String = MojangMetadata.MANIFEST_URL,
+    val resourcesUrl: String = MojangMetadata.RESOURCES_URL,
+)
+
 /**
  * Reads Mojang's launcher metadata. The version manifest is fetched each time to find a version;
  * the version file and the asset index are hash-checked and kept in [store].
@@ -20,8 +26,7 @@ import kotlin.io.path.readText
 public class MojangMetadata(
     private val http: Http,
     private val store: ArtifactStore,
-    private val manifestUrl: String = MANIFEST_URL,
-    private val resourcesUrl: String = RESOURCES_URL,
+    private val endpoints: MojangEndpoints = MojangEndpoints(),
 ) {
     /** Resolves version [id] for [platform], keeping the arguments whose rules accept [features]. */
     public suspend fun version(
@@ -30,7 +35,7 @@ public class MojangMetadata(
         features: Set<String>,
     ): Outcome<GameVersion, MetadataError> =
         http
-            .text(manifestUrl, MAX_MANIFEST_BYTES)
+            .text(endpoints.manifestUrl, MAX_MANIFEST_BYTES)
             .mapError { MetadataError.Download(it) }
             .flatMap { Codec.decode<VersionManifestJson>("version manifest", it) }
             .flatMap { manifest ->
@@ -46,7 +51,7 @@ public class MojangMetadata(
         val source = "asset index ${version.assetIndexId}"
         return obtainText(version.assetIndex, source)
             .flatMap { Codec.decode<AssetIndexJson>(source, it) }
-            .flatMap { Resolution.assets(it, resourcesUrl) }
+            .flatMap { Resolution.assets(it, endpoints.resourcesUrl) }
     }
 
     private suspend fun obtainText(
