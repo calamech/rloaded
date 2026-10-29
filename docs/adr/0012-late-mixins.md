@@ -1,4 +1,4 @@
-# ADR 0011: Mixins applied after startup
+# ADR 0012: Mixins applied after startup
 
 - Status: Accepted
 - Date: 2026-10-29

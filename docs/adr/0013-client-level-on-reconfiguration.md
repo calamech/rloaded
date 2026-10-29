@@ -1,4 +1,4 @@
-# ADR 0012: The client drops its level during reconfiguration
+# ADR 0013: The client drops its level during reconfiguration
 
 - Status: Accepted
 - Date: 2026-10-29
