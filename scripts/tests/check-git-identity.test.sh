@@ -115,6 +115,9 @@ expect "pre-push refuses a non-HTTPS remote" 1 "is not https://github.com/" pre_
 new_repo push-delete
 expect "pre-push accepts a branch deletion" 0 "OK" pre_push "$github_url" "$zero_oid"
 
+new_repo push-blank-line
+expect "pre-push accepts input without refs" 0 "OK" bash -c "cd '${repo}' && printf '\\n' | '${script}' pre-push origin '${github_url}'"
+
 new_repo push-published-history
 git -C "$repo" commit -q --allow-empty --author="Someone <someone@example.com>" -m "chore: already published"
 publish

@@ -70,7 +70,8 @@ check_pushed_commits() {
   local remote="$1" local_ref local_oid remote_ref remote_oid commits commit
   # shellcheck disable=SC2034 # remote_ref and remote_oid are part of the hook's input format.
   while read -r local_ref local_oid remote_ref remote_oid; do
-    if [[ "$local_oid" == "$zero_oid" ]]; then
+    # Deletions push nothing, and a blank line carries no ref at all.
+    if [[ -z "$local_oid" || "$local_oid" == "$zero_oid" ]]; then
       continue
     fi
     if ! commits=$(git rev-list "$local_oid" --not --remotes="$remote"); then
