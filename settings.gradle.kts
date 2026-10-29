@@ -27,6 +27,7 @@ rootProject.name = "rloaded"
 
 // Also included as a regular build so the detekt rules it builds can be used as a dependency.
 includeBuild("build-logic")
+includeBuild("rloaded-runtime")
 
 include("rloaded-agent")
 include("rloaded-core")

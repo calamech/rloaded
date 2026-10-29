@@ -13,3 +13,10 @@ dependencies {
 
     testFixturesImplementation(libs.commons.compress)
 }
+
+// The runtime mod is built against the versions of the catalog and run with the pinned ones.
+tasks.test {
+    val catalog = rootProject.file("gradle/libs.versions.toml")
+    inputs.file(catalog).withPropertyName("catalog").withPathSensitivity(PathSensitivity.NONE)
+    systemProperty("rloaded.catalog", catalog.absolutePath)
+}

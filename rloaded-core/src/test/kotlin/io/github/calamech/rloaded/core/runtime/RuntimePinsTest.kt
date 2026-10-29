@@ -54,6 +54,17 @@ class RuntimePinsTest {
     }
 
     @Test
+    fun `runs the versions the runtime mod is built against`() {
+        val catalog = java.io.File(System.getProperty("rloaded.catalog")).readText()
+
+        fun version(name: String): String? = Regex("""(?m)^$name = "([^"]+)"""").find(catalog)?.groupValues?.get(1)
+
+        assertEquals(version("minecraft"), pins.minecraftVersion)
+        assertEquals(version("fabric-loader"), pins.fabricLoaderVersion)
+        assertEquals("fabric-api-${version("fabric-api")}.jar", pins.baseSet.first().fileName)
+    }
+
+    @Test
     fun `refuses a pins file with an unknown field`() {
         val text = javaClass.getResource("runtime-pins.json")!!.readText().replaceFirst("{", """{"extra": 1,""")
 

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "rloaded",
+  "version": "${version}",
+  "name": "Rloaded",
+  "description": "Adds Fabric mods to a running game.",
+  "license": "MIT",
+  "contact": {
+    "sources": "https://github.com/calamech/rloaded"
+  },
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.calamech.rloaded.runtime.RloadedRuntime"]
+  },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
