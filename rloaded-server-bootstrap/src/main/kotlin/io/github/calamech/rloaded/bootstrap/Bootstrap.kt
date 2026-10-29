@@ -4,8 +4,6 @@ import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.flatMap
 import io.github.calamech.rloaded.core.map
 import io.github.calamech.rloaded.core.mapError
-import io.github.calamech.rloaded.core.runtime.RuntimePins
-import java.io.File
 import java.io.IOException
 import java.io.PrintStream
 import java.nio.file.Files
@@ -87,7 +85,7 @@ public class Bootstrap(
                     installer.install().flatMap { installed ->
                         writeBundled("agent", "rloaded-agent.jar").flatMap { agent ->
                             writeBundled("runtime", "rloaded-runtime.jar").map { runtime ->
-                                command(installed, agent, runtime, config.server.maxMemoryMiB)
+                                ServerCommand.build(installed, agent, listOf(runtime), config.server.maxMemoryMiB)
                             }
                         }
                     }
@@ -108,24 +106,6 @@ public class Bootstrap(
             out.println("Restarting the server.")
         }
     }
-
-    private fun command(
-        installed: InstalledServer,
-        agent: Path,
-        runtime: Path,
-        maxMemoryMiB: Int,
-    ): List<String> =
-        listOf(
-            installed.java.toString(),
-            "-Xmx${maxMemoryMiB}M",
-            "-XX:+AllowEnhancedClassRedefinition",
-            "-javaagent:$agent",
-            "-Dfabric.addMods=${(installed.mods + listOf(runtime)).joinToString(File.pathSeparator)}",
-            "-cp",
-            installed.classpath.joinToString(File.pathSeparator),
-            RuntimePins.FABRIC_SERVER_MAIN_CLASS,
-            "nogui",
-        )
 
     // The agent and the runtime mod ship inside the bootstrap, so they always match its version.
     private fun writeBundled(
