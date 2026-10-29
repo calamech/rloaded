@@ -1,7 +1,8 @@
 package io.github.calamech.rloaded.conventions
 
-import org.gradle.testkit.runner.BuildResult
-import org.gradle.testkit.runner.GradleRunner
+import io.github.calamech.rloaded.conventions.ConventionFixture.Companion.JAVA_21_CLASS_FILE_VERSION
+import io.github.calamech.rloaded.conventions.ConventionFixture.Companion.assertOutput
+import io.github.calamech.rloaded.conventions.ConventionFixture.Companion.classFileVersion
 import org.gradle.testkit.runner.TaskOutcome
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -9,7 +10,6 @@ import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Builds a small library with the rloaded.kotlin-library convention and checks that each gate
@@ -20,50 +20,13 @@ import kotlin.test.assertTrue
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class KotlinLibraryConventionTest {
-    private lateinit var root: File
+    private lateinit var fixture: ConventionFixture
 
     @BeforeAll
     fun createFixture(
         @TempDir dir: File,
     ) {
-        root = dir
-        val repository = File(System.getProperty("rloaded.repositoryDir"))
-        // Sources only: build outputs may be locked by the running build, on Windows in particular.
-        val buildLogic = repository.resolve("build-logic")
-        buildLogic
-            .walkTopDown()
-            .onEnter { it.name !in BUILD_OUTPUTS }
-            .filter { it.isFile }
-            .forEach { it.copyTo(root.resolve("build-logic").resolve(it.relativeTo(buildLogic))) }
-        repository.resolve("gradle/libs.versions.toml").copyTo(root.resolve("gradle/libs.versions.toml"))
-        repository.resolve("config/detekt/detekt.yml").copyTo(root.resolve("config/detekt/detekt.yml"))
-        root.resolve("settings.gradle.kts").writeText(
-            """
-            pluginManagement {
-                includeBuild("build-logic")
-                repositories {
-                    gradlePluginPortal()
-                    mavenCentral()
-                }
-            }
-            dependencyResolutionManagement {
-                repositories {
-                    mavenCentral()
-                }
-            }
-            includeBuild("build-logic")
-            rootProject.name = "fixture"
-            include(":lib")
-            """.trimIndent(),
-        )
-        root.resolve("lib/build.gradle.kts").also { it.parentFile.mkdirs() }.writeText(
-            """
-            plugins {
-                id("rloaded.kotlin-library")
-            }
-
-            """.trimIndent(),
-        )
+        fixture = ConventionFixture(dir, "rloaded.kotlin-library")
     }
 
     @Test
@@ -75,8 +38,7 @@ class KotlinLibraryConventionTest {
         for (task in listOf(":lib:spotlessCheck", ":lib:detekt", ":lib:test", ":lib:koverVerify")) {
             assertEquals(TaskOutcome.SUCCESS, result.task(task)?.outcome, task)
         }
-        val classFile = root.resolve("lib/build/classes/kotlin/main/fixture/Greeter.class").readBytes()
-        assertEquals(JAVA_21_CLASS_FILE_VERSION, (classFile[6].toInt() shl 8) or classFile[7].toInt())
+        assertEquals(JAVA_21_CLASS_FILE_VERSION, classFileVersion(fixture.output("classes/kotlin/main/fixture/Greeter.class")))
     }
 
     @Test
@@ -167,10 +129,7 @@ class KotlinLibraryConventionTest {
         main: String,
         test: String,
     ) {
-        val sources = root.resolve("lib/src")
-        sources.deleteRecursively()
-        sources.resolve("main/kotlin/fixture/Greeter.kt").also { it.parentFile.mkdirs() }.writeText(main)
-        sources.resolve("test/kotlin/fixture/GreeterTest.kt").also { it.parentFile.mkdirs() }.writeText(test)
+        fixture.sources(mapOf("main/kotlin/fixture/Greeter.kt" to main, "test/kotlin/fixture/GreeterTest.kt" to test))
     }
 
     private fun testOf(
@@ -188,28 +147,9 @@ class KotlinLibraryConventionTest {
 
         """.trimIndent()
 
-    private fun run(): GradleRunner =
-        GradleRunner
-            .create()
-            .withProjectDir(root)
-            .withArguments(
-                ":lib:check",
-                "--configuration-cache",
-                "--stacktrace",
-                // Command line properties reach every build of the composite, including build-logic.
-                "-Porg.gradle.java.installations.auto-detect=false",
-                "-Porg.gradle.java.installations.auto-download=false",
-                "-Porg.gradle.java.installations.paths=${System.getProperty("rloaded.jdks")}",
-            )
-
-    private fun BuildResult.assertOutput(expected: String) {
-        assertTrue(expected in output, "Expected the output to contain '$expected'. Output:\n$output")
-    }
+    private fun run() = fixture.run()
 
     private companion object {
-        val BUILD_OUTPUTS = setOf("build", ".gradle", ".kotlin")
-        const val JAVA_21_CLASS_FILE_VERSION = 65
-
         val GREETER =
             """
             package fixture
