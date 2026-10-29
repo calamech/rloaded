@@ -17,6 +17,8 @@ public data class LaunchSettings(
     val server: ServerAddress?,
     /** The Rloaded agent jar, given to the JVM with `-javaagent`. */
     val agentJar: Path,
+    /** The Rloaded runtime mod jar, loaded with the base set. */
+    val runtimeMod: Path,
     /** Shown by the game as the launcher version. */
     val launcherVersion: String,
     val maxMemoryMiB: Int = DEFAULT_MAX_MEMORY_MIB,
@@ -69,7 +71,7 @@ public object ClientCommand {
                 "-Xmx${settings.maxMemoryMiB}M",
                 "-XX:+AllowEnhancedClassRedefinition",
                 "-javaagent:${settings.agentJar}",
-                "-Dfabric.addMods=${installed.mods.joinToString(File.pathSeparator)}",
+                "-Dfabric.addMods=${(installed.mods + listOf(settings.runtimeMod)).joinToString(File.pathSeparator)}",
             )
         val logging = listOfNotNull(installed.game.logging?.argument)
         return (installed.game.jvmArguments + logging).traverse { fill(it, values) }.flatMap { jvm ->

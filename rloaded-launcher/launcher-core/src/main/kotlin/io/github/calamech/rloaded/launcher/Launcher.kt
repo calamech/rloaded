@@ -39,6 +39,7 @@ public class Launcher(
     private val installer: GameInstaller,
     private val directories: ClientDirectories,
     private val agentJar: Path,
+    private val runtimeMod: Path,
     private val launcherVersion: String,
     private val processes: ProcessStarter = ProcessStarter(GameProcess::start),
 ) {
@@ -54,7 +55,7 @@ public class Launcher(
             .install(features, onProgress)
             .mapError<InstalledGame, InstallFailure, LaunchFailure> { LaunchFailure.Install(it) }
             .flatMap { installed ->
-                val settings = LaunchSettings(profile, gameDirectory, server, agentJar, launcherVersion)
+                val settings = LaunchSettings(profile, gameDirectory, server, agentJar, runtimeMod, launcherVersion)
                 ClientCommand
                     .build(installed, settings, directories.assets, gameDirectory.resolve("natives"))
                     .mapError<List<String>, UnknownPlaceholder, LaunchFailure> { LaunchFailure.Command(it) }
@@ -67,5 +68,11 @@ public class Launcher(
 
     // One game directory per server, so options and saves of different servers stay apart.
     private fun profileName(server: ServerAddress?): String =
-        if (server == null) "default" else "server-" + "${server.host}-${server.port}".replace(Regex("[^A-Za-z0-9.-]"), "_")
+        if (server ==
+            null
+        ) {
+            "default"
+        } else {
+            "server-" + "${server.host}-${server.port}".replace(Regex("[^A-Za-z0-9.-]"), "_")
+        }
 }

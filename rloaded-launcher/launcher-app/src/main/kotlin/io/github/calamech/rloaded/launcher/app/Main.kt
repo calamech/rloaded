@@ -43,7 +43,13 @@ public fun main() {
     val log = directories.root.resolve("logs/launcher.log")
     val http = KtorHttp(UrlPolicy.PRODUCTION, HttpSettings())
     val launcher =
-        Launcher(GameInstaller(http, directories, platform, RuntimePins.CURRENT), directories, writeAgent(directories), LAUNCHER_VERSION)
+        Launcher(
+            GameInstaller(http, directories, platform, RuntimePins.CURRENT),
+            directories,
+            writeBundled(directories, "agent", "rloaded-agent.jar"),
+            writeBundled(directories, "runtime", "rloaded-runtime.jar"),
+            LAUNCHER_VERSION,
+        )
     application {
         Window(
             onCloseRequest = {
@@ -60,11 +66,15 @@ public fun main() {
     }
 }
 
-private fun writeAgent(directories: ClientDirectories): Path {
-    val target = directories.root.resolve("agent/rloaded-agent.jar")
+// The agent and the runtime mod ship inside the launcher, so they always match its version.
+private fun writeBundled(
+    directories: ClientDirectories,
+    directory: String,
+    name: String,
+): Path {
+    val target = directories.root.resolve(directory).resolve(name)
     target.parent.createDirectories()
-    val resource =
-        checkNotNull(LauncherState::class.java.getResourceAsStream("rloaded-agent.jar")) { "the agent jar is missing from the launcher" }
+    val resource = checkNotNull(LauncherState::class.java.getResourceAsStream(name)) { "$name is missing from the launcher" }
     resource.use { Files.copy(it, target, StandardCopyOption.REPLACE_EXISTING) }
     return target
 }

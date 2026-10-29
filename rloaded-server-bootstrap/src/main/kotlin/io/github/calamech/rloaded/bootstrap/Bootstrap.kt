@@ -85,7 +85,11 @@ public class Bootstrap(
                 }.flatMap { config ->
                     out.println("Installing the runtime for ${folder.serverName(config)}…")
                     installer.install().flatMap { installed ->
-                        writeAgent().map { agent -> command(installed, agent, config.server.maxMemoryMiB) }
+                        writeBundled("agent", "rloaded-agent.jar").flatMap { agent ->
+                            writeBundled("runtime", "rloaded-runtime.jar").map { runtime ->
+                                command(installed, agent, runtime, config.server.maxMemoryMiB)
+                            }
+                        }
                     }
                 }
         return when (command) {
@@ -108,6 +112,7 @@ public class Bootstrap(
     private fun command(
         installed: InstalledServer,
         agent: Path,
+        runtime: Path,
         maxMemoryMiB: Int,
     ): List<String> =
         listOf(
@@ -115,23 +120,26 @@ public class Bootstrap(
             "-Xmx${maxMemoryMiB}M",
             "-XX:+AllowEnhancedClassRedefinition",
             "-javaagent:$agent",
-            "-Dfabric.addMods=${installed.mods.joinToString(File.pathSeparator)}",
+            "-Dfabric.addMods=${(installed.mods + listOf(runtime)).joinToString(File.pathSeparator)}",
             "-cp",
             installed.classpath.joinToString(File.pathSeparator),
             RuntimePins.FABRIC_SERVER_MAIN_CLASS,
             "nogui",
         )
 
-    private fun writeAgent(): Outcome<Path, String> {
-        val target = folder.data.resolve("agent/rloaded-agent.jar")
-        val resource =
-            checkNotNull(Bootstrap::class.java.getResourceAsStream("rloaded-agent.jar")) { "the agent jar is missing from the bootstrap" }
+    // The agent and the runtime mod ship inside the bootstrap, so they always match its version.
+    private fun writeBundled(
+        directory: String,
+        name: String,
+    ): Outcome<Path, String> {
+        val target = folder.data.resolve(directory).resolve(name)
+        val resource = checkNotNull(Bootstrap::class.java.getResourceAsStream(name)) { "$name is missing from the bootstrap" }
         return try {
             target.parent.createDirectories()
             resource.use { Files.copy(it, target, StandardCopyOption.REPLACE_EXISTING) }
             Outcome.Ok(target)
         } catch (e: IOException) {
-            Outcome.Err("cannot write the agent jar: ${e.message}")
+            Outcome.Err("cannot write $name: ${e.message}")
         }
     }
 

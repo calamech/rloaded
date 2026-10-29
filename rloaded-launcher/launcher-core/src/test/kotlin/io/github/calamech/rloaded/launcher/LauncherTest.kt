@@ -107,6 +107,6 @@ class LauncherTest {
                 RuntimePins.parse(distribution.pins),
                 endpoints = MojangEndpoints(distribution.manifestUrl, distribution.resourcesUrl),
             )
-        return Launcher(installer, directories, root.resolve("agent.jar"), "0.1.0", starter)
+        return Launcher(installer, directories, root.resolve("agent.jar"), root.resolve("rloaded-runtime.jar"), "0.1.0", starter)
     }
 }

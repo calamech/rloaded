@@ -5,6 +5,8 @@ plugins {
 
 val agent = configurations.dependencyScope("agent")
 val agentJar = configurations.resolvable("agentJar") { extendsFrom(agent.get()) }
+val runtimeMod = configurations.dependencyScope("runtimeMod")
+val runtimeModJar = configurations.resolvable("runtimeModJar") { extendsFrom(runtimeMod.get()) }
 
 dependencies {
     implementation(project(":rloaded-core"))
@@ -12,15 +14,20 @@ dependencies {
     // Ktor logs through SLF4J; the bootstrap reports failures itself, so its logs are dropped.
     runtimeOnly(libs.slf4j.nop)
     agent(project(":rloaded-agent"))
+    runtimeMod("io.github.calamech.rloaded:rloaded-runtime") { isTransitive = false }
 
     testImplementation(testFixtures(project(":rloaded-core")))
 }
 
-// The bootstrap carries the agent jar and writes it next to the server at startup.
+// The bootstrap carries the agent and the runtime mod, and writes them next to the server at startup.
 tasks.processResources {
     from(agentJar) {
         into("io/github/calamech/rloaded/bootstrap")
         rename { "rloaded-agent.jar" }
+    }
+    from(runtimeModJar) {
+        into("io/github/calamech/rloaded/bootstrap")
+        rename { "rloaded-runtime.jar" }
     }
 }
 

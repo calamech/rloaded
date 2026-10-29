@@ -8,6 +8,8 @@ plugins {
 
 val agent = configurations.dependencyScope("agent")
 val agentJar = configurations.resolvable("agentJar") { extendsFrom(agent.get()) }
+val runtimeMod = configurations.dependencyScope("runtimeMod")
+val runtimeModJar = configurations.resolvable("runtimeModJar") { extendsFrom(runtimeMod.get()) }
 
 dependencies {
     implementation(project(":rloaded-launcher:launcher-core"))
@@ -15,15 +17,20 @@ dependencies {
     implementation(compose.material3)
     implementation(compose.components.resources)
     agent(project(":rloaded-agent"))
+    runtimeMod("io.github.calamech.rloaded:rloaded-runtime") { isTransitive = false }
 
     testImplementation(libs.kotlinx.coroutines.test)
 }
 
-// The launcher carries the agent jar and writes it to its data directory before each launch.
+// The launcher carries the agent and the runtime mod, and writes them to its data directory at startup.
 tasks.processResources {
     from(agentJar) {
         into("io/github/calamech/rloaded/launcher/app")
         rename { "rloaded-agent.jar" }
+    }
+    from(runtimeModJar) {
+        into("io/github/calamech/rloaded/launcher/app")
+        rename { "rloaded-runtime.jar" }
     }
 }
 
