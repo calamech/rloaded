@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "content-basic",
+  "version": "${version}",
+  "name": "Content basic (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.calamech.rloaded.testmods.contentbasic.ContentBasic"]
+  },
+  "depends": {
+    "minecraft": "26.3",
+    "fabric-api": "*"
+  }
+}

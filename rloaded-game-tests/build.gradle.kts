@@ -8,6 +8,8 @@ val testMods = configurations.dependencyScope("testMods")
 val testModJars = configurations.resolvable("testModJars") { extendsFrom(testMods.get()) }
 val runtimeMod = configurations.dependencyScope("runtimeMod")
 val runtimeModJar = configurations.resolvable("runtimeModJar") { extendsFrom(runtimeMod.get()) }
+val hotAddMods = configurations.dependencyScope("hotAddMods")
+val hotAddModJars = configurations.resolvable("hotAddModJars") { extendsFrom(hotAddMods.get()) }
 val clientTestMods = configurations.dependencyScope("clientTestMods")
 val clientTestModJars = configurations.resolvable("clientTestModJars") { extendsFrom(clientTestMods.get()) }
 
@@ -22,6 +24,12 @@ dependencies {
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-gametest") }
     }
     testMods(libs.fabric.gametest.api) { isTransitive = false }
+    for (mod in listOf("content-basic", "mixin-loaded-class")) {
+        hotAddMods("io.github.calamech.rloaded:rloaded-runtime") {
+            isTransitive = false
+            capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }
+        }
+    }
     runtimeMod("io.github.calamech.rloaded:rloaded-runtime") { isTransitive = false }
     clientTestMods("io.github.calamech.rloaded:rloaded-runtime") {
         isTransitive = false
@@ -62,8 +70,10 @@ tasks.register<JavaExec>("gameTest") {
     val report = layout.buildDirectory.file("game-test/report.xml")
     val agentFile = files(agentJar)
     val modFiles = files(testModJars)
+    val hotAddFiles = files(hotAddModJars)
     inputs.files(agentFile).withPropertyName("agent")
     inputs.files(modFiles).withPropertyName("testMods")
+    inputs.files(hotAddFiles).withPropertyName("hotAddMods")
     outputs.file(report)
     argumentProviders.add {
         listOf(
@@ -71,6 +81,7 @@ tasks.register<JavaExec>("gameTest") {
             run.get().asFile.absolutePath,
             report.get().asFile.absolutePath,
             agentFile.singleFile.absolutePath,
+            hotAddFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         ) + modFiles.files.map { it.absolutePath }
     }
 }
