@@ -1,11 +1,8 @@
 package io.github.calamech.rloaded.runtime.join.client;
 
 import io.github.calamech.rloaded.core.download.ArtifactStore;
-import io.github.calamech.rloaded.core.download.HttpSettings;
 import io.github.calamech.rloaded.core.download.KtorHttp;
-import io.github.calamech.rloaded.core.download.Origin;
 import io.github.calamech.rloaded.core.download.RetryPolicy;
-import io.github.calamech.rloaded.core.download.UrlPolicy;
 import io.github.calamech.rloaded.core.join.ClientJoin;
 import io.github.calamech.rloaded.core.join.InstallProgress;
 import io.github.calamech.rloaded.core.join.JoinFailure;
@@ -17,21 +14,19 @@ import io.github.calamech.rloaded.modrinth.ModInstaller;
 import io.github.calamech.rloaded.modrinth.Modrinth;
 import io.github.calamech.rloaded.modrinth.ModrinthError;
 import io.github.calamech.rloaded.modrinth.ModrinthProject;
-import io.github.calamech.rloaded.modrinth.ModrinthSettings;
 import io.github.calamech.rloaded.protocol.InstallResult;
 import io.github.calamech.rloaded.protocol.InstallStage;
 import io.github.calamech.rloaded.protocol.ModEntry;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.protocol.Side;
 import io.github.calamech.rloaded.runtime.AgentBridge;
+import io.github.calamech.rloaded.runtime.ModrinthAccess;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
 import io.github.calamech.rloaded.runtime.join.JoinPayloads;
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -55,7 +50,6 @@ public final class JoinClient {
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
   private static final String MOD_STORE_PROPERTY = "rloaded.mod-store";
   private static final String TRUST_STORE_PROPERTY = "rloaded.trust-store";
-  private static final String TEST_MODRINTH_PROPERTY = "rloaded.test.modrinth";
   private static final int MAX_REPORT = 1000;
   private static final int PERCENT = 100;
 
@@ -342,19 +336,9 @@ public final class JoinClient {
     if (modStore == null || trustStore == null) {
       return null;
     }
-    String testModrinth = System.getProperty(TEST_MODRINTH_PROPERTY);
-    ModrinthSettings settings = new ModrinthSettings();
-    UrlPolicy policy = UrlPolicy.Companion.getPRODUCTION();
-    if (testModrinth != null) {
-      URI uri = URI.create(testModrinth);
-      LOGGER.warn("Reading mods from the test server {} instead of Modrinth", testModrinth);
-      settings =
-          new ModrinthSettings(
-              testModrinth + "/v2", settings.getMaxIdsPerRequest(), settings.getMaxResponseBytes());
-      policy = new UrlPolicy(Set.of(new Origin(uri.getScheme(), uri.getHost(), uri.getPort())));
-    }
-    KtorHttp http = new KtorHttp(policy, new HttpSettings());
-    Modrinth modrinth = new Modrinth(http, settings);
+    ModrinthAccess access = ModrinthAccess.open();
+    KtorHttp http = access.http();
+    Modrinth modrinth = access.modrinth();
     ArtifactStore store =
         new ArtifactStore(
             Path.of(modStore), http, new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES);

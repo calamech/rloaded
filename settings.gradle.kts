@@ -36,6 +36,7 @@ rootProject.name = "rloaded"
 includeBuild("build-logic")
 includeBuild("rloaded-runtime")
 
+include("rloaded-admin")
 include("rloaded-agent")
 include("rloaded-core")
 include("rloaded-game-tests")
