@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Amended: 2026-10-30, client side and resource reload (see the end of Decision)
 
 ## Context
 
@@ -29,6 +30,8 @@ Checked on 2026-10-30 on the game test server (JetBrains Runtime 25.0.4.1 build 
 
 - `HotAddGameTest` loads `content-basic`, which registers a block and its item, and `mixin-loaded-class`, which adds an interface, a field and a method to `Item`. Afterwards the loader lists both mods, the block knows its item and can be placed, and the stone item that existed before the add answers the new method with a counter kept in the new field. No error was logged. It failed when the mixins were skipped and when the entrypoints were not registered.
 - `HotAddRefusalGameTest` checks the exact reason of each refusal with jars that hold only a `fabric.mod.json`, and that none of the refused mods was registered. It failed when the `preLaunch` check was removed.
+
+Amendment of 2026-10-30, client side: `HotAddClientGameTest` loads both test mods into the client at the title screen, before any world exists, then calls `Minecraft.reloadResourcePacks`. The new block and its item then have their own models, and the stone item answers the mixin's method. The reload sees the new mod's assets because Fabric's `ModResourcePackCreator` lists `FabricLoader.getAllMods()` each time packs are reloaded (read in `fabric-resource-loader-v1` 3.1.0). The test failed with the missing model when the reload was skipped. Server data packs (loot, recipes) are not reloaded yet.
 
 ## Alternatives
 
