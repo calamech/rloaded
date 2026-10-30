@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
@@ -54,13 +56,38 @@ public final class HotAddRefusalGameTest {
         directory,
         "adapter.jar",
         mod("adapter", "\"languageAdapters\": {\"custom\": \"example.Adapter\"},"),
-        "adapter.jar is refused: it brings a language adapter, which only works from startup");
+        "adapter.jar is refused: mod adapter needs the language adapters custom, which only work from"
+            + " startup");
+    expect(
+        mismatches,
+        directory,
+        "foreign.jar",
+        mod(
+            "foreign",
+            "\"entrypoints\": {\"main\": [{\"adapter\": \"scala\", \"value\": \"a.Main\"}]},"),
+        "foreign.jar is refused: mod foreign needs the language adapters scala, which only work from"
+            + " startup");
     expect(
         mismatches,
         directory,
         "prelaunch.jar",
         mod("prelaunch", "\"entrypoints\": {\"preLaunch\": [\"example.Early\"]},"),
-        "prelaunch.jar is refused: it has a preLaunch entrypoint, which runs before the game starts");
+        "prelaunch.jar is refused: mod prelaunch has a preLaunch entrypoint, which runs before the game"
+            + " starts");
+    expect(
+        mismatches,
+        directory,
+        "worldgen.jar",
+        mod("worldgen", ""),
+        Map.of(
+            "data/worldgen/worldgen/biome/hot.json",
+            "{}",
+            "data/worldgen/enchantment/spark.json",
+            "{}",
+            "data/worldgen/recipe/thing.json",
+            "{}"),
+        "worldgen.jar is refused: mod worldgen adds data pack entries to enchantment, worldgen/biome,"
+            + " which the game only reads when a world loads");
     expect(
         mismatches,
         directory,
@@ -82,7 +109,16 @@ public final class HotAddRefusalGameTest {
 
     helper.assertValueEqual(mismatches, List.of(), "refusals that differ from the expected ones");
     for (String id :
-        List.of("only-client", "nested", "widener", "adapter", "prelaunch", "depends", "breaks")) {
+        List.of(
+            "only-client",
+            "nested",
+            "widener",
+            "adapter",
+            "foreign",
+            "prelaunch",
+            "worldgen",
+            "depends",
+            "breaks")) {
       helper.assertTrue(
           !FabricLoader.getInstance().isModLoaded(id), "the refused mod " + id + " was registered");
     }
@@ -92,12 +128,28 @@ public final class HotAddRefusalGameTest {
   private static void expect(
       List<String> mismatches, Path directory, String name, String metadata, String refusal)
       throws IOException, ReflectiveOperationException {
+    expect(mismatches, directory, name, metadata, Map.of(), refusal);
+  }
+
+  private static void expect(
+      List<String> mismatches,
+      Path directory,
+      String name,
+      String metadata,
+      Map<String, String> files,
+      String refusal)
+      throws IOException, ReflectiveOperationException {
     Path jar = directory.resolve(name);
     try (OutputStream file = Files.newOutputStream(jar);
         ZipOutputStream zip = new ZipOutputStream(file)) {
       zip.putNextEntry(new ZipEntry(metadata == null ? "readme.txt" : "fabric.mod.json"));
       zip.write((metadata == null ? "" : metadata).getBytes(StandardCharsets.UTF_8));
       zip.closeEntry();
+      for (Map.Entry<String, String> extra : new TreeMap<>(files).entrySet()) {
+        zip.putNextEntry(new ZipEntry(extra.getKey()));
+        zip.write(extra.getValue().getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+      }
     }
     String actual;
     try {
