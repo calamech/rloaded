@@ -1,6 +1,8 @@
 // The runtime mod is a build of its own: Fabric Loom adds project repositories, including local
 // ones for the game jars, which the main build does not allow.
 pluginManagement {
+    // The Java gates the agent uses: formatting, Error Prone, warnings as errors.
+    includeBuild("../build-logic")
     repositories {
         maven("https://maven.fabricmc.net/")
         gradlePluginPortal()

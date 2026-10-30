@@ -10,6 +10,7 @@ import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.protocol.Progress;
 import io.github.calamech.rloaded.protocol.ProtocolCodec;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
@@ -30,14 +31,17 @@ public final class NestedLibrariesGameTest {
   @GameTest
   public void nestedLibrariesWorkInTheGame(GameTestHelper helper) throws Exception {
     helper.assertTrue(
-        FabricLoader.getInstance().isModLoaded("io_github_calamech_rloaded_rloaded-protocol"), "the loader does not list the nested protocol library");
+        FabricLoader.getInstance().isModLoaded("io_github_calamech_rloaded_rloaded-protocol"),
+        "the loader does not list the nested protocol library");
 
     Progress progress = new Progress(InstallStage.DOWNLOAD, 42);
     byte[] encoded = ProtocolCodec.INSTANCE.encode(Progress.Companion.serializer(), progress);
-    Outcome<Progress, ?> decoded = ProtocolCodec.INSTANCE.decode(Progress.Companion.serializer(), encoded);
+    Outcome<Progress, ?> decoded =
+        ProtocolCodec.INSTANCE.decode(Progress.Companion.serializer(), encoded);
     helper.assertValueEqual(decoded, new Outcome.Ok<>(progress), "decoded progress");
 
-    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    HttpServer server =
+        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     server.createContext(
         "/hello",
         exchange -> {
@@ -53,11 +57,15 @@ public final class NestedLibrariesGameTest {
     Object fetched;
     try (KtorHttp http = new KtorHttp(policy, new HttpSettings())) {
       String url = "http://127.0.0.1:" + port + "/hello";
-      fetched = BuildersKt.runBlocking(EmptyCoroutineContext.INSTANCE, (scope, continuation) -> http.text(url, MAX_BYTES, continuation));
+      fetched =
+          BuildersKt.runBlocking(
+              EmptyCoroutineContext.INSTANCE,
+              (scope, continuation) -> http.text(url, MAX_BYTES, continuation));
     } finally {
       server.stop(0);
     }
-    helper.assertValueEqual(fetched, new Outcome.Ok<>("hello from loopback"), "body fetched with Ktor");
+    helper.assertValueEqual(
+        fetched, new Outcome.Ok<>("hello from loopback"), "body fetched with Ktor");
     helper.succeed();
   }
 }

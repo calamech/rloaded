@@ -19,6 +19,8 @@ import net.minecraft.world.entity.decoration.ArmorStand;
  * the configuration phase, as it does to install mods while players are connected.
  */
 public final class ReconfigurationClientGameTest implements FabricClientGameTest {
+  // The client must build new entity and level objects: identity is what this checks.
+  @SuppressWarnings("ReferenceEquality")
   @Override
   public void runTest(ClientGameTestContext context) {
     try (TestDedicatedServerContext server = context.worldBuilder().createServer();
@@ -37,7 +39,8 @@ public final class ReconfigurationClientGameTest implements FabricClientGameTest
         throw new AssertionError("the client kept the armor stand object across reconfiguration");
       }
       if (standBefore.level() != levelBefore) {
-        throw new AssertionError("the armor stand seen before reconfiguration was not in the client's level");
+        throw new AssertionError(
+            "the armor stand seen before reconfiguration was not in the client's level");
       }
       if (!standAfter.getUUID().equals(standBefore.getUUID())) {
         throw new AssertionError("the rebuilt armor stand is another entity");
@@ -48,7 +51,8 @@ public final class ReconfigurationClientGameTest implements FabricClientGameTest
 
   private static void spawnArmorStandNextToPlayer(MinecraftServer server) {
     ServerPlayer player = Reconfiguration.onlyPlayer(server);
-    ArmorStand stand = new ArmorStand(player.level(), player.getX() + 2, player.getY(), player.getZ());
+    ArmorStand stand =
+        new ArmorStand(player.level(), player.getX() + 2, player.getY(), player.getZ());
     if (!player.level().addFreshEntity(stand)) {
       throw new AssertionError("the server refused the armor stand");
     }
@@ -59,7 +63,7 @@ public final class ReconfigurationClientGameTest implements FabricClientGameTest
       return Optional.empty();
     }
     return StreamSupport.stream(client.level.entitiesForRendering().spliterator(), false)
-        .filter(entity -> entity.getType() == EntityTypes.ARMOR_STAND)
+        .filter(entity -> entity.getType().equals(EntityTypes.ARMOR_STAND))
         .findFirst();
   }
 }

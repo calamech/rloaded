@@ -11,8 +11,8 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 /**
- * Rebuilds the block entities of a server level from their saved data, so that they are new
- * objects of the current classes.
+ * Rebuilds the block entities of a server level from their saved data, so that they are new objects
+ * of the current classes.
  *
  * <p>A late Mixin adds fields to block entity classes, but objects that already exist never run the
  * new field initializers. For every loaded chunk, each block entity is saved, read back as a new
@@ -40,7 +40,11 @@ public final class BlockEntityCycling {
     if (!level.getServer().isSameThread()) {
       throw new IllegalStateException("block entities can only be cycled on the server thread");
     }
-    long[] held = ((ChunkMapAccess) level.getChunkSource().chunkMap).rloaded$visibleChunkMap().keySet().toLongArray();
+    long[] held =
+        ((ChunkMapAccess) level.getChunkSource().chunkMap)
+            .rloaded$visibleChunkMap()
+            .keySet()
+            .toLongArray();
     int rebuilt = 0;
     List<BlockPos> notRebuilt = new ArrayList<>();
     for (long key : held) {
@@ -52,7 +56,8 @@ public final class BlockEntityCycling {
       for (BlockEntity old : List.copyOf(chunk.getBlockEntities().values())) {
         BlockPos pos = old.getBlockPos();
         CompoundTag saved = old.saveWithFullMetadata(level.registryAccess());
-        BlockEntity fresh = BlockEntity.loadStatic(pos, old.getBlockState(), saved, level.registryAccess());
+        BlockEntity fresh =
+            BlockEntity.loadStatic(pos, old.getBlockState(), saved, level.registryAccess());
         if (fresh == null) {
           notRebuilt.add(pos);
         } else {

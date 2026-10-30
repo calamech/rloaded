@@ -25,8 +25,8 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 
 /**
  * What the server and the clients of the registry sync check share: the blocks each of them
- * registers while the game runs, in an order of its own, and the raw ids each writes for the harness
- * to compare.
+ * registers while the game runs, in an order of its own, and the raw ids each writes for the
+ * harness to compare.
  */
 public final class RegistrySyncCheck {
   private static final String OUTPUT_PROPERTY = "rloaded.registry-sync.output";
@@ -68,8 +68,11 @@ public final class RegistrySyncCheck {
     List<String> paths = Arrays.asList(order.split(","));
     RegistryThaw.thaw(BuiltInRegistries.BLOCK);
     for (String path : paths) {
-      ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath("rloaded-gametest", path));
-      Registry.register(BuiltInRegistries.BLOCK, key, new LateBlock(BlockBehaviour.Properties.of().setId(key)));
+      ResourceKey<Block> key =
+          ResourceKey.create(
+              Registries.BLOCK, Identifier.fromNamespaceAndPath("rloaded-gametest", path));
+      Registry.register(
+          BuiltInRegistries.BLOCK, key, new LateBlock(BlockBehaviour.Properties.of().setId(key)));
     }
     RegistryThaw.freeze(BuiltInRegistries.BLOCK);
   }
@@ -81,7 +84,12 @@ public final class RegistrySyncCheck {
   public static void writeIds(Path file) {
     Stream<String> blocks =
         BuiltInRegistries.BLOCK.stream()
-            .map(block -> "block " + BuiltInRegistries.BLOCK.getKey(block) + " " + BuiltInRegistries.BLOCK.getId(block));
+            .map(
+                block ->
+                    "block "
+                        + BuiltInRegistries.BLOCK.getKey(block)
+                        + " "
+                        + BuiltInRegistries.BLOCK.getId(block));
     Stream<String> states =
         StreamSupport.stream(Block.BLOCK_STATE_REGISTRY.spliterator(), false)
             .map(state -> "state " + state + " " + Block.BLOCK_STATE_REGISTRY.getId(state));

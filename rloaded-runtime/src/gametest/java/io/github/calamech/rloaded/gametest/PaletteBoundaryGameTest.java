@@ -29,9 +29,9 @@ import net.minecraft.world.level.chunk.PalettedContainerRO;
  * states past a power of two.
  *
  * <p>A section with more than 256 different states stores global state ids, with as many bits as
- * the state count needed when the level was created. The test builds such sections with the
- * level's own factory, as the server does, and with a new factory, as a client does when it
- * rebuilds its level after an add.
+ * the state count needed when the level was created. The test builds such sections with the level's
+ * own factory, as the server does, and with a new factory, as a client does when it rebuilds its
+ * level after an add.
  */
 public final class PaletteBoundaryGameTest {
   private static final int SECTION_SIZE = 4096;
@@ -49,22 +49,38 @@ public final class PaletteBoundaryGameTest {
     int bitsAtStart = Mth.ceillog2(Block.BLOCK_STATE_REGISTRY.size());
 
     BlockState small = register("palette_small", LateBlock::new).defaultBlockState();
-    helper.assertValueEqual(Mth.ceillog2(Block.BLOCK_STATE_REGISTRY.size()), bitsAtStart, "bits after adding four states");
-    helper.assertTrue(canStore(levelFactory, small), "a section cannot store a new state below the boundary");
-    helper.assertTrue(reloads(levelFactory, small), "a saved section loses a new state below the boundary");
-    helper.assertValueEqual(resend(helper, levelFactory), Resend.INTACT, "a section resent below the boundary");
+    helper.assertValueEqual(
+        Mth.ceillog2(Block.BLOCK_STATE_REGISTRY.size()),
+        bitsAtStart,
+        "bits after adding four states");
+    helper.assertTrue(
+        canStore(levelFactory, small), "a section cannot store a new state below the boundary");
+    helper.assertTrue(
+        reloads(levelFactory, small), "a saved section loses a new state below the boundary");
+    helper.assertValueEqual(
+        resend(helper, levelFactory), Resend.INTACT, "a section resent below the boundary");
 
     int statesBefore = Block.BLOCK_STATE_REGISTRY.size();
     BlockState wide = register("palette_wide", WideBlock::new).defaultBlockState();
     helper.assertTrue(
         Mth.ceillog2(Block.BLOCK_STATE_REGISTRY.size()) > bitsAtStart,
-        "the wide block did not cross a power of two: " + statesBefore + " states before, " + Block.BLOCK_STATE_REGISTRY.size() + " after");
-    BlockState pastBoundary = Block.BLOCK_STATE_REGISTRY.byId(Block.BLOCK_STATE_REGISTRY.size() - 1);
-    helper.assertTrue(pastBoundary.getBlock() == wide.getBlock(), "the last state id is not the wide block's");
+        "the wide block did not cross a power of two: "
+            + statesBefore
+            + " states before, "
+            + Block.BLOCK_STATE_REGISTRY.size()
+            + " after");
+    BlockState pastBoundary =
+        Block.BLOCK_STATE_REGISTRY.byId(Block.BLOCK_STATE_REGISTRY.size() - 1);
+    helper.assertTrue(
+        pastBoundary.is(wide.getBlock()), "the last state id is not the wide block's");
 
-    helper.assertTrue(!canStore(levelFactory, pastBoundary), "a section of the level stored a state past the boundary");
-    helper.assertTrue(!reloads(levelFactory, pastBoundary), "a saved section kept a state past the boundary");
-    helper.assertValueEqual(resend(helper, levelFactory), Resend.UNREADABLE, "a section resent past the boundary");
+    helper.assertTrue(
+        !canStore(levelFactory, pastBoundary),
+        "a section of the level stored a state past the boundary");
+    helper.assertTrue(
+        !reloads(levelFactory, pastBoundary), "a saved section kept a state past the boundary");
+    helper.assertValueEqual(
+        resend(helper, levelFactory), Resend.UNREADABLE, "a section resent past the boundary");
     helper.succeed();
   }
 
@@ -72,7 +88,8 @@ public final class PaletteBoundaryGameTest {
   private static PalettedContainer<BlockState> globalSection(PalettedContainerFactory factory) {
     PalettedContainer<BlockState> section = factory.createForBlockStates();
     for (int index = 0; index < DISTINCT_STATES; index++) {
-      section.set(index & 15, index >> 8, (index >> 4) & 15, Block.BLOCK_STATE_REGISTRY.byId(index + 1));
+      section.set(
+          index & 15, index >> 8, (index >> 4) & 15, Block.BLOCK_STATE_REGISTRY.byId(index + 1));
     }
     return section;
   }
@@ -81,7 +98,7 @@ public final class PaletteBoundaryGameTest {
     PalettedContainer<BlockState> section = globalSection(factory);
     try {
       section.set(15, 15, 15, state);
-      return section.get(15, 15, 15) == state;
+      return state.equals(section.get(15, 15, 15));
     } catch (IllegalArgumentException e) {
       return false;
     }
@@ -98,12 +115,15 @@ public final class PaletteBoundaryGameTest {
     for (int index = 0; index < DISTINCT_STATES + 1; index++) {
       entries[index] = index;
     }
-    SimpleBitStorage storage = new SimpleBitStorage(Mth.ceillog2(palette.size()), SECTION_SIZE, entries);
+    SimpleBitStorage storage =
+        new SimpleBitStorage(Mth.ceillog2(palette.size()), SECTION_SIZE, entries);
     Optional<LongStream> values = Optional.of(LongStream.of(storage.getRaw()));
     PalettedContainer<BlockState> loaded =
-        PalettedContainer.unpack(factory.blockStatesStrategy(), new PalettedContainerRO.PackedData<>(palette, values))
+        PalettedContainer.unpack(
+                factory.blockStatesStrategy(),
+                new PalettedContainerRO.PackedData<>(palette, values))
             .getOrThrow();
-    return loaded.get(0, 0, 0) == state;
+    return state.equals(loaded.get(0, 0, 0));
   }
 
   // Sends a level section the way the server does and reads it the way a client does after an add.
@@ -111,7 +131,8 @@ public final class PaletteBoundaryGameTest {
     PalettedContainer<BlockState> sent = globalSection(levelFactory);
     FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
     sent.write(buffer);
-    PalettedContainer<BlockState> received = PalettedContainerFactory.create(helper.getLevel().registryAccess()).createForBlockStates();
+    PalettedContainer<BlockState> received =
+        PalettedContainerFactory.create(helper.getLevel().registryAccess()).createForBlockStates();
     try {
       received.read(buffer);
     } catch (IndexOutOfBoundsException e) {
@@ -121,7 +142,7 @@ public final class PaletteBoundaryGameTest {
     for (int y = 0; y < 16; y++) {
       for (int z = 0; z < 16; z++) {
         for (int x = 0; x < 16; x++) {
-          if (sent.get(x, y, z) != received.get(x, y, z)) {
+          if (!sent.get(x, y, z).equals(received.get(x, y, z))) {
             mismatches++;
           }
         }
@@ -130,15 +151,19 @@ public final class PaletteBoundaryGameTest {
     return mismatches == 0 && buffer.readableBytes() == 0 ? Resend.INTACT : Resend.CHANGED;
   }
 
-  private static Block register(String path, Function<BlockBehaviour.Properties, Block> constructor) {
+  private static Block register(
+      String path, Function<BlockBehaviour.Properties, Block> constructor) {
     Registry<Block> blocks = BuiltInRegistries.BLOCK;
     RegistryThaw.thaw(blocks);
-    Block block = Registry.register(blocks, key(path), constructor.apply(BlockBehaviour.Properties.of().setId(key(path))));
+    Block block =
+        Registry.register(
+            blocks, key(path), constructor.apply(BlockBehaviour.Properties.of().setId(key(path))));
     RegistryThaw.freeze(blocks);
     return block;
   }
 
   private static ResourceKey<Block> key(String path) {
-    return ResourceKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath("rloaded-gametest", path));
+    return ResourceKey.create(
+        Registries.BLOCK, Identifier.fromNamespaceAndPath("rloaded-gametest", path));
   }
 }

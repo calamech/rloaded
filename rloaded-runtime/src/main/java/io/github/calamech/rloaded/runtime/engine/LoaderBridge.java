@@ -30,8 +30,8 @@ import net.fabricmc.loader.impl.metadata.VersionOverrides;
 
 /**
  * The only class that touches Fabric Loader's internals, read in Fabric Loader 0.20.1: it reads a
- * mod jar's metadata, and registers the mod with the loader the way {@code FabricLoaderImpl} does at
- * startup, so the loader lists it and its entrypoints.
+ * mod jar's metadata, and registers the mod with the loader the way {@code FabricLoaderImpl} does
+ * at startup, so the loader lists it and its entrypoints.
  */
 public final class LoaderBridge {
   private LoaderBridge() {}
@@ -52,9 +52,11 @@ public final class LoaderBridge {
   public static ModJar read(Path jar) throws HotAddRefusal {
     try (FileSystem files = FileSystems.newFileSystem(jar);
         InputStream input = Files.newInputStream(files.getPath("fabric.mod.json"))) {
-      DependencyOverrides overrides = new DependencyOverrides(FabricLoader.getInstance().getConfigDir());
+      DependencyOverrides overrides =
+          new DependencyOverrides(FabricLoader.getInstance().getConfigDir());
       LoaderModMetadata metadata =
-          ModMetadataParser.parseMetadata(input, jar.toString(), List.of(), new VersionOverrides(), overrides, false);
+          ModMetadataParser.parseMetadata(
+              input, jar.toString(), List.of(), new VersionOverrides(), overrides, false);
       return new ModJar(jar, metadata);
     } catch (NoSuchFileException e) {
       throw new HotAddRefusal(jar, "it has no fabric.mod.json");
@@ -103,7 +105,8 @@ public final class LoaderBridge {
         try {
           entrypoints.add(container, key, entrypoint, adapters);
         } catch (Exception e) {
-          throw new IllegalStateException("cannot register entrypoint " + entrypoint.getValue() + " of " + mod.id(), e);
+          throw new IllegalStateException(
+              "cannot register entrypoint " + entrypoint.getValue() + " of " + mod.id(), e);
         }
       }
     }
@@ -112,22 +115,27 @@ public final class LoaderBridge {
   // ModCandidateImpl.createPlain is package-private; the loader calls it for a plain mod jar.
   private static ModCandidateImpl candidate(ModJar mod) throws ReflectiveOperationException {
     Method createPlain =
-        ModCandidateImpl.class.getDeclaredMethod("createPlain", List.class, LoaderModMetadata.class, boolean.class, Collection.class);
+        ModCandidateImpl.class.getDeclaredMethod(
+            "createPlain", List.class, LoaderModMetadata.class, boolean.class, Collection.class);
     createPlain.setAccessible(true);
-    return (ModCandidateImpl) createPlain.invoke(null, List.of(mod.path()), mod.metadata(), false, List.of());
+    return (ModCandidateImpl)
+        createPlain.invoke(null, List.of(mod.path()), mod.metadata(), false, List.of());
   }
 
   @SuppressWarnings("unchecked")
-  private static List<ModContainerImpl> modList(FabricLoaderImpl loader) throws ReflectiveOperationException {
+  private static List<ModContainerImpl> modList(FabricLoaderImpl loader)
+      throws ReflectiveOperationException {
     return field(loader, "mods", List.class);
   }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, ModContainerImpl> modMap(FabricLoaderImpl loader) throws ReflectiveOperationException {
+  private static Map<String, ModContainerImpl> modMap(FabricLoaderImpl loader)
+      throws ReflectiveOperationException {
     return field(loader, "modMap", Map.class);
   }
 
-  private static <T> T field(FabricLoaderImpl loader, String name, Class<T> type) throws ReflectiveOperationException {
+  private static <T> T field(FabricLoaderImpl loader, String name, Class<T> type)
+      throws ReflectiveOperationException {
     Field field = FabricLoaderImpl.class.getDeclaredField(name);
     field.setAccessible(true);
     return type.cast(field.get(loader));

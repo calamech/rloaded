@@ -7,11 +7,13 @@ import kotlin.test.assertTrue
 
 /**
  * A copy of the repository's build-logic, version catalog and detekt configuration, plus one
- * library module `:lib` that applies [plugin]. Builds run with the JDKs of the outer build.
+ * library module `:lib` that applies [plugin], followed by [buildScript]. Builds run with the JDKs
+ * of the outer build.
  */
 class ConventionFixture(
     private val root: File,
     plugin: String,
+    buildScript: String = "",
 ) {
     init {
         val repository = File(System.getProperty("rloaded.repositoryDir"))
@@ -49,7 +51,7 @@ class ConventionFixture(
                 id("$plugin")
             }
 
-            """.trimIndent(),
+            """.trimIndent() + if (buildScript.isEmpty()) "" else "\n$buildScript\n",
         )
     }
 

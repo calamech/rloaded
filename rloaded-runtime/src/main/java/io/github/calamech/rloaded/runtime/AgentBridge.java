@@ -12,7 +12,8 @@ import java.util.Optional;
  */
 public final class AgentBridge {
   private static final String AGENT_STATE = "io.github.calamech.rloaded.agent.AgentState";
-  private static final String CLASS_REDEFINITION = "io.github.calamech.rloaded.agent.ClassRedefinition";
+  private static final String CLASS_REDEFINITION =
+      "io.github.calamech.rloaded.agent.ClassRedefinition";
 
   private AgentBridge() {}
 
