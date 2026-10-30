@@ -1,11 +1,11 @@
 package io.github.calamech.rloaded.core.runtime
 
 import io.github.calamech.rloaded.core.download.Artifact
-import io.github.calamech.rloaded.core.download.Checksum
-import io.github.calamech.rloaded.core.download.HashAlgorithm
 import io.github.calamech.rloaded.core.mojang.Architecture
 import io.github.calamech.rloaded.core.mojang.OperatingSystem
 import io.github.calamech.rloaded.core.mojang.Platform
+import io.github.calamech.rloaded.protocol.Checksum
+import io.github.calamech.rloaded.protocol.HashAlgorithm
 import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

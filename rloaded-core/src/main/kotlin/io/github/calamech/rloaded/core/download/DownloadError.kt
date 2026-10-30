@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.core.download
 
+import io.github.calamech.rloaded.protocol.Checksum
 import java.nio.file.Path
 
 /** Why a download failed. [retryable] tells whether trying again may succeed. */

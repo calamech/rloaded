@@ -2,13 +2,13 @@ package io.github.calamech.rloaded.core.runtime
 
 import io.github.calamech.rloaded.core.download.Artifact
 import io.github.calamech.rloaded.core.download.ArtifactStore
-import io.github.calamech.rloaded.core.download.Checksum
 import io.github.calamech.rloaded.core.download.DownloadError
-import io.github.calamech.rloaded.core.download.HashAlgorithm
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.TestServer
 import io.github.calamech.rloaded.core.mojang.OperatingSystem
+import io.github.calamech.rloaded.protocol.Checksum
+import io.github.calamech.rloaded.protocol.HashAlgorithm
 import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry

@@ -1,5 +1,7 @@
 package io.github.calamech.rloaded.core.download
 
+import io.github.calamech.rloaded.protocol.Checksum
+import io.github.calamech.rloaded.protocol.HashAlgorithm
 import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
