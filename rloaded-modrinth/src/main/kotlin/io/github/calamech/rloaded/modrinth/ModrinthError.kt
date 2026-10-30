@@ -28,4 +28,9 @@ public sealed interface ModrinthError {
     public data class UnknownVersions(
         val ids: List<String>,
     ) : ModrinthError
+
+    /** Modrinth has no project with these ids, or no longer lists them. */
+    public data class UnknownProjects(
+        val ids: List<String>,
+    ) : ModrinthError
 }

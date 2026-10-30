@@ -37,3 +37,22 @@ internal data class FileJson(
 internal data class HashesJson(
     val sha512: String,
 )
+
+@Serializable
+internal data class ProjectJson(
+    val id: String,
+    val title: String,
+    val downloads: Long,
+    val team: String,
+)
+
+@Serializable
+internal data class MemberJson(
+    @SerialName("team_id") val teamId: String,
+    val user: UserJson,
+)
+
+@Serializable
+internal data class UserJson(
+    val username: String,
+)

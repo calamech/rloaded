@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
-- Amended: 2026-10-30, the installer (see the end of Decision)
+- Amended: 2026-10-30, the installer and project details (see the end of Decision)
 
 ## Context
 
@@ -25,6 +25,8 @@ Answers are decoded with unknown fields ignored: Modrinth adds fields to its rec
 Tests run against a real HTTP server on the loopback interface that answers from versions recorded on `api.modrinth.com` on 2026-10-30, leaving unknown ids out as Modrinth does. A request with no recorded answer fails the test.
 
 Amendment of 2026-10-30, the installer: `ModInstaller.install` takes manifest entries, reads their records in one go, refuses every entry that disagrees with its record before downloading anything, then downloads each file from the URL in the record into the content-addressed `ArtifactStore`, which verifies size and SHA-512, four at a time. `installAsync` returns a `CompletableFuture` for the runtime mod's Java code. `InstallPlan.entriesToInstall`, in `rloaded-core`, picks the entries a client installs: never server-only mods, not the client-only mods the player left out (ADR 0029), not mods the game already loaded; a mod loaded in another version is reported as a conflict, since a running game cannot replace it.
+
+Amendment of 2026-10-30, project details: `Modrinth.projects(ids)` returns the title, download count and team members of each project, in two requests (`/v2/projects`, then `/v2/teams`), for the trust screen. Checked against `api.modrinth.com` on 2026-10-30: team roles are free text ("Owner", "Original creator", "Maintainer"), there is no ownership flag, and Mod Menu belongs to an organization; the members are kept in Modrinth's order and the screen decides how many to show.
 
 ## Alternatives
 
