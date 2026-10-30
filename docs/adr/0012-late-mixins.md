@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-29
+- Amended: 2026-10-30, late configurations skip the loaded target check (ADR 0014)
 
 ## Context
 
