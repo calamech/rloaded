@@ -10,6 +10,7 @@ import io.github.calamech.rloaded.protocol.Manifest
 import io.github.calamech.rloaded.protocol.ManifestKind
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.PROTOCOL_VERSION
+import io.github.calamech.rloaded.protocol.Progress
 import io.github.calamech.rloaded.protocol.ProtocolCodec
 import io.github.calamech.rloaded.protocol.ServerHello
 import io.github.calamech.rloaded.protocol.flatMap
@@ -56,6 +57,10 @@ public class ServerJoin(
             .flatMap { hello ->
                 if (hello.protocol == PROTOCOL_VERSION) Outcome.Ok(hello) else Outcome.Err(JoinRefusal.OtherProtocol(hello.protocol))
             }
+
+    /** Reads where the client's install is. */
+    public fun progress(bytes: ByteArray): Outcome<Progress, JoinRefusal> =
+        ProtocolCodec.decode(Progress.serializer(), bytes).mapError { JoinRefusal.Malformed(it.toString()) }
 
     /** Reads how the client's install ended. */
     public fun result(bytes: ByteArray): Outcome<InstallResult, JoinRefusal> =

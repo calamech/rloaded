@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
@@ -17,14 +18,17 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 
 /**
- * Joins a server running in another process for the first time, accepts its mods on the trust
- * screen, and checks that content-basic and mixin-loaded-class work once in the world, without a
- * restart.
+ * Joins a server running in another process for the first time, reads the trust screen for {@code
+ * rloaded.join-test.trust-seconds}, accepts its mods, and checks that content-basic and
+ * mixin-loaded-class work once in the world, without a restart. With {@code
+ * rloaded.join-test.expect-disconnect}, the downloads are expected to stall: the test then waits to
+ * be disconnected and reports the reason.
  */
 public final class JoinClientGameTest implements FabricClientGameTest {
   private static final Identifier BASIC_BLOCK =
       Identifier.fromNamespaceAndPath("content-basic", "basic_block");
   private static final int JOIN_TICKS = 6000;
+  private static final int TICKS_PER_SECOND = 20;
 
   @Override
   public void runTest(ClientGameTestContext context) {
@@ -45,7 +49,17 @@ public final class JoinClientGameTest implements FabricClientGameTest {
             client.gui.screen() != null
                 && client.gui.screen().getClass().getSimpleName().equals("TrustScreen"),
         JOIN_TICKS);
+    context.waitTicks(
+        Integer.parseInt(required("rloaded.join-test.trust-seconds")) * TICKS_PER_SECOND);
     context.clickScreenButton("rloaded.trust.install");
+    if (Boolean.getBoolean("rloaded.join-test.expect-disconnect")) {
+      context.waitFor(client -> client.gui.screen() instanceof DisconnectedScreen, JOIN_TICKS);
+      String reason =
+          context.computeOnClient(client -> client.gui.screen().getNarrationMessage().getString());
+      write(report, "disconnected: " + reason);
+      context.runOnClient(client -> client.gui.setScreen(new TitleScreen()));
+      return;
+    }
     context.waitFor(client -> client.level != null && client.player != null, JOIN_TICKS);
 
     if (BuiltInRegistries.BLOCK.getOptional(BASIC_BLOCK).isEmpty()) {
@@ -58,11 +72,12 @@ public final class JoinClientGameTest implements FabricClientGameTest {
     }
     context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
     context.waitFor(client -> client.level == null && client.gui.screen() instanceof TitleScreen);
+    write(report, "joined and loaded content-basic and mixin-loaded-class");
+  }
+
+  private static void write(Path report, String line) {
     try {
-      Files.writeString(
-          report,
-          "joined and loaded content-basic and mixin-loaded-class\n",
-          StandardCharsets.UTF_8);
+      Files.writeString(report, line + "\n", StandardCharsets.UTF_8);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

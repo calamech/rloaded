@@ -62,6 +62,7 @@ kover {
                     "io.github.calamech.rloaded.gametests.ClientLaunch",
                     "io.github.calamech.rloaded.gametests.SeparateProcessesKt*",
                     "io.github.calamech.rloaded.gametests.JoinMainKt*",
+                    "io.github.calamech.rloaded.gametests.JoinPlayer",
                     "io.github.calamech.rloaded.gametests.FakeModrinth*",
                     "io.github.calamech.rloaded.gametests.FakeMod",
                 )

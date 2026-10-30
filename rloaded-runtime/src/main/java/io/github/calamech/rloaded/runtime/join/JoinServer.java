@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.runtime.join;
 
+import io.github.calamech.rloaded.core.join.JoinDeadlines;
 import io.github.calamech.rloaded.core.join.JoinRefusal;
 import io.github.calamech.rloaded.core.join.ServerJoin;
 import io.github.calamech.rloaded.core.lockfile.Lockfile;
@@ -8,10 +9,12 @@ import io.github.calamech.rloaded.protocol.InstallResult;
 import io.github.calamech.rloaded.protocol.Outcome;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Consumer;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.fabricmc.loader.api.FabricLoader;
@@ -34,12 +37,16 @@ public final class JoinServer {
       Identifier.fromNamespaceAndPath("rloaded", "install");
   private static final int MAX_SERVER_NAME = 64;
   private static volatile ServerJoin join;
+  private static volatile JoinDeadlines<ServerConfigurationPacketListenerImpl> deadlines;
 
   private JoinServer() {}
 
   /** Registers the join on the server side. */
   public static void register() {
     ServerLifecycleEvents.SERVER_STARTING.register(JoinServer::start);
+    ServerTickEvents.END_SERVER_TICK.register(server -> endExpiredJoins());
+    ServerConfigurationConnectionEvents.DISCONNECT.register(
+        (listener, server) -> deadlines.end(listener));
     ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.addPhaseOrdering(
         BEFORE_REGISTRY_SYNC, Event.DEFAULT_PHASE);
     ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register(
@@ -52,10 +59,18 @@ public final class JoinServer {
           }
         });
     ServerConfigurationNetworking.registerGlobalReceiver(
-        JoinPayloads.Progress.TYPE, (payload, context) -> {});
+        JoinPayloads.Progress.TYPE,
+        (payload, context) -> {
+          switch (join.progress(payload.bytes())) {
+            case Outcome.Ok<?> ok -> deadlines.progress(context.packetListener());
+            case Outcome.Err<?> err ->
+                context.packetListener().disconnect(refusal((JoinRefusal) err.getError()));
+          }
+        });
     ServerConfigurationNetworking.registerGlobalReceiver(
         JoinPayloads.Result.TYPE,
         (payload, context) -> {
+          deadlines.end(context.packetListener());
           switch (join.result(payload.bytes())) {
             case Outcome.Ok<?> ok ->
                 finish(context.packetListener(), (InstallResult) ok.getValue());
@@ -65,9 +80,16 @@ public final class JoinServer {
         });
   }
 
-  // A missing identity is created; a broken identity or lockfile stops the server before anyone
-  // joins.
+  // A missing identity is created; a broken identity, lockfile or timeout stops the server before
+  // anyone joins.
   private static void start(MinecraftServer server) {
+    Duration timeout =
+        switch (JoinDeadlines.Companion.timeout(
+            System.getProperty(JoinDeadlines.TIMEOUT_PROPERTY))) {
+          case Outcome.Ok<?> ok -> (Duration) ok.getValue();
+          case Outcome.Err<?> err -> throw new IllegalStateException(err.getError().toString());
+        };
+    deadlines = new JoinDeadlines<>(timeout, System::nanoTime);
     Path directory = server.getServerDirectory().resolve("rloaded");
     ServerIdentity identity =
         switch (ServerIdentity.Companion.loadOrCreate(directory.resolve("identity.key"))) {
@@ -101,7 +123,16 @@ public final class JoinServer {
               "This server installs its mods for you: join it from the Rloaded launcher."));
       return;
     }
-    listener.addTask(new InstallTask());
+    listener.addTask(new InstallTask(listener));
+  }
+
+  private static void endExpiredJoins() {
+    for (ServerConfigurationPacketListenerImpl listener : deadlines.expired()) {
+      listener.disconnect(
+          Component.translatableWithFallback(
+              "rloaded.disconnect.timeout",
+              "Your game stopped answering while it installed this server's mods."));
+    }
   }
 
   private static void finish(ServerConfigurationPacketListenerImpl listener, InstallResult result) {
@@ -152,9 +183,15 @@ public final class JoinServer {
   /** Sends the hello and the manifest, then waits for the client's result. */
   private static final class InstallTask implements ConfigurationTask {
     static final Type TYPE = new Type("rloaded:install");
+    private final ServerConfigurationPacketListenerImpl listener;
+
+    InstallTask(ServerConfigurationPacketListenerImpl listener) {
+      this.listener = listener;
+    }
 
     @Override
     public void start(Consumer<Packet<?>> sender) {
+      deadlines.start(listener);
       sender.accept(
           ServerConfigurationNetworking.createClientboundPacket(
               new JoinPayloads.Hello(join.hello())));

@@ -164,7 +164,8 @@ public final class JoinClient {
               sender.sendPacket(
                   new JoinPayloads.Result(
                       ClientJoin.Companion.result(InstallResult.RefusedByUser.INSTANCE)));
-            }));
+            },
+            () -> progress(sender, InstallStage.TRUST, 0)));
   }
 
   private static void install(
@@ -179,11 +180,7 @@ public final class JoinClient {
             .installer()
             .installAsync(
                 entries,
-                (done, total) ->
-                    sender.sendPacket(
-                        new JoinPayloads.Progress(
-                            ClientJoin.Companion.progress(
-                                InstallStage.DOWNLOAD, done * PERCENT / total)))),
+                (done, total) -> progress(sender, InstallStage.DOWNLOAD, done * PERCENT / total)),
         client,
         sender,
         outcome -> load(client, sender, outcome));
@@ -197,6 +194,7 @@ public final class JoinClient {
     }
     @SuppressWarnings("unchecked")
     List<InstalledMod> mods = (List<InstalledMod>) ((Outcome.Ok<?>) outcome).getValue();
+    progress(sender, InstallStage.LOAD, 0);
     try {
       HotAdd.load(
           mods.stream().map(InstalledMod::getJar).toList(),
@@ -212,6 +210,7 @@ public final class JoinClient {
       return;
     }
     mods.forEach(mod -> LOADED.put(mod.getEntry().getProjectId(), mod.getEntry().getVersionId()));
+    progress(sender, InstallStage.RELOAD, 0);
     onClientThread(
         client.reloadResourcePacks(),
         client,
@@ -241,6 +240,10 @@ public final class JoinClient {
                         sendFailure(sender, null, "unexpected error: " + error);
                       }
                     }));
+  }
+
+  private static void progress(PacketSender sender, InstallStage stage, int percent) {
+    sender.sendPacket(new JoinPayloads.Progress(ClientJoin.Companion.progress(stage, percent)));
   }
 
   private static void fail(PacketSender sender, String failingMod, String report) {

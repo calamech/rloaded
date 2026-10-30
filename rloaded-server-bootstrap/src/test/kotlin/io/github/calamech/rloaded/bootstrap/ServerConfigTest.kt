@@ -26,6 +26,15 @@ class ServerConfigTest {
     }
 
     @Test
+    fun `reads the client timeout and refuses one out of range`() {
+        assertEquals(Outcome.Ok(ServerConfig(rollout = RolloutSection(30))), ServerConfig.parse("[rollout]\nclientTimeoutSeconds = 30\n"))
+        assertEquals(
+            Outcome.Err("rollout.clientTimeoutSeconds must be between 10 and 3600"),
+            ServerConfig.parse("[rollout]\nclientTimeoutSeconds = 5\n"),
+        )
+    }
+
+    @Test
     fun `refuses memory out of range`() {
         assertEquals(
             Outcome.Err("server.maxMemoryMiB must be between 512 and 65536"),

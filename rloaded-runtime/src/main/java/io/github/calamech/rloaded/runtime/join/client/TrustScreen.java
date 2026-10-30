@@ -30,12 +30,15 @@ final class TrustScreen extends Screen {
   private static final int SHOWN_AUTHORS = 2;
   private static final double THOUSAND = 1_000;
   private static final double MILLION = 1_000_000;
+  private static final int HEARTBEAT_TICKS = 100;
 
   private final Screen parent;
   private final List<ModEntry> mods;
   private final Map<String, ModrinthProject> projects;
   private final Consumer<Set<String>> onInstall;
   private final Runnable onLeave;
+  private final Runnable heartbeat;
+  private int ticks;
   private final Set<String> optedOut = new LinkedHashSet<>();
   private final HeaderAndFooterLayout layout =
       new HeaderAndFooterLayout(this, HEADER_HEIGHT, HEADER_HEIGHT / 2);
@@ -46,13 +49,15 @@ final class TrustScreen extends Screen {
       List<ModEntry> mods,
       Map<String, ModrinthProject> projects,
       Consumer<Set<String>> onInstall,
-      Runnable onLeave) {
+      Runnable onLeave,
+      Runnable heartbeat) {
     super(title(serverName, mods.size()));
     this.parent = parent;
     this.mods = mods;
     this.projects = projects;
     this.onInstall = onInstall;
     this.onLeave = onLeave;
+    this.heartbeat = heartbeat;
   }
 
   private static Component title(String serverName, int count) {
@@ -162,6 +167,11 @@ final class TrustScreen extends Screen {
   @Override
   public void tick() {
     super.tick();
+    // The server stops waiting for a join without progress; reading this screen is progress.
+    ticks++;
+    if (ticks % HEARTBEAT_TICKS == 0) {
+      heartbeat.run();
+    }
     if (parent instanceof ConnectScreen || parent instanceof ServerReconfigScreen) {
       parent.tick();
     }

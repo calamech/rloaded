@@ -15,5 +15,6 @@
   "rloaded.disconnect.declined": "You did not accept this server's mods.",
   "rloaded.disconnect.failed": "The mods could not be installed: %s",
   "rloaded.disconnect.other_protocol": "Update your Rloaded launcher to join this server.",
-  "rloaded.disconnect.malformed": "Your game sent a message the server cannot read."
+  "rloaded.disconnect.malformed": "Your game sent a message the server cannot read.",
+  "rloaded.disconnect.timeout": "Your game stopped answering while it installed this server's mods."
 }
