@@ -21,16 +21,18 @@ import kotlin.system.exitProcess
  * Installs the pinned server into a cache directory, starts a game test server in a fresh run
  * directory with the agent and the test mods, and fails unless every game test passed.
  *
- * Arguments: cache directory, run directory, report file, agent jar, then the mod jars.
+ * Arguments: cache directory, run directory, report file, agent jar, the jars the tests load while
+ * the server runs (joined with the path separator), then the mod jars the server starts with.
  */
 @OptIn(kotlin.io.path.ExperimentalPathApi::class)
 public fun main(arguments: Array<String>) {
-    val paths = arguments.map { Path.of(it) }
+    val paths = arguments.take(AGENT_ARGUMENT + 1).map { Path.of(it) }
     val cache = paths[0]
     val run = paths[1]
     val report = paths[2]
-    val agent = paths[FIXED_ARGUMENTS - 1]
-    val mods = paths.drop(FIXED_ARGUMENTS)
+    val agent = paths[AGENT_ARGUMENT]
+    val hotAddMods = arguments[FIXED_ARGUMENTS - 1]
+    val mods = arguments.drop(FIXED_ARGUMENTS).map { Path.of(it) }
     val platform = (Platforms.current() as? Outcome.Ok)?.value ?: fail("unsupported platform")
     val installed =
         KtorHttp(UrlPolicy.PRODUCTION, HttpSettings()).use { http ->
@@ -42,7 +44,12 @@ public fun main(arguments: Array<String>) {
     if (run.exists()) run.deleteRecursively()
     run.createDirectories()
     report.deleteIfExists()
-    val properties = mapOf("fabric-api.gametest" to "true", "fabric-api.gametest.report-file" to report.toString())
+    val properties =
+        mapOf(
+            "fabric-api.gametest" to "true",
+            "fabric-api.gametest.report-file" to report.toString(),
+            "rloaded.hot-add-mods" to hotAddMods,
+        )
     val command = ServerCommand.build(installed, agent, mods, MAX_MEMORY_MIB, properties)
     val exit =
         ProcessBuilder(command)
@@ -66,7 +73,8 @@ public fun main(arguments: Array<String>) {
 }
 
 private const val MAX_MEMORY_MIB = 2048
-private const val FIXED_ARGUMENTS = 4
+private const val AGENT_ARGUMENT = 3
+private const val FIXED_ARGUMENTS = 5
 
 private fun fail(message: String): Nothing {
     println("Game tests could not run: $message")

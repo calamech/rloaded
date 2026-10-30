@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "mixin-loaded-class",
+  "version": "${version}",
+  "name": "Mixin on a loaded class (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "mixins": ["mixin-loaded-class.mixins.json"],
+  "depends": {
+    "minecraft": "26.3"
+  }
+}
