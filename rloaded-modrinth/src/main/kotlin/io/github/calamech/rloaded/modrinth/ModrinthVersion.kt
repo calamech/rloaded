@@ -16,3 +16,11 @@ public data class ModrinthFile(
     val size: Long,
     val sha512: Checksum,
 )
+
+/** What players see of a project before they install it. [authors] are its team members, in Modrinth's order. */
+public data class ModrinthProject(
+    val id: String,
+    val title: String,
+    val downloads: Long,
+    val authors: List<String>,
+)

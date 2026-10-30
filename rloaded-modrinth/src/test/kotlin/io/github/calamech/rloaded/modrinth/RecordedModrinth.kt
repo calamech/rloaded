@@ -39,6 +39,37 @@ class RecordedModrinth(
             exchange.respond(200, answer.toString().toByteArray())
         }
 
+    /** Answers `/v2/projects` and `/v2/teams` from the projects and teams recorded on the same day. */
+    fun answerProjectsFromRecording() {
+        server.route(PROJECTS) { exchange, _ ->
+            val wanted = requestedIds(exchange)
+            val answer =
+                JsonArray(
+                    PROJECTS_RECORDED.filter {
+                        it.jsonObject
+                            .getValue("id")
+                            .jsonPrimitive.content in wanted
+                    },
+                )
+            exchange.respond(200, answer.toString().toByteArray())
+        }
+        server.route(TEAMS) { exchange, _ ->
+            val wanted = requestedIds(exchange)
+            val answer =
+                JsonArray(
+                    TEAMS_RECORDED.filter { team ->
+                        team.jsonArray
+                            .first()
+                            .jsonObject
+                            .getValue("team_id")
+                            .jsonPrimitive.content in
+                            wanted
+                    },
+                )
+            exchange.respond(200, answer.toString().toByteArray())
+        }
+    }
+
     fun answer(
         body: String,
         status: Int = 200,
@@ -48,6 +79,8 @@ class RecordedModrinth(
 
     companion object {
         const val PATH = "/v2/versions"
+        const val PROJECTS = "/v2/projects"
+        const val TEAMS = "/v2/teams"
         const val FABRIC_API = "EQKgpeKu"
         const val MOD_MENU = "kyy7dbrZ"
 
@@ -57,6 +90,19 @@ class RecordedModrinth(
                 .parseToJsonElement(
                     RecordedModrinth::class.java.getResource("versions-EQKgpeKu-kyy7dbrZ-zzzzzzzz.json")?.readText()
                         ?: error("recording missing"),
+                ).jsonArray
+
+        /**
+         * The projects and teams recorded on 2026-10-30, trimmed to the fields Rloaded reads and a few
+         * it ignores: the full answers carry each project's whole description page.
+         */
+        val PROJECTS_RECORDED: JsonArray = recording("projects-P7dR8mSH-mOgUt4GM-zzzzzzzz.json")
+        val TEAMS_RECORDED: JsonArray = recording("teams-BZoBsPo6-VMz4FpgB.json")
+
+        private fun recording(name: String): JsonArray =
+            Json
+                .parseToJsonElement(
+                    RecordedModrinth::class.java.getResource(name)?.readText() ?: error("recording $name missing"),
                 ).jsonArray
 
         /** One recorded version with [change] applied to its JSON object. */

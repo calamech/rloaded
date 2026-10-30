@@ -1,0 +1,51 @@
+[
+  [
+    {
+      "team_id": "BZoBsPo6",
+      "role": "Member",
+      "ordering": 0,
+      "user": {
+        "id": "iFMgB5Ib",
+        "username": "Player7457"
+      }
+    },
+    {
+      "team_id": "BZoBsPo6",
+      "role": "Owner",
+      "ordering": 0,
+      "user": {
+        "id": "JZA4dW8o",
+        "username": "modmuss50"
+      }
+    }
+  ],
+  [
+    {
+      "team_id": "VMz4FpgB",
+      "role": "Maintainer",
+      "ordering": 0,
+      "user": {
+        "id": "qtMYDuLg",
+        "username": "gniftygnome"
+      }
+    },
+    {
+      "team_id": "VMz4FpgB",
+      "role": "Original creator",
+      "ordering": 0,
+      "user": {
+        "id": "Dc7EYhxG",
+        "username": "Prospector"
+      }
+    },
+    {
+      "team_id": "VMz4FpgB",
+      "role": "Contributor",
+      "ordering": 0,
+      "user": {
+        "id": "JZA4dW8o",
+        "username": "modmuss50"
+      }
+    }
+  ]
+]
