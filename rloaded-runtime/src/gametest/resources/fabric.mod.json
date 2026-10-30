@@ -6,7 +6,9 @@
   "license": "MIT",
   "environment": "*",
   "entrypoints": {
+    "main": ["io.github.calamech.rloaded.gametest.GameTestContent"],
     "fabric-gametest": [
+      "io.github.calamech.rloaded.gametest.BlockEntityCyclingGameTest",
       "io.github.calamech.rloaded.gametest.EntityCyclingGameTest",
       "io.github.calamech.rloaded.gametest.LateMixinGameTest"
     ]
