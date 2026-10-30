@@ -8,6 +8,7 @@
   "entrypoints": {
     "main": ["io.github.calamech.rloaded.gametest.GameTestContent"],
     "client": ["io.github.calamech.rloaded.gametest.client.GameTestClientContent"],
+    "server": ["io.github.calamech.rloaded.gametest.RegistrySyncServer"],
     "fabric-client-gametest": [
       "io.github.calamech.rloaded.gametest.client.ReconfigurationClientGameTest",
       "io.github.calamech.rloaded.gametest.client.ReconfigurationStabilityClientGameTest"

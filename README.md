@@ -16,7 +16,7 @@ Design decisions are recorded in [docs/adr](docs/adr/).
 | `rloaded-runtime` | The Fabric mod loaded in every game and server (a separate Loom build) |
 | `rloaded-launcher` | `launcher-core`, which installs and starts the game, and `launcher-app`, the desktop window |
 | `rloaded-server-bootstrap` | `rloaded-server.jar`, which sets up and starts a server |
-| `rloaded-game-tests` | Game tests on a real game test server |
+| `rloaded-game-tests` | Game tests on a real game test server, and checks with real clients |
 
 ## Development
 
@@ -25,6 +25,7 @@ You need a JDK 17 or newer to start Gradle. Gradle then downloads the JetBrains 
 ```sh
 ./gradlew check                                  # build and unit tests
 ./gradlew :rloaded-game-tests:gameTest           # game tests, downloads the pinned server
+./gradlew :rloaded-game-tests:registrySyncTest   # a server and two clients agree on raw ids after an add
 ./gradlew :rloaded-launcher:launcher-app:run     # the launcher window
 ./gradlew :rloaded-server-bootstrap:serverJar    # rloaded-server-bootstrap/build/libs/rloaded-server.jar
 ```

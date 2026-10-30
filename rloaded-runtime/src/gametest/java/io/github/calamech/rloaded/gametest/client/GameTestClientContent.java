@@ -5,7 +5,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
-/** The client side of {@link PingTraffic}: answers every tick while connected. */
+/** The client side of {@link PingTraffic}, and of the registry sync check when it runs. */
 public final class GameTestClientContent implements ClientModInitializer {
   @Override
   public void onInitializeClient() {
@@ -17,5 +17,6 @@ public final class GameTestClientContent implements ClientModInitializer {
             ClientPlayNetworking.send(new PingTraffic.Ping(client.player.tickCount));
           }
         });
+    RegistrySyncClient.register();
   }
 }

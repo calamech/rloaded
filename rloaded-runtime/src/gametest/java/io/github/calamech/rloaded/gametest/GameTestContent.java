@@ -28,5 +28,6 @@ public final class GameTestContent implements ModInitializer {
     Registry.register(BuiltInRegistries.BLOCK, FRAGILE_ID, FRAGILE);
     Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, FRAGILE_ID, FRAGILE_BLOCK_ENTITY);
     PingTraffic.register();
+    RegistrySyncCheck.registerPayloads();
   }
 }
