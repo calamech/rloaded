@@ -12,6 +12,9 @@ plugins {
 
 val libs = versionCatalogs.named("libs")
 
+// The runtime mod's build asks for these libraries by these coordinates.
+group = "io.github.calamech.rloaded"
+
 // Libraries compile to Java 21 bytecode: the server bootstrap uses them and starts on any Java 21+.
 kotlin {
     explicitApi()
