@@ -55,7 +55,7 @@ public fun main(arguments: Array<String>) {
     val settings = LaunchSettings(profile, run, null, agent, runtimeMod, "client-game-test")
     val command =
         when (val built = ClientCommand.build(installed, settings, directories.assets, run.resolve("natives"))) {
-            is Outcome.Ok -> withTestMods(built.value, testMods, report)
+            is Outcome.Ok -> withTestMods(built.value, testMods, clientGameTestProperties(report))
             is Outcome.Err -> fail("unknown launch placeholder ${built.error.name}")
         }
     val client =

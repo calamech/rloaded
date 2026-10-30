@@ -39,6 +39,12 @@ kover {
                 classes("io.github.calamech.rloaded.gametests.MainKt*")
                 // Like Main, but starts a client; the command it builds is unit tested in ClientTestCommand.
                 classes("io.github.calamech.rloaded.gametests.ClientMainKt*")
+                // Starts a server and two clients; the comparison it ends with is unit tested in RegistryIds.
+                classes(
+                    "io.github.calamech.rloaded.gametests.RegistrySyncMainKt*",
+                    "io.github.calamech.rloaded.gametests.ClientLaunch",
+                    "io.github.calamech.rloaded.gametests.ClientRun",
+                )
             }
         }
     }
@@ -96,5 +102,37 @@ tasks.register<JavaExec>("clientGameTest") {
             agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
         ) + modFiles.files.map { it.absolutePath }
+    }
+}
+
+// Runs the pinned server in its own process and two clients that join it, adds blocks while they
+// are connected, and fails unless the three agree on the raw ids. Needs a display, like
+// clientGameTest, and runs in the same CI job.
+tasks.register<JavaExec>("registrySyncTest") {
+    description = "Checks that the server and two clients agree on raw ids after an add."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.RegistrySyncMainKt"
+    val clientCache = layout.buildDirectory.dir("client-game-test/cache")
+    val serverCache = layout.buildDirectory.dir("registry-sync-test/server-cache")
+    val run = layout.buildDirectory.dir("registry-sync-test/run")
+    val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
+    val serverModFiles = files(testModJars)
+    val clientModFiles = files(clientTestModJars)
+    inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
+    inputs.files(serverModFiles).withPropertyName("serverMods")
+    inputs.files(clientModFiles).withPropertyName("clientMods")
+    argumentProviders.add {
+        listOf(
+            clientCache.get().asFile.absolutePath,
+            serverCache.get().asFile.absolutePath,
+            run.get().asFile.absolutePath,
+            agentFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            serverModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+            clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+        )
     }
 }

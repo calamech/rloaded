@@ -12,12 +12,12 @@ class ClientTestCommandTest {
     fun `adds the test mods and turns the tests on`() {
         val command = listOf("java", "-Xmx4096M", "-Dfabric.addMods=base.jar", "Main", "--username", "Tester")
 
-        val result = withTestMods(command, listOf(Path.of("a.jar"), Path.of("b.jar")), report)
+        val result = withTestMods(command, listOf(Path.of("a.jar"), Path.of("b.jar")), clientGameTestProperties(report))
 
         assertEquals(
             listOf(
                 "java",
-                "-Dfabric.client.gametest",
+                "-Dfabric.client.gametest=true",
                 "-Drloaded.client-game-test.report=$report",
                 "-Xmx4096M",
                 "-Dfabric.addMods=base.jar${File.pathSeparator}a.jar${File.pathSeparator}b.jar",
@@ -31,7 +31,7 @@ class ClientTestCommandTest {
 
     @Test
     fun `refuses a command that does not load mods`() {
-        val refused = runCatching { withTestMods(listOf("java", "Main"), listOf(Path.of("a.jar")), report) }.exceptionOrNull()
+        val refused = runCatching { withTestMods(listOf("java", "Main"), listOf(Path.of("a.jar")), emptyMap()) }.exceptionOrNull()
 
         assertEquals("the launch command has no -Dfabric.addMods= argument", refused?.message)
     }
