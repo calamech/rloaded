@@ -56,3 +56,27 @@ jobs:
           key: game-test-${{ hashFiles('rloaded-core/src/main/resources/io/github/calamech/rloaded/core/runtime/runtime-pins.json') }}
       - name: Game tests
         run: ./gradlew :rloaded-game-tests:gameTest --stacktrace
+
+  client-game-test:
+    name: client-game-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: jetbrains
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      # The pinned client, runtime and mods, downloaded once per set of pins.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: rloaded-game-tests/build/client-game-test/cache
+          key: client-game-test-${{ hashFiles('rloaded-core/src/main/resources/io/github/calamech/rloaded/core/runtime/runtime-pins.json') }}
+      # The client needs a display: a virtual one, rendered by Mesa's software OpenGL.
+      - name: Virtual display
+        run: sudo apt-get update && sudo apt-get install --yes xvfb libgl1-mesa-dri
+      - name: Client game tests
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" ./gradlew :rloaded-game-tests:clientGameTest --stacktrace

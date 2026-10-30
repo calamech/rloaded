@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-29
+- Amended: 2026-10-30, confirmed on a real client by `ReconfigurationClientGameTest` (ADR 0022)
 
 ## Context
 
