@@ -12,6 +12,7 @@ Design decisions are recorded in [docs/adr](docs/adr/).
 | --- | --- |
 | `rloaded-protocol` | The messages between server, game and launcher, and types shared by every module such as `Outcome` and `Checksum` |
 | `rloaded-core` | Verified downloads, Mojang metadata, the pinned runtime, the JetBrains Runtime installer |
+| `rloaded-modrinth` | Reads Modrinth's records of mod versions and checks manifest entries against them |
 | `rloaded-agent` | The Java agent started with the game |
 | `rloaded-runtime` | The Fabric mod loaded in every game and server (a separate Loom build) |
 | `rloaded-launcher` | `launcher-core`, which installs and starts the game, and `launcher-app`, the desktop window |
