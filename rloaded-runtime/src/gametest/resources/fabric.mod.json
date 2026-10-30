@@ -10,7 +10,8 @@
     "fabric-gametest": [
       "io.github.calamech.rloaded.gametest.BlockEntityCyclingGameTest",
       "io.github.calamech.rloaded.gametest.EntityCyclingGameTest",
-      "io.github.calamech.rloaded.gametest.LateMixinGameTest"
+      "io.github.calamech.rloaded.gametest.LateMixinGameTest",
+      "io.github.calamech.rloaded.gametest.RegistryThawGameTest"
     ]
   },
   "depends": {
