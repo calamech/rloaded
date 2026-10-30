@@ -9,7 +9,7 @@ class ClientTestCommandTest {
     private val report = Path.of("build", "report.txt")
 
     @Test
-    fun `adds the test mods, turns the tests on and forces OpenGL`() {
+    fun `adds the test mods and turns the tests on`() {
         val command = listOf("java", "-Xmx4096M", "-Dfabric.addMods=base.jar", "Main", "--username", "Tester")
 
         val result = withTestMods(command, listOf(Path.of("a.jar"), Path.of("b.jar")), report)
@@ -24,8 +24,6 @@ class ClientTestCommandTest {
                 "Main",
                 "--username",
                 "Tester",
-                "--graphicsBackend",
-                "opengl",
             ),
             result,
         )

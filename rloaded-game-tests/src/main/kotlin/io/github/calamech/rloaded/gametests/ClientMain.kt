@@ -13,6 +13,7 @@ import io.github.calamech.rloaded.launcher.OfflineProfile
 import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
@@ -57,12 +58,16 @@ public fun main(arguments: Array<String>) {
             is Outcome.Ok -> withTestMods(built.value, testMods, report)
             is Outcome.Err -> fail("unknown launch placeholder ${built.error.name}")
         }
-    val exit =
+    val client =
         ProcessBuilder(command)
             .directory(run.toFile())
             .inheritIO()
             .start()
-            .waitFor()
+    if (!client.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
+        client.destroyForcibly().waitFor()
+        fail("the client did not finish within $TIMEOUT_MINUTES minutes")
+    }
+    val exit = client.exitValue()
     val passed = if (report.exists()) report.readLines().filter { it.isNotBlank() } else emptyList()
     println("Client game tests: exit code $exit, ${passed.size} passed")
     passed.forEach { println("  passed: $it") }
@@ -70,6 +75,7 @@ public fun main(arguments: Array<String>) {
 }
 
 private const val PLAYER = "Tester"
+private const val TIMEOUT_MINUTES = 15L
 private const val AGENT_ARGUMENT = 3
 private const val RUNTIME_MOD_ARGUMENT = 4
 

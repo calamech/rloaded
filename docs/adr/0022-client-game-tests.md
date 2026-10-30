@@ -11,9 +11,9 @@ Fabric API ships a client game test module, `fabric-client-gametest-api-v1`, lef
 
 ## Decision
 
-`:rloaded-game-tests:clientGameTest` installs the pinned client with the launcher's own `GameInstaller` and `ClientCommand`, into a cache under the build directory, and starts it in a fresh run directory with the agent, the runtime mod, the game test mod and Fabric's two game test modules from Fabric's Maven repository. It forces OpenGL with `--graphicsBackend opengl`, which every runner and virtual display offers. It writes `eula.txt` in the run directory: the project owner accepted the EULA for these test directories on 2026-10-30. Each client test appends its name to a report file once it passed; the task fails unless the client exited with 0 and the report lists at least one test.
+`:rloaded-game-tests:clientGameTest` installs the pinned client with the launcher's own `GameInstaller` and `ClientCommand`, into a cache under the build directory, and starts it in a fresh run directory with the agent, the runtime mod, the game test mod and Fabric's two game test modules from Fabric's Maven repository. The game picks its graphics backend as it does for players. It writes `eula.txt` in the run directory: the project owner accepted the EULA for these test directories on 2026-10-30. Each client test appends its name to a report file once it passed; the task fails unless the client exited with 0 and the report lists at least one test, and stops a client that runs for more than 15 minutes.
 
-CI runs it in a `client-game-test` job on Ubuntu, under `xvfb-run` with Mesa's software OpenGL.
+CI runs it in a `client-game-test` job on Ubuntu, under `xvfb-run`, with Mesa's software Vulkan driver installed. On that runner the game cannot create an OpenGL context under Xvfb ("Couldn't find matching GLX visual" on 2026-10-30), and falls back to Vulkan when it is not forced to OpenGL; Fabric API's own client test job shows the same fallback, read in its run of 2026-10-23.
 
 The first test, `ReconfigurationClientGameTest`, spawns an armor stand next to the player, sends the player to the configuration phase with `switchToConfig` and back with `returnToWorld`, as the debug `config` command does, and checks that the client has a new level and a new armor stand object for the same entity. Checked on 2026-10-30 on macOS with the pinned JetBrains Runtime, Fabric Loader 0.20.1, Fabric API 0.165.0 and Minecraft 26.3: it passed, and it failed with a timeout when the reconfiguration was left out.
 
@@ -26,8 +26,9 @@ The first test, `ReconfigurationClientGameTest`, spawns an armor stand next to t
 ## Consequences
 
 - The client and the in-process server share registries, so tests about what the client receives from the server need a separate process.
-- The job installs `xvfb` and Mesa from Ubuntu's packages, which are not pinned like the rest.
+- The job installs `xvfb` and Mesa's Vulkan driver from Ubuntu's packages, which are not pinned like the rest.
 - The Ubuntu job draws with a software renderer; tests must not depend on rendering speed.
+- Forcing OpenGL left the client without a backend on that runner, and it waited until the job timed out; the 15-minute limit turns such a hang into a failure.
 
 ## Enforcement
 

@@ -75,8 +75,9 @@ jobs:
         with:
           path: rloaded-game-tests/build/client-game-test/cache
           key: client-game-test-${{ hashFiles('rloaded-core/src/main/resources/io/github/calamech/rloaded/core/runtime/runtime-pins.json') }}
-      # The client needs a display: a virtual one, rendered by Mesa's software OpenGL.
+      # The client needs a display and a graphics backend: a virtual display, and Mesa's software
+      # Vulkan, which the game picks when OpenGL is not available, as on Fabric API's own CI.
       - name: Virtual display
-        run: sudo apt-get update && sudo apt-get install --yes xvfb libgl1-mesa-dri
+        run: sudo apt-get update && sudo apt-get install --yes xvfb mesa-vulkan-drivers
       - name: Client game tests
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" ./gradlew :rloaded-game-tests:clientGameTest --stacktrace
+        run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:clientGameTest --stacktrace
