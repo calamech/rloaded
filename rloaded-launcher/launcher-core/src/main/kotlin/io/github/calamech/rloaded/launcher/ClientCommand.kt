@@ -21,6 +21,10 @@ public data class LaunchSettings(
     val runtimeMod: Path,
     /** Shown by the game as the launcher version. */
     val launcherVersion: String,
+    /** Where the game keeps the mod jars it downloads, by SHA-512. */
+    val modStore: Path,
+    /** Where the game keeps the servers the player trusts. */
+    val trustStore: Path,
     val maxMemoryMiB: Int = DEFAULT_MAX_MEMORY_MIB,
 ) {
     private companion object {
@@ -72,6 +76,8 @@ public object ClientCommand {
                 "-XX:+AllowEnhancedClassRedefinition",
                 "-javaagent:${settings.agentJar}",
                 "-Dfabric.addMods=${(installed.mods + listOf(settings.runtimeMod)).joinToString(File.pathSeparator)}",
+                "-Drloaded.mod-store=${settings.modStore}",
+                "-Drloaded.trust-store=${settings.trustStore}",
             )
         val logging = listOfNotNull(installed.game.logging?.argument)
         return (installed.game.jvmArguments + logging).traverse { fill(it, values) }.flatMap { jvm ->

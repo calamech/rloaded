@@ -55,7 +55,17 @@ public class Launcher(
             .install(features, onProgress)
             .mapError<InstalledGame, InstallFailure, LaunchFailure> { LaunchFailure.Install(it) }
             .flatMap { installed ->
-                val settings = LaunchSettings(profile, gameDirectory, server, agentJar, runtimeMod, launcherVersion)
+                val settings =
+                    LaunchSettings(
+                        profile,
+                        gameDirectory,
+                        server,
+                        agentJar,
+                        runtimeMod,
+                        launcherVersion,
+                        directories.mods,
+                        directories.trustStore,
+                    )
                 ClientCommand
                     .build(installed, settings, directories.assets, gameDirectory.resolve("natives"))
                     .mapError<List<String>, UnknownPlaceholder, LaunchFailure> { LaunchFailure.Command(it) }

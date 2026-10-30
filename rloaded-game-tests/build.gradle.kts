@@ -10,6 +10,8 @@ val runtimeMod = configurations.dependencyScope("runtimeMod")
 val runtimeModJar = configurations.resolvable("runtimeModJar") { extendsFrom(runtimeMod.get()) }
 val hotAddMods = configurations.dependencyScope("hotAddMods")
 val hotAddModJars = configurations.resolvable("hotAddModJars") { extendsFrom(hotAddMods.get()) }
+val joinClientMods = configurations.dependencyScope("joinClientMods")
+val joinClientModJars = configurations.resolvable("joinClientModJars") { extendsFrom(joinClientMods.get()) }
 val clientTestMods = configurations.dependencyScope("clientTestMods")
 val clientTestModJars = configurations.resolvable("clientTestModJars") { extendsFrom(clientTestMods.get()) }
 
@@ -37,6 +39,11 @@ dependencies {
     }
     clientTestMods(libs.fabric.gametest.api) { isTransitive = false }
     clientTestMods(libs.fabric.client.gametest.api) { isTransitive = false }
+    joinClientMods("io.github.calamech.rloaded:rloaded-runtime") {
+        isTransitive = false
+        capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-join-test") }
+    }
+    joinClientMods(libs.fabric.client.gametest.api) { isTransitive = false }
 }
 
 // The entry point downloads and starts a real game test server; its logic is checked by running it.
@@ -47,11 +54,15 @@ kover {
                 classes("io.github.calamech.rloaded.gametests.MainKt*")
                 // Like Main, but starts a client; the command it builds is unit tested in ClientTestCommand.
                 classes("io.github.calamech.rloaded.gametests.ClientMainKt*")
-                // Starts a server and two clients; the comparison it ends with is unit tested in RegistryIds.
+                // These start servers and clients in processes of their own; the logic they check is tested
+                // in RegistryIds and in the runtime's join, which the checks exercise.
                 classes(
                     "io.github.calamech.rloaded.gametests.RegistrySyncMainKt*",
                     "io.github.calamech.rloaded.gametests.ClientLaunch",
-                    "io.github.calamech.rloaded.gametests.ClientRun",
+                    "io.github.calamech.rloaded.gametests.SeparateProcessesKt*",
+                    "io.github.calamech.rloaded.gametests.JoinMainKt*",
+                    "io.github.calamech.rloaded.gametests.FakeModrinth*",
+                    "io.github.calamech.rloaded.gametests.FakeMod",
                 )
             }
         }
@@ -147,6 +158,39 @@ tasks.register<JavaExec>("registrySyncTest") {
             runtimeFile.singleFile.absolutePath,
             serverModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
             clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+        )
+    }
+}
+
+// A first join end to end: a server in its own process with content-basic and mixin-loaded-class in
+// its lockfile, a client that accepts the trust screen and gets both mods from a fake Modrinth.
+// Needs a display, like clientGameTest, and runs in the same CI job.
+tasks.register<JavaExec>("joinTest") {
+    description = "Checks that a client joining a server installs its mods without a restart."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.JoinMainKt"
+    val clientCache = layout.buildDirectory.dir("client-game-test/cache")
+    val serverCache = layout.buildDirectory.dir("registry-sync-test/server-cache")
+    val run = layout.buildDirectory.dir("join-test/run")
+    val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
+    val servedFiles = files(hotAddModJars)
+    val clientModFiles = files(joinClientModJars)
+    inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
+    inputs.files(servedFiles).withPropertyName("servedMods")
+    inputs.files(clientModFiles).withPropertyName("clientMods")
+    argumentProviders.add {
+        listOf(
+            clientCache.get().asFile.absolutePath,
+            serverCache.get().asFile.absolutePath,
+            run.get().asFile.absolutePath,
+            agentFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            (runtimeFile.files + servedFiles.files).joinToString(File.pathSeparator) { it.absolutePath },
+            clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+            servedFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         )
     }
 }

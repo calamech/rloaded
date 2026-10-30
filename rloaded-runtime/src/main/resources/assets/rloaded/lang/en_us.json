@@ -1,0 +1,19 @@
+{
+  "rloaded.trust.title.none": "%s uses Rloaded",
+  "rloaded.trust.title.one": "%s wants to install 1 mod",
+  "rloaded.trust.title.many": "%s wants to install %s mods",
+  "rloaded.trust.subtitle": "They come from Modrinth and run on your computer, like mods you install yourself.",
+  "rloaded.trust.subtitle.none": "It has no mods for you to install yet.",
+  "rloaded.trust.future": "You trust this server for its future mods too.",
+  "rloaded.trust.client": "(client)",
+  "rloaded.trust.by": "by %s",
+  "rloaded.trust.by_more": "by %s and %s more",
+  "rloaded.trust.downloads": "%s downloads",
+  "rloaded.trust.install": "Install and join",
+  "rloaded.trust.leave": "Leave",
+  "rloaded.disconnect.no_launcher": "This server installs its mods for you: join it from the Rloaded launcher.",
+  "rloaded.disconnect.declined": "You did not accept this server's mods.",
+  "rloaded.disconnect.failed": "The mods could not be installed: %s",
+  "rloaded.disconnect.other_protocol": "Update your Rloaded launcher to join this server.",
+  "rloaded.disconnect.malformed": "Your game sent a message the server cannot read."
+}

@@ -10,14 +10,14 @@ import java.util.Optional;
  * public methods by name: {@code AgentState.instrumentation()} and {@code
  * ClassRedefinition.current()}.
  */
-final class AgentBridge {
+public final class AgentBridge {
   private static final String AGENT_STATE = "io.github.calamech.rloaded.agent.AgentState";
   private static final String CLASS_REDEFINITION = "io.github.calamech.rloaded.agent.ClassRedefinition";
 
   private AgentBridge() {}
 
   /** The agent's instrumentation, or nothing when the JVM was started without the agent. */
-  static Optional<Instrumentation> instrumentation() {
+  public static Optional<Instrumentation> instrumentation() {
     return call(AGENT_STATE, "instrumentation")
         .flatMap(value -> (Optional<?>) value)
         .map(Instrumentation.class::cast);

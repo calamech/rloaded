@@ -132,7 +132,9 @@ public class ArtifactStore(
             Outcome.Err(DownloadError.Storage(path, e.message ?: e.javaClass.simpleName))
         }
 
-    private companion object {
-        const val DEFAULT_MAX_UNSIZED_BYTES = 512L * 1024 * 1024
+    /** Defaults, for callers that cannot use default arguments. */
+    public companion object {
+        /** The default for downloads without a published size. */
+        public const val DEFAULT_MAX_UNSIZED_BYTES: Long = 512L * 1024 * 1024
     }
 }
