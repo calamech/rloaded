@@ -42,9 +42,31 @@ val serverJar =
         from(sourceSets.main.map { it.output })
         from(configurations.runtimeClasspath.map { classpath -> classpath.map { zipTree(it) } }) {
             exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/versions/*/module-info.class", "module-info.class")
+            exclude("META-INF/LICENSE*", "META-INF/NOTICE*")
         }
+        // Dependencies name their license and notice files alike, so each keeps them under its own path.
+        includeEmptyDirs = false
+        configurations.runtimeClasspath
+            .get()
+            .incoming.artifacts.resolvedArtifacts
+            .get()
+            .forEach { artifact ->
+                val module = artifact.id.componentIdentifier as? ModuleComponentIdentifier ?: return@forEach
+                val directory = "META-INF/licenses/${module.group}/${module.module}"
+                from(zipTree(artifact.file)) {
+                    include("META-INF/LICENSE*", "META-INF/NOTICE*")
+                    eachFile { path = "$directory/$name" }
+                }
+            }
     }
 
 tasks.assemble {
     dependsOn(serverJar)
+}
+
+// ServerJarTest reads the built jar.
+tasks.test {
+    val jar = serverJar.flatMap { it.archiveFile }
+    inputs.file(jar).withPropertyName("serverJar")
+    systemProperty("rloaded.serverJar", jar.get().asFile.absolutePath)
 }
