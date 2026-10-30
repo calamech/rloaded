@@ -19,6 +19,7 @@ dependencies {
     implementation(project(":rloaded-core"))
     implementation(project(":rloaded-server-bootstrap"))
     implementation(project(":rloaded-launcher:launcher-core"))
+    implementation(project(":rloaded-modrinth"))
     agent(project(":rloaded-agent"))
     testMods("io.github.calamech.rloaded:rloaded-runtime") { isTransitive = false }
     testMods("io.github.calamech.rloaded:rloaded-runtime") {
@@ -162,8 +163,8 @@ tasks.register<JavaExec>("registrySyncTest") {
     }
 }
 
-// A first join end to end: a server in its own process with content-basic and mixin-loaded-class in
-// its lockfile, a client that accepts the trust screen and gets both mods from a fake Modrinth.
+// A first join end to end: a server in its own process that gets content-basic and mixin-loaded-class
+// from its lockfile, a client that accepts the trust screen and gets both mods from a fake Modrinth.
 // Needs a display, like clientGameTest, and runs in the same CI job.
 tasks.register<JavaExec>("joinTest") {
     description = "Checks that a client joining a server installs its mods without a restart."
@@ -188,7 +189,7 @@ tasks.register<JavaExec>("joinTest") {
             run.get().asFile.absolutePath,
             agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
-            (runtimeFile.files + servedFiles.files).joinToString(File.pathSeparator) { it.absolutePath },
+            runtimeFile.singleFile.absolutePath,
             clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
             servedFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         )

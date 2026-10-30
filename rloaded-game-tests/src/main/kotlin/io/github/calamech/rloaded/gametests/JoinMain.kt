@@ -1,8 +1,20 @@
 package io.github.calamech.rloaded.gametests
 
+import io.github.calamech.rloaded.bootstrap.LockfileMods
+import io.github.calamech.rloaded.core.download.ArtifactStore
+import io.github.calamech.rloaded.core.download.HttpSettings
+import io.github.calamech.rloaded.core.download.KtorHttp
+import io.github.calamech.rloaded.core.download.Origin
+import io.github.calamech.rloaded.core.download.UrlPolicy
 import io.github.calamech.rloaded.launcher.ClientDirectories
+import io.github.calamech.rloaded.modrinth.ModInstaller
+import io.github.calamech.rloaded.modrinth.Modrinth
+import io.github.calamech.rloaded.modrinth.ModrinthSettings
+import io.github.calamech.rloaded.protocol.Outcome
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.net.ServerSocket
+import java.net.URI
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.createDirectories
@@ -14,10 +26,10 @@ import kotlin.io.path.writeText
 import kotlin.system.exitProcess
 
 /**
- * Checks a first join end to end: a server in its own process runs content-basic and
- * mixin-loaded-class from its lockfile; a client with only the base set joins it, accepts the trust
- * screen, downloads both mods from a fake Modrinth, loads them before the world exists, and uses them
- * in the world without a restart.
+ * Checks a first join end to end: a server in its own process gets content-basic and
+ * mixin-loaded-class from its lockfile, the way the bootstrap does, and loads them; a client with only
+ * the base set joins it, accepts the trust screen, downloads both mods from a fake Modrinth, loads them
+ * before the world exists, and uses them in the world without a restart.
  *
  * The project owner accepted the Minecraft EULA for the server directory this check creates.
  *
@@ -52,7 +64,8 @@ public fun main(arguments: Array<String>) {
             .createDirectories()
             .resolve("lockfile.json")
             .writeText(lockfile(mods))
-        val serverProcess = startServer(server, agent, serverMods, serverDirectory, emptyMap())
+        val lockfileMods = lockfileMods(serverDirectory, modrinth.url)
+        val serverProcess = startServer(server, agent, serverMods + lockfileMods, serverDirectory, emptyMap())
         processes += serverProcess
         waitForPort(port, serverProcess, deadline)
 
@@ -77,14 +90,36 @@ public fun main(arguments: Array<String>) {
                 .walk()
                 .filter { it.toString().endsWith(".jar") }
                 .count()
-        println("Join check: ${report.readText().trim()}; $cached jars in the cache; trust store written: ${"\"key\"" in trust}")
-        exitProcess(if (cached == mods.size && "\"key\"" in trust) 0 else 1)
+        val serverLog = serverDirectory.resolve("logs").resolve("latest.log").readText()
+        val serverLoaded = listOf("content-basic", "mixin-loaded-class").filter { "\t- $it " in serverLog }
+        println(
+            "Join check: ${report.readText().trim()}; $cached jars in the cache; trust store written: ${"\"key\"" in trust}; " +
+                "server loaded $serverLoaded",
+        )
+        exitProcess(if (cached == mods.size && "\"key\"" in trust && serverLoaded.size == mods.size) 0 else 1)
     }
 }
 
 private const val FIXED_PATHS = 5
 private const val AGENT_ARGUMENT = 3
 private const val RUNTIME_MOD_ARGUMENT = 4
+
+// The bootstrap's own code, pointed at the fake Modrinth.
+private fun lockfileMods(
+    serverDirectory: Path,
+    modrinthUrl: String,
+): List<Path> {
+    val uri = URI(modrinthUrl)
+    val data = serverDirectory.resolve("rloaded")
+    return KtorHttp(UrlPolicy(setOf(Origin(uri.scheme, uri.host, uri.port))), HttpSettings()).use { http ->
+        val installer =
+            ModInstaller(Modrinth(http, ModrinthSettings(apiUrl = "$modrinthUrl/v2")), ArtifactStore(data.resolve("cache/mods"), http))
+        when (val obtained = runBlocking { LockfileMods(installer).obtain(data.resolve("lockfile.json")) }) {
+            is Outcome.Ok -> obtained.value
+            is Outcome.Err -> failCheck(obtained.error)
+        }
+    }
+}
 
 private fun lockfile(mods: List<FakeMod>): String {
     val entries =

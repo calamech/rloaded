@@ -1,10 +1,13 @@
 package io.github.calamech.rloaded.bootstrap
 
+import io.github.calamech.rloaded.core.download.ArtifactStore
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.UrlPolicy
 import io.github.calamech.rloaded.core.mojang.Platforms
 import io.github.calamech.rloaded.core.runtime.RuntimePins
+import io.github.calamech.rloaded.modrinth.ModInstaller
+import io.github.calamech.rloaded.modrinth.Modrinth
 import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
@@ -27,8 +30,9 @@ public fun main(arguments: Array<String>) {
     val folder = ServerFolder(Path.of("").toAbsolutePath())
     val code =
         KtorHttp(UrlPolicy.PRODUCTION, HttpSettings()).use { http ->
-            val bootstrap =
-                Bootstrap(folder, ServerInstaller(http, folder.data, platform, RuntimePins.CURRENT), InheritedIoProcess, System.out)
+            val installer = ServerInstaller(http, folder.data, platform, RuntimePins.CURRENT)
+            val mods = LockfileMods(ModInstaller(Modrinth(http), ArtifactStore(folder.data.resolve("cache/mods"), http)))
+            val bootstrap = Bootstrap(folder, installer, mods, InheritedIoProcess, System.out)
             runBlocking { bootstrap.run(arguments.toList()) }
         }
     exitProcess(code)

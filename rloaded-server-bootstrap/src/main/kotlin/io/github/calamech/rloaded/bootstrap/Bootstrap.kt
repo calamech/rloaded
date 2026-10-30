@@ -37,11 +37,13 @@ public fun interface ServerProcess {
 
 /**
  * The bootstrap: sets up a new server folder, then on later starts installs the pinned runtime and
- * starts Fabric's server on it with the agent, again each time the server asks for a restart.
+ * starts Fabric's server on it with the agent and the lockfile's mods, again each time the server
+ * asks for a restart.
  */
 public class Bootstrap(
     private val folder: ServerFolder,
     private val installer: ServerInstaller,
+    private val lockfileMods: LockfileMods,
     private val process: ServerProcess,
     private val out: PrintStream,
     private val maxRestarts: Int = MAX_RESTARTS,
@@ -85,7 +87,9 @@ public class Bootstrap(
                     installer.install().flatMap { installed ->
                         writeBundled("agent", "rloaded-agent.jar").flatMap { agent ->
                             writeBundled("runtime", "rloaded-runtime.jar").map { runtime ->
-                                ServerCommand.build(installed, agent, listOf(runtime), config.server.maxMemoryMiB)
+                                { mods: List<Path> ->
+                                    ServerCommand.build(installed, agent, listOf(runtime) + mods, config.server.maxMemoryMiB)
+                                }
                             }
                         }
                     }
@@ -96,16 +100,23 @@ public class Bootstrap(
         }
     }
 
-    private fun runUntilStopped(command: List<String>): Int {
+    private suspend fun runUntilStopped(command: (List<Path>) -> List<String>): Int {
         var restarts = 0
         while (true) {
-            val exit = process.run(command, folder.root)
+            val exit = runOnce(command)
             if (exit != ExitCode.RESTART) return exit
             if (restarts == maxRestarts) return fail("The server asked for $maxRestarts restarts in a row; stopping.")
             restarts++
             out.println("Restarting the server.")
         }
     }
+
+    // The lockfile is read again at each start: a restart is how mods leave it.
+    private suspend fun runOnce(command: (List<Path>) -> List<String>): Int =
+        when (val mods = lockfileMods.obtain(folder.lockfile)) {
+            is Outcome.Ok -> process.run(command(mods.value), folder.root)
+            is Outcome.Err -> fail(mods.error)
+        }
 
     // The agent and the runtime mod ship inside the bootstrap, so they always match its version.
     private fun writeBundled(
