@@ -11,7 +11,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 
-/** Registers the blocks the game tests place. */
+/** Registers the blocks the game tests place, and the packets other mods would send. */
 public final class GameTestContent implements ModInitializer {
   private static final Identifier FRAGILE_ID = Identifier.fromNamespaceAndPath("rloaded-gametest", "fragile");
 
@@ -27,5 +27,6 @@ public final class GameTestContent implements ModInitializer {
   public void onInitialize() {
     Registry.register(BuiltInRegistries.BLOCK, FRAGILE_ID, FRAGILE);
     Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, FRAGILE_ID, FRAGILE_BLOCK_ENTITY);
+    PingTraffic.register();
   }
 }
