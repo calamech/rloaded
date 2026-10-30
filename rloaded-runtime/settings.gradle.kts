@@ -20,3 +20,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "rloaded-runtime"
+
+// The mod embeds Kotlin libraries of the main build, asked for by their coordinates: including the
+// main build here lets Gradle substitute its projects for them.
+includeBuild("..")
