@@ -1,14 +1,10 @@
 package io.github.calamech.rloaded.bootstrap
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.ArtifactStore
 import io.github.calamech.rloaded.core.download.Download
 import io.github.calamech.rloaded.core.download.DownloadFailures
 import io.github.calamech.rloaded.core.download.Downloads
 import io.github.calamech.rloaded.core.download.Http
-import io.github.calamech.rloaded.core.flatMap
-import io.github.calamech.rloaded.core.map
-import io.github.calamech.rloaded.core.mapError
 import io.github.calamech.rloaded.core.mojang.GameVersion
 import io.github.calamech.rloaded.core.mojang.MetadataError
 import io.github.calamech.rloaded.core.mojang.MojangEndpoints
@@ -17,6 +13,10 @@ import io.github.calamech.rloaded.core.mojang.Platform
 import io.github.calamech.rloaded.core.runtime.InstallError
 import io.github.calamech.rloaded.core.runtime.JetBrainsRuntimeInstaller
 import io.github.calamech.rloaded.core.runtime.RuntimePins
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
+import io.github.calamech.rloaded.protocol.map
+import io.github.calamech.rloaded.protocol.mapError
 import java.nio.file.Path
 
 /** The pinned runtime, the server jar, Fabric Loader and the base set, on disk and verified. */

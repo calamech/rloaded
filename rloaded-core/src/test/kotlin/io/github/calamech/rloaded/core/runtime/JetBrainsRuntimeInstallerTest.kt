@@ -1,6 +1,5 @@
 package io.github.calamech.rloaded.core.runtime
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.Artifact
 import io.github.calamech.rloaded.core.download.ArtifactStore
 import io.github.calamech.rloaded.core.download.Checksum
@@ -10,6 +9,7 @@ import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.TestServer
 import io.github.calamech.rloaded.core.mojang.OperatingSystem
+import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream

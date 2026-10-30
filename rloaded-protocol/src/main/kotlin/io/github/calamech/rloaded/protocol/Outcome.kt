@@ -1,4 +1,4 @@
-package io.github.calamech.rloaded.core
+package io.github.calamech.rloaded.protocol
 
 /**
  * The result of an operation that can fail in an expected way, described by a typed error [E].

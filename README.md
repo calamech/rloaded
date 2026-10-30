@@ -10,6 +10,7 @@ Design decisions are recorded in [docs/adr](docs/adr/).
 
 | Module | What it does |
 | --- | --- |
+| `rloaded-protocol` | Types shared by every module, starting with `Outcome` for expected failures |
 | `rloaded-core` | Verified downloads, Mojang metadata, the pinned runtime, the JetBrains Runtime installer |
 | `rloaded-agent` | The Java agent started with the game |
 | `rloaded-runtime` | The Fabric mod loaded in every game and server (a separate Loom build) |

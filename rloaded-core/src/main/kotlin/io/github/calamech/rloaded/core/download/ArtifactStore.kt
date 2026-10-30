@@ -1,7 +1,7 @@
 package io.github.calamech.rloaded.core.download
 
-import io.github.calamech.rloaded.core.Outcome
-import io.github.calamech.rloaded.core.flatMap
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext

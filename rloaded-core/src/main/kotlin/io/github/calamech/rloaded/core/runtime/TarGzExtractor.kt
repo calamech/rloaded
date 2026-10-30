@@ -1,6 +1,6 @@
 package io.github.calamech.rloaded.core.runtime
 
-import io.github.calamech.rloaded.core.Outcome
+import io.github.calamech.rloaded.protocol.Outcome
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import java.io.IOException

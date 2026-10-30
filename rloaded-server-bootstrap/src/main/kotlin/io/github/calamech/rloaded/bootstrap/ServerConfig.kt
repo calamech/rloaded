@@ -1,8 +1,8 @@
 package io.github.calamech.rloaded.bootstrap
 
 import com.akuleshov7.ktoml.Toml
-import io.github.calamech.rloaded.core.Outcome
-import io.github.calamech.rloaded.core.flatMap
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 

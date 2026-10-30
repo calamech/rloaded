@@ -1,9 +1,9 @@
 package io.github.calamech.rloaded.bootstrap
 
-import io.github.calamech.rloaded.core.Outcome
-import io.github.calamech.rloaded.core.flatMap
-import io.github.calamech.rloaded.core.map
-import io.github.calamech.rloaded.core.mapError
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
+import io.github.calamech.rloaded.protocol.map
+import io.github.calamech.rloaded.protocol.mapError
 import java.io.IOException
 import java.io.PrintStream
 import java.nio.file.Files

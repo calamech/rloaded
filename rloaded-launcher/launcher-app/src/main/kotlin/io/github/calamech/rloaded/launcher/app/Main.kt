@@ -6,7 +6,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.UrlPolicy
@@ -16,6 +15,7 @@ import io.github.calamech.rloaded.launcher.ClientDirectories
 import io.github.calamech.rloaded.launcher.DataDirectory
 import io.github.calamech.rloaded.launcher.GameInstaller
 import io.github.calamech.rloaded.launcher.Launcher
+import io.github.calamech.rloaded.protocol.Outcome
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption

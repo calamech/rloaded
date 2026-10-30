@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":rloaded-protocol"))
     api(libs.kotlinx.coroutines.core)
     implementation(libs.commons.compress)
     implementation(libs.kotlinx.serialization.json)

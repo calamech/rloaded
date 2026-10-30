@@ -1,10 +1,10 @@
 package io.github.calamech.rloaded.launcher.app
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.launcher.InstallFailure
 import io.github.calamech.rloaded.launcher.LaunchFailure
 import io.github.calamech.rloaded.launcher.OfflineProfile
 import io.github.calamech.rloaded.launcher.ServerAddress
+import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -1,12 +1,12 @@
 package io.github.calamech.rloaded.core.mojang
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.Artifact
 import io.github.calamech.rloaded.core.download.ArtifactStore
 import io.github.calamech.rloaded.core.download.DownloadError
 import io.github.calamech.rloaded.core.download.Http
-import io.github.calamech.rloaded.core.flatMap
-import io.github.calamech.rloaded.core.mapError
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
+import io.github.calamech.rloaded.protocol.mapError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException

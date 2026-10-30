@@ -1,10 +1,10 @@
 package io.github.calamech.rloaded.launcher
 
-import io.github.calamech.rloaded.core.Outcome
-import io.github.calamech.rloaded.core.flatMap
-import io.github.calamech.rloaded.core.map
 import io.github.calamech.rloaded.core.runtime.RuntimePins
-import io.github.calamech.rloaded.core.traverse
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
+import io.github.calamech.rloaded.protocol.map
+import io.github.calamech.rloaded.protocol.traverse
 import java.io.File
 import java.nio.file.Path
 

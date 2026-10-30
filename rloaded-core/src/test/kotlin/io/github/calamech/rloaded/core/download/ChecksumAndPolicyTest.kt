@@ -1,8 +1,8 @@
 package io.github.calamech.rloaded.core.download
 
-import io.github.calamech.rloaded.core.Outcome
-import io.github.calamech.rloaded.core.flatMap
-import io.github.calamech.rloaded.core.map
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
+import io.github.calamech.rloaded.protocol.map
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path

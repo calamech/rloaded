@@ -1,11 +1,11 @@
 package io.github.calamech.rloaded.core.mojang
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.ArtifactStore
 import io.github.calamech.rloaded.core.download.DownloadError
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.TestServer
+import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test

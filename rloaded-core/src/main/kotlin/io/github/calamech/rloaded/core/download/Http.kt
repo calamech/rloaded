@@ -1,6 +1,6 @@
 package io.github.calamech.rloaded.core.download
 
-import io.github.calamech.rloaded.core.Outcome
+import io.github.calamech.rloaded.protocol.Outcome
 import java.nio.file.Path
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes

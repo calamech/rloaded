@@ -1,9 +1,9 @@
 package io.github.calamech.rloaded.launcher
 
-import io.github.calamech.rloaded.core.Outcome
-import io.github.calamech.rloaded.core.flatMap
-import io.github.calamech.rloaded.core.mapError
 import io.github.calamech.rloaded.core.mojang.LaunchFeatures
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
+import io.github.calamech.rloaded.protocol.mapError
 import java.nio.file.Path
 
 /** Why the game could not be started. */
