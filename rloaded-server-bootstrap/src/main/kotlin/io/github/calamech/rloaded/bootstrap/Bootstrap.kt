@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.bootstrap
 
+import io.github.calamech.rloaded.core.join.JoinDeadlines
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.flatMap
 import io.github.calamech.rloaded.protocol.map
@@ -88,7 +89,13 @@ public class Bootstrap(
                         writeBundled("agent", "rloaded-agent.jar").flatMap { agent ->
                             writeBundled("runtime", "rloaded-runtime.jar").map { runtime ->
                                 { mods: List<Path> ->
-                                    ServerCommand.build(installed, agent, listOf(runtime) + mods, config.server.maxMemoryMiB)
+                                    ServerCommand.build(
+                                        installed,
+                                        agent,
+                                        listOf(runtime) + mods,
+                                        config.server.maxMemoryMiB,
+                                        mapOf(JoinDeadlines.TIMEOUT_PROPERTY to config.rollout.clientTimeoutSeconds.toString()),
+                                    )
                                 }
                             }
                         }

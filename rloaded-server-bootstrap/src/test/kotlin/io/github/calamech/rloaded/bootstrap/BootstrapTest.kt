@@ -120,6 +120,7 @@ class BootstrapTest {
             val classpath = command[command.indexOf("-cp") + 1].split(File.pathSeparator).map { Path.of(it).readText() }
             assertTrue(Path.of(command.first()).endsWith(Path.of("jbr", "Contents", "Home", "bin", "java")))
             assertEquals(listOf("-Xmx4096M", "-XX:+AllowEnhancedClassRedefinition"), command.subList(1, 3))
+            assertTrue("-Drloaded.client-timeout-seconds=120" in command)
             assertEquals(
                 "io.github.calamech.rloaded.agent.RloadedAgent",
                 JarFile(agent.toFile()).use {

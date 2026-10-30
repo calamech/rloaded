@@ -6,16 +6,19 @@ import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.time.Duration
+import java.util.concurrent.Executors
 import kotlin.io.path.fileSize
 import kotlin.io.path.name
 import kotlin.io.path.readBytes
 
-/** A mod the fake Modrinth serves: its ids, its title and its jar. */
+/** A mod the fake Modrinth serves: its ids, its title, its jar, and how long its file takes to come. */
 internal data class FakeMod(
     val projectId: String,
     val versionId: String,
     val title: String,
     val jar: Path,
+    val fileDelay: Duration = Duration.ZERO,
 ) {
     val sha512: String get() = MessageDigest.getInstance("SHA-512").digest(jar.readBytes()).toHexString()
     val size: Long get() = jar.fileSize()
@@ -31,6 +34,9 @@ internal class FakeModrinth(
 ) : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress(LOOPBACK, 0), 0)
 
+    // A thread per request, so a delayed file does not hold back the others.
+    private val executor = Executors.newCachedThreadPool()
+
     /** The base URL clients use instead of Modrinth's. */
     val url: String get() = "http://$LOOPBACK:${server.address.port}"
 
@@ -45,10 +51,12 @@ internal class FakeModrinth(
         }
         server.createContext("/cdn/") { exchange ->
             val mod = mods.find { exchange.requestURI.path == "/cdn/${it.jar.name}" }
+            Thread.sleep(mod?.fileDelay ?: Duration.ZERO)
             val body = mod?.jar?.readBytes() ?: ByteArray(0)
             exchange.sendResponseHeaders(if (mod == null) NOT_FOUND else OK, if (body.isEmpty()) -1 else body.size.toLong())
             exchange.responseBody.use { it.write(body) }
         }
+        server.executor = executor
         server.start()
     }
 
@@ -82,6 +90,7 @@ internal class FakeModrinth(
 
     override fun close() {
         server.stop(0)
+        executor.shutdownNow()
     }
 
     private companion object {

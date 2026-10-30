@@ -6,6 +6,7 @@ import io.github.calamech.rloaded.bootstrap.ServerInstaller
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.UrlPolicy
+import io.github.calamech.rloaded.core.join.JoinDeadlines
 import io.github.calamech.rloaded.core.mojang.Platforms
 import io.github.calamech.rloaded.core.runtime.RuntimePins
 import io.github.calamech.rloaded.core.trust.ServerIdentity
@@ -87,6 +88,7 @@ internal fun trustServer(
     if (trusted is Outcome.Err) failCheck("cannot trust the server: ${trusted.error}")
 }
 
+/** Starts the server; [properties] may set another join timeout than the default. */
 internal fun startServer(
     installed: InstalledServer,
     agent: Path,
@@ -94,8 +96,15 @@ internal fun startServer(
     directory: Path,
     properties: Map<String, String>,
 ): Process =
-    ProcessBuilder(ServerCommand.build(installed, agent, mods, SERVER_MEMORY_MIB, properties))
-        .directory(directory.toFile())
+    ProcessBuilder(
+        ServerCommand.build(
+            installed,
+            agent,
+            mods,
+            SERVER_MEMORY_MIB,
+            mapOf(JoinDeadlines.TIMEOUT_PROPERTY to JoinDeadlines.DEFAULT_TIMEOUT_SECONDS.toString()) + properties,
+        ),
+    ).directory(directory.toFile())
         .redirectOutput(ProcessBuilder.Redirect.INHERIT)
         .redirectError(ProcessBuilder.Redirect.INHERIT)
         .start()

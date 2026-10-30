@@ -9,8 +9,10 @@ import io.github.calamech.rloaded.protocol.Checksum
 import io.github.calamech.rloaded.protocol.ClientHello
 import io.github.calamech.rloaded.protocol.HashAlgorithm
 import io.github.calamech.rloaded.protocol.InstallResult
+import io.github.calamech.rloaded.protocol.InstallStage
 import io.github.calamech.rloaded.protocol.ModEntry
 import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.Progress
 import io.github.calamech.rloaded.protocol.ProtocolCodec
 import io.github.calamech.rloaded.protocol.Side
 import org.junit.jupiter.api.Test
@@ -91,6 +93,14 @@ class JoinTest {
         assertEquals(Outcome.Err(JoinRefusal.OtherProtocol(2)), serverJoin.clientHello(newer))
         assertEquals(Outcome.Ok(failed), serverJoin.result(ClientJoin.result(failed)))
         assertIs<JoinRefusal.Malformed>((serverJoin.result(byteArrayOf(9)) as Outcome.Err).error)
+    }
+
+    @Test
+    fun `the server reads the client's progress and refuses bytes that are not progress`() {
+        val serverJoin = ServerJoin(identity, lockfile, "Friends SMP")
+
+        assertEquals(Outcome.Ok(Progress(InstallStage.LOAD, 0)), serverJoin.progress(ClientJoin.progress(InstallStage.LOAD, 0)))
+        assertIs<JoinRefusal.Malformed>((serverJoin.progress(ClientJoin.result(InstallResult.Loaded)) as Outcome.Err).error)
     }
 
     @Test
