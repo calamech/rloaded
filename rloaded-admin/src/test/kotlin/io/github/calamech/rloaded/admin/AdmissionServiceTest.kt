@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.CountDownLatch
@@ -108,6 +109,29 @@ class AdmissionServiceTest {
     }
 
     @Test
+    fun `refuses versions published too recently and projects with too few downloads, listing every one`() {
+        publish("fresh", jar("fresh"), published = "2026-10-30T12:00:00Z", downloadCount = 10)
+        publish("needsfresh", jar("needsfresh"), dependsOn = "fresh")
+
+        val refusal = (add("needsfresh") as Outcome.Err).error
+
+        assertEquals(
+            AddRefusal.Unproven(
+                listOf(
+                    ReputationFailure.TooRecent("fresh", "1.0.0", Instant.parse("2026-10-30T12:00:00Z"), Duration.ofHours(72)),
+                    ReputationFailure.TooFewDownloads("fresh", 10, 1_000),
+                ),
+            ),
+            refusal,
+        )
+        assertEquals(
+            "fresh 1.0.0 was published on 2026-10-30T12:00:00Z, less than 72 hours ago; fresh has 10 downloads, fewer than 1000",
+            refusal.reason,
+        )
+        assertFalse(lockfile.exists())
+    }
+
+    @Test
     fun `refuses a lockfile it cannot read`() {
         lockfile.parent.toFile().mkdirs()
         lockfile.writeText("{}")
@@ -139,19 +163,38 @@ class AdmissionServiceTest {
 
     // One service for the whole test, so concurrent adds share its lock.
     private val service by lazy {
+        val modrinth = Modrinth(http, ModrinthSettings(apiUrl = server.url("/v2")))
+        val clock = Clock.fixed(now, ZoneOffset.UTC)
         AdmissionService(
-            Resolver(Modrinth(http, ModrinthSettings(apiUrl = server.url("/v2"))), "26.3"),
+            Resolver(modrinth, "26.3"),
+            Reputation(modrinth, ReputationRules(Duration.ofHours(72), 1_000), clock),
             ArtifactStore(directory.resolve("store"), http, RetryPolicy(maxAttempts = 1)),
-            JarClassifier(emptySet(), setOf("default")),
-            { jars ->
+            JarRules(JarClassifier(emptySet(), setOf("default"))) { jars ->
                 serverChecks += jars.map { jar -> projectOf(jar) }
                 whileChecking()
                 serverRefusal
             },
             LockfileLocation(lockfile, empty),
-            Clock.fixed(now, ZoneOffset.UTC),
+            clock,
         )
     }
+
+    private val downloads = mutableMapOf<String, Long>()
+
+    init {
+        // Modrinth's project records, with the download counts set in [downloads], and no team members.
+        server.route("/v2/projects") { exchange, _ ->
+            val asked = exchange.requestURI.query.removePrefix("ids=")
+            val projects =
+                downloads
+                    .filterKeys { "\"$it\"" in asked }
+                    .entries
+                    .joinToString(",", "[", "]") { (id, count) -> """{"id": "$id", "title": "$id", "downloads": $count, "team": "t$id"}""" }
+            exchange.respond(200, projects.toByteArray())
+        }
+        server.route("/v2/teams") { exchange, _ -> exchange.respond(200, "[]".toByteArray()) }
+    }
+
     private val jarProjects = mutableMapOf<String, String>()
 
     private fun projectOf(jar: Path): String =
@@ -162,13 +205,16 @@ class AdmissionServiceTest {
         project: String,
         jar: ByteArray,
         dependsOn: String? = null,
+        published: String = "2026-10-01T00:00:00Z",
+        downloadCount: Long = 5_000,
     ) {
+        downloads[project] = downloadCount
         val hex = MessageDigest.getInstance("SHA-512").digest(jar).toHexString()
         jarProjects[hex] = project
         val dependencies = dependsOn?.let { """{"project_id": "$it", "dependency_type": "required"}""" }.orEmpty()
         val version =
             """[{"id": "v$project", "project_id": "$project", "version_number": "1.0.0", "version_type": "release", """ +
-                """"date_published": "2026-10-01T00:00:00Z", "game_versions": ["26.3"], "loaders": ["fabric"], """ +
+                """"date_published": "$published", "game_versions": ["26.3"], "loaders": ["fabric"], """ +
                 """"dependencies": [$dependencies], "files": [{"url": "${server.url(
                     "/cdn/$project.jar",
                 )}", "filename": "$project.jar", """ +

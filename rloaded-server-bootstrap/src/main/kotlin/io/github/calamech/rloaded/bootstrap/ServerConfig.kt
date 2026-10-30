@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.bootstrap
 
 import com.akuleshov7.ktoml.Toml
+import io.github.calamech.rloaded.admin.ReputationRules
 import io.github.calamech.rloaded.core.join.JoinDeadlines
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.flatMap
@@ -12,7 +13,16 @@ import kotlinx.serialization.SerializationException
 public data class ServerConfig(
     val server: ServerSection = ServerSection(),
     val rollout: RolloutSection = RolloutSection(),
+    val reputation: ReputationSection = ReputationSection(),
 ) {
+    /** The settings the game reads, as the system properties the bootstrap starts it with. */
+    public fun gameProperties(): Map<String, String> =
+        mapOf(
+            JoinDeadlines.TIMEOUT_PROPERTY to rollout.clientTimeoutSeconds.toString(),
+            ReputationRules.VERSION_AGE_PROPERTY to reputation.minVersionAgeHours.toString(),
+            ReputationRules.DOWNLOADS_PROPERTY to reputation.minProjectDownloads.toString(),
+        )
+
     /** Reading and writing `rloaded-server.toml`. */
     public companion object {
         /** The file written at first start, with every setting at its default. */
@@ -31,6 +41,12 @@ public data class ServerConfig(
             # server's mods, before it disconnects the player.
             clientTimeoutSeconds = 120
 
+            [reputation]
+            # A mod version is added only once it has been public this many hours. 0 turns the rule off.
+            minVersionAgeHours = 72
+            # A mod is added only once its project has been downloaded this many times. 0 turns the rule off.
+            minProjectDownloads = 1000
+
             """.trimIndent()
 
         private val MEMORY_RANGE = 512..65_536
@@ -48,11 +64,24 @@ public data class ServerConfig(
                         Outcome.Err("rollout.clientTimeoutSeconds must be between ${timeouts.first} and ${timeouts.last}")
                     }
 
+                    config.reputation.minVersionAgeHours !in ReputationRules.VERSION_AGE_HOURS -> {
+                        Outcome.Err(outOfRange("reputation.minVersionAgeHours", ReputationRules.VERSION_AGE_HOURS))
+                    }
+
+                    config.reputation.minProjectDownloads !in ReputationRules.PROJECT_DOWNLOADS -> {
+                        Outcome.Err(outOfRange("reputation.minProjectDownloads", ReputationRules.PROJECT_DOWNLOADS))
+                    }
+
                     else -> {
                         Outcome.Ok(config)
                     }
                 }
             }
+
+        private fun outOfRange(
+            key: String,
+            range: LongRange,
+        ): String = "$key must be between ${range.first} and ${range.last}"
 
         private fun decode(text: String): Outcome<ServerConfig, String> =
             try {
@@ -80,4 +109,11 @@ public data class ServerSection(
 @Serializable
 public data class RolloutSection(
     val clientTimeoutSeconds: Int = JoinDeadlines.DEFAULT_TIMEOUT_SECONDS,
+)
+
+/** The `[reputation]` table. */
+@Serializable
+public data class ReputationSection(
+    val minVersionAgeHours: Long = ReputationRules.DEFAULT_VERSION_AGE_HOURS,
+    val minProjectDownloads: Long = ReputationRules.DEFAULT_PROJECT_DOWNLOADS,
 )

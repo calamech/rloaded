@@ -5,6 +5,9 @@ import com.mojang.brigadier.context.CommandContext;
 import io.github.calamech.rloaded.admin.AddRefusal;
 import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
+import io.github.calamech.rloaded.admin.JarRules;
+import io.github.calamech.rloaded.admin.Reputation;
+import io.github.calamech.rloaded.admin.ReputationRules;
 import io.github.calamech.rloaded.admin.Resolver;
 import io.github.calamech.rloaded.core.download.ArtifactStore;
 import io.github.calamech.rloaded.core.download.RetryPolicy;
@@ -20,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.SharedConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -38,12 +42,23 @@ public final class AdminCommands {
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
   private static final String PROJECT = "project";
   private static final String VERSION = "version";
+  private static volatile ReputationRules rules;
   private static AdmissionService service;
 
   private AdminCommands() {}
 
   /** Registers the commands; the server calls it once. */
   public static void register() {
+    // The rules come from rloaded-server.toml through the bootstrap; a server without them does not
+    // start.
+    ServerLifecycleEvents.SERVER_STARTING.register(
+        server ->
+            rules =
+                switch (ReputationRules.Companion.fromProperties(System::getProperty)) {
+                  case Outcome.Ok<?> ok -> (ReputationRules) ok.getValue();
+                  case Outcome.Err<?> err ->
+                      throw new IllegalStateException(err.getError().toString());
+                });
     CommandRegistrationCallback.EVENT.register(
         (dispatcher, context, selection) ->
             dispatcher.register(
@@ -129,15 +144,16 @@ public final class AdminCommands {
     if (service == null) {
       ModrinthAccess access = ModrinthAccess.open();
       Path cache = server.getServerDirectory().resolve("rloaded").resolve("cache").resolve("mods");
+      Clock clock = Clock.systemUTC();
       service =
           new AdmissionService(
               new Resolver(access.modrinth(), SharedConstants.getCurrentVersion().name()),
+              new Reputation(access.modrinth(), rules, clock),
               new ArtifactStore(
                   cache, access.http(), new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES),
-              Admission.classifier(),
-              AdminCommands::serverRefusal,
+              new JarRules(Admission.classifier(), AdminCommands::serverRefusal),
               ServerLockfile.of(server),
-              Clock.systemUTC());
+              clock);
     }
     return service;
   }

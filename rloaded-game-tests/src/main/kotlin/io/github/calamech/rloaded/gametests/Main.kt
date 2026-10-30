@@ -1,11 +1,11 @@
 package io.github.calamech.rloaded.gametests
 
 import io.github.calamech.rloaded.bootstrap.ServerCommand
+import io.github.calamech.rloaded.bootstrap.ServerConfig
 import io.github.calamech.rloaded.bootstrap.ServerInstaller
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.UrlPolicy
-import io.github.calamech.rloaded.core.join.JoinDeadlines
 import io.github.calamech.rloaded.core.mojang.Platforms
 import io.github.calamech.rloaded.core.runtime.RuntimePins
 import io.github.calamech.rloaded.protocol.Outcome
@@ -50,8 +50,7 @@ public fun main(arguments: Array<String>) {
             "fabric-api.gametest" to "true",
             "fabric-api.gametest.report-file" to report.toString(),
             "rloaded.hot-add-mods" to hotAddMods,
-            JoinDeadlines.TIMEOUT_PROPERTY to JoinDeadlines.DEFAULT_TIMEOUT_SECONDS.toString(),
-        )
+        ) + ServerConfig().gameProperties()
     val command = ServerCommand.build(installed, agent, mods, MAX_MEMORY_MIB, properties)
     val exit =
         ProcessBuilder(command)
