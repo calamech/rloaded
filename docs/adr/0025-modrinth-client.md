@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Amended: 2026-10-30, the installer (see the end of Decision)
 
 ## Context
 
@@ -22,6 +23,8 @@ The module goes through the `Http` port of `rloaded-core`, so it gets the URL po
 Answers are decoded with unknown fields ignored: Modrinth adds fields to its records over time, and refusing them would break every client the day it does. The fields Rloaded checks are required and validated; a missing one, or a SHA-512 that is not 128 hexadecimal digits, makes the answer malformed.
 
 Tests run against a real HTTP server on the loopback interface that answers from versions recorded on `api.modrinth.com` on 2026-10-30, leaving unknown ids out as Modrinth does. A request with no recorded answer fails the test.
+
+Amendment of 2026-10-30, the installer: `ModInstaller.install` takes manifest entries, reads their records in one go, refuses every entry that disagrees with its record before downloading anything, then downloads each file from the URL in the record into the content-addressed `ArtifactStore`, which verifies size and SHA-512, four at a time. `installAsync` returns a `CompletableFuture` for the runtime mod's Java code. `InstallPlan.entriesToInstall`, in `rloaded-core`, picks the entries a client installs: never server-only mods, not the client-only mods the player left out (ADR 0029), not mods the game already loaded; a mod loaded in another version is reported as a conflict, since a running game cannot replace it.
 
 ## Alternatives
 
