@@ -14,9 +14,10 @@ dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         mavenCentral()
-        // Fabric's game test module, which the release of Fabric API on Modrinth leaves out.
+        // Fabric's game test modules, which the release of Fabric API on Modrinth leaves out.
         maven("https://maven.fabricmc.net/") {
             content {
+                includeModule("net.fabricmc.fabric-api", "fabric-client-gametest-api-v1")
                 includeModule("net.fabricmc.fabric-api", "fabric-gametest-api-v1")
             }
         }
