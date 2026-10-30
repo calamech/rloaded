@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "io.github.calamech.rloaded.runtime.mixin",
   "compatibilityLevel": "JAVA_25",
-  "mixins": ["PersistentEntitySectionManagerAccess", "ServerLevelAccess"],
+  "mixins": ["ChunkMapAccess", "PersistentEntitySectionManagerAccess", "ServerLevelAccess"],
   "injectors": {
     "defaultRequire": 1
   }
