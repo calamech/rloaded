@@ -1,6 +1,5 @@
 package io.github.calamech.rloaded.launcher.app
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.DownloadError
 import io.github.calamech.rloaded.core.mojang.MetadataError
 import io.github.calamech.rloaded.core.runtime.ExtractionError
@@ -11,6 +10,7 @@ import io.github.calamech.rloaded.launcher.OfflineProfile
 import io.github.calamech.rloaded.launcher.ServerAddress
 import io.github.calamech.rloaded.launcher.StartFailure
 import io.github.calamech.rloaded.launcher.UnknownPlaceholder
+import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

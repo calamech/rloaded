@@ -1,6 +1,6 @@
 package io.github.calamech.rloaded.core.mojang
 
-import io.github.calamech.rloaded.core.Outcome
+import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement

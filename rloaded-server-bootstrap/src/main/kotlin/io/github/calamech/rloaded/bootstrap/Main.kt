@@ -1,11 +1,11 @@
 package io.github.calamech.rloaded.bootstrap
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.UrlPolicy
 import io.github.calamech.rloaded.core.mojang.Platforms
 import io.github.calamech.rloaded.core.runtime.RuntimePins
+import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.nio.file.Path

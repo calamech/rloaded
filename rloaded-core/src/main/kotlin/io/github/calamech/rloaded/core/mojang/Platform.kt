@@ -1,6 +1,6 @@
 package io.github.calamech.rloaded.core.mojang
 
-import io.github.calamech.rloaded.core.Outcome
+import io.github.calamech.rloaded.protocol.Outcome
 
 /** Operating systems, with the names Mojang uses in its rules. */
 public enum class OperatingSystem(

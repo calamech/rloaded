@@ -1,12 +1,12 @@
 package io.github.calamech.rloaded.core.mojang
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.Artifact
 import io.github.calamech.rloaded.core.download.Checksum
 import io.github.calamech.rloaded.core.download.HashAlgorithm
-import io.github.calamech.rloaded.core.flatMap
-import io.github.calamech.rloaded.core.map
-import io.github.calamech.rloaded.core.traverse
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.flatMap
+import io.github.calamech.rloaded.protocol.map
+import io.github.calamech.rloaded.protocol.traverse
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

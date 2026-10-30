@@ -1,6 +1,5 @@
 package io.github.calamech.rloaded.launcher
 
-import io.github.calamech.rloaded.core.Outcome
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.TestServer
@@ -10,6 +9,7 @@ import io.github.calamech.rloaded.core.mojang.OperatingSystem
 import io.github.calamech.rloaded.core.mojang.Platform
 import io.github.calamech.rloaded.core.runtime.FakeDistribution
 import io.github.calamech.rloaded.core.runtime.RuntimePins
+import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test

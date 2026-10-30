@@ -1,7 +1,7 @@
 package io.github.calamech.rloaded.gametests
 
-import io.github.calamech.rloaded.core.Outcome
-import io.github.calamech.rloaded.core.map
+import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.map
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.xml.sax.InputSource

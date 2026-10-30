@@ -1,6 +1,6 @@
 package io.github.calamech.rloaded.launcher
 
-import io.github.calamech.rloaded.core.Outcome
+import io.github.calamech.rloaded.protocol.Outcome
 import java.util.UUID
 
 /**
