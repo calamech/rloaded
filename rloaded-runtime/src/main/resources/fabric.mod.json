@@ -9,6 +9,7 @@
     "sources": "https://github.com/calamech/rloaded"
   },
   "environment": "*",
+  "mixins": ["rloaded.mixins.json"],
   "entrypoints": {
     "main": ["io.github.calamech.rloaded.runtime.RloadedRuntime"]
   },

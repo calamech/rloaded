@@ -1,9 +1,7 @@
 package io.github.calamech.rloaded.gametest;
 
 import io.github.calamech.rloaded.runtime.engine.LateMixins;
-import java.lang.instrument.Instrumentation;
 import java.util.List;
-import java.util.Optional;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 
@@ -20,7 +18,7 @@ public final class LateMixinGameTest {
     List<String> redefined;
     List<String> errors;
     try (ErrorLog log = ErrorLog.open()) {
-      redefined = LateMixins.apply("rloaded-gametest.late.mixins.json", instrumentation());
+      redefined = LateMixins.apply("rloaded-gametest.late.mixins.json", Agent.instrumentation());
       errors = log.lines();
     }
 
@@ -32,11 +30,5 @@ public final class LateMixinGameTest {
     helper.assertValueEqual(greeting.rloadedGreeting(), "hello from target #2", "second greeting");
     helper.assertValueEqual(((LateGreeting) (Object) new LateMixinTarget()).rloadedGreeting(), "hello from target #1", "new instance");
     helper.succeed();
-  }
-
-  private static Instrumentation instrumentation() throws ReflectiveOperationException {
-    Class<?> agentState = Class.forName("io.github.calamech.rloaded.agent.AgentState", true, ClassLoader.getSystemClassLoader());
-    Optional<?> instrumentation = (Optional<?>) agentState.getMethod("instrumentation").invoke(null);
-    return (Instrumentation) instrumentation.orElseThrow(() -> new IllegalStateException("start the server with the Rloaded agent"));
   }
 }
