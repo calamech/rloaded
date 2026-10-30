@@ -62,7 +62,10 @@ internal class FakeModrinth(
 
     private fun version(mod: FakeMod): String =
         """{"id": "${mod.versionId}", "project_id": "${mod.projectId}", "files": [{"url": "$url/cdn/${mod.jar.name}", """ +
-            """"filename": "${mod.jar.name}", "size": ${mod.size}, "hashes": {"sha512": "${mod.sha512}"}}]}"""
+            """"filename": "${mod.jar.name}", "size": ${mod.size}, "hashes": {"sha512": "${mod.sha512}"}, """ +
+            """"primary": true}], "version_number": "1.0.0", "version_type": "release", """ +
+            """"date_published": "2026-10-01T00:00:00Z", """ +
+            """"game_versions": ["26.3"], "loaders": ["fabric"], "dependencies": []}"""
 
     private fun project(mod: FakeMod): String =
         """{"id": "${mod.projectId}", "title": "${mod.title}", "downloads": 1234, "team": "team${mod.projectId}"}"""

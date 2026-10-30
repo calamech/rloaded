@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.Instant
+import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -126,6 +127,21 @@ class LockfileTest {
         assertEquals(Lockfile.parse(lockfile()), Lockfile.read(file))
         assertIs<LockfileError.Unreadable>((Lockfile.read(missing) as Outcome.Err).error)
         assertEquals(Outcome.Err(LockfileError.TooLarge(large, Lockfile.MAX_BYTES)), Lockfile.read(large))
+    }
+
+    @Test
+    fun `writes a lockfile that reads back the same, and reports one it cannot write`(
+        @TempDir directory: Path,
+    ) {
+        val lockfile = ok(Lockfile.parse(lockfile()))
+        val file = directory.resolve("rloaded/lockfile.json")
+
+        assertEquals(Outcome.Ok(Unit), lockfile.write(file))
+        assertEquals(Outcome.Ok(lockfile), Lockfile.read(file))
+        assertTrue("\n    \"schema\": 1," in file.readText(), "one field per line")
+
+        val blocked = directory.resolve("blocked").also { it.writeText("a file, not a folder") }
+        assertIs<LockfileError.Unwritable>((lockfile.write(blocked.resolve("lockfile.json")) as Outcome.Err).error)
     }
 
     private fun <T> ok(outcome: Outcome<T, LockfileError>): T =

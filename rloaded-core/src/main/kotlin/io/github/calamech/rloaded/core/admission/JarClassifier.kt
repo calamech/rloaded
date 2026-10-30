@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.core.admission
 
 import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.Side
 import io.github.calamech.rloaded.protocol.flatMap
 import io.github.calamech.rloaded.protocol.map
 import io.github.calamech.rloaded.protocol.traverse
@@ -50,6 +51,15 @@ public sealed interface Refusal {
             "mod $modId adds data pack entries to ${registries.joinToString()}, which the game only reads when a world loads"
     }
 }
+
+/** What the classifier read in a jar: its mod, where the mod runs, and every refusal. */
+public data class JarReport(
+    val modId: String,
+    /** From the `environment` of its `fabric.mod.json`: `client`, `server`, or both for `*` or none. */
+    val side: Side,
+    /** The refusals of the jar and of the jars nested in it; empty when none of the rules refuses it. */
+    val refusals: List<Refusal>,
+)
 
 /** Why a jar cannot be classified. A mod that cannot be classified is not added. */
 public sealed interface JarProblem {
@@ -101,8 +111,8 @@ public class JarClassifier(
     private val datapackRegistries: Set<String>,
     private val languageAdapters: Set<String>,
 ) {
-    /** Every refusal of [jar] and of the jars nested in it; an empty list means none of these rules refuses it. */
-    public fun classify(jar: Path): Outcome<List<Refusal>, JarProblem> =
+    /** Reads [jar] and the jars nested in it. */
+    public fun classify(jar: Path): Outcome<JarReport, JarProblem> =
         try {
             Files.newInputStream(jar).use { classify(jar.fileName.toString(), it, 0) }
         } catch (e: IOException) {
@@ -113,7 +123,7 @@ public class JarClassifier(
         name: String,
         input: InputStream,
         depth: Int,
-    ): Outcome<List<Refusal>, JarProblem> =
+    ): Outcome<JarReport, JarProblem> =
         if (depth > MAX_DEPTH) {
             Outcome.Err(JarProblem.TooLarge(name, "nested jars"))
         } else {
@@ -127,7 +137,9 @@ public class JarClassifier(
                             } else {
                                 classify("$name!/$file", bytes.inputStream(), depth + 1)
                             }
-                        }.map { nested -> refusals(metadata, contents.names) + nested.flatten() }
+                        }.map { nested ->
+                            JarReport(metadata.id, metadata.side, refusals(metadata, contents.names) + nested.flatMap { it.refusals })
+                        }
                 }
             }
         }
@@ -191,6 +203,7 @@ public class JarClassifier(
 
     private class ModMetadata(
         val id: String,
+        val side: Side,
         val preLaunch: Boolean,
         val declaredAdapters: List<String>,
         val usedAdapters: List<String>,
@@ -205,13 +218,18 @@ public class JarClassifier(
         return try {
             val root = JSON.parseToJsonElement(bytes.decodeToString()) as? JsonObject
             val id = (root?.get("id") as? JsonPrimitive)?.takeIf { it.isString }?.content
+            val environment = (root?.get("environment") as? JsonPrimitive)?.content ?: "*"
+            val side = SIDES[environment]
             if (root == null || id == null) {
                 Outcome.Err(JarProblem.Malformed(name, "no mod id"))
+            } else if (side == null) {
+                Outcome.Err(JarProblem.Malformed(name, "unknown environment $environment"))
             } else {
                 val entrypoints = root["entrypoints"] as? JsonObject ?: JsonObject(emptyMap())
                 Outcome.Ok(
                     ModMetadata(
                         id = id,
+                        side = side,
                         preLaunch = (entrypoints["preLaunch"] as? JsonArray).orEmpty().isNotEmpty(),
                         declaredAdapters = (root["languageAdapters"] as? JsonObject)?.keys.orEmpty().toList(),
                         usedAdapters = entrypoints.values.flatMap { (it as? JsonArray).orEmpty() }.map { adapterOf(it) },
@@ -247,5 +265,8 @@ public class JarClassifier(
         private const val DEFAULT_ADAPTER = "default"
         private const val MIN_DATA_PARTS = 4
         private val JSON = Json { isLenient = true }
+
+        // Fabric Loader's values for `environment`.
+        private val SIDES = mapOf("*" to Side.BOTH, "client" to Side.CLIENT, "server" to Side.SERVER)
     }
 }

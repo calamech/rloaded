@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.runtime.join;
 
+import io.github.calamech.rloaded.admin.LockfileLocation;
 import io.github.calamech.rloaded.core.join.JoinDeadlines;
 import io.github.calamech.rloaded.core.join.JoinRefusal;
 import io.github.calamech.rloaded.core.join.ServerJoin;
@@ -7,18 +8,16 @@ import io.github.calamech.rloaded.core.lockfile.Lockfile;
 import io.github.calamech.rloaded.core.trust.ServerIdentity;
 import io.github.calamech.rloaded.protocol.InstallResult;
 import io.github.calamech.rloaded.protocol.Outcome;
+import io.github.calamech.rloaded.runtime.ServerLockfile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.List;
 import java.util.function.Consumer;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.Identifier;
@@ -97,15 +96,11 @@ public final class JoinServer {
           case Outcome.Err<?> err ->
               throw new IllegalStateException("cannot use the server identity: " + err.getError());
         };
-    Path lockfilePath = directory.resolve("lockfile.json");
+    LockfileLocation location = ServerLockfile.of(server);
+    Path lockfilePath = location.getPath();
     Lockfile lockfile =
         !Files.exists(lockfilePath)
-            ? new Lockfile(
-                SharedConstants.getCurrentVersion().name(),
-                rloadedVersion(),
-                List.of(),
-                List.of(),
-                List.of())
+            ? location.getWhenMissing()
             : switch (Lockfile.Companion.read(lockfilePath)) {
               case Outcome.Ok<?> ok -> (Lockfile) ok.getValue();
               case Outcome.Err<?> err ->
@@ -169,15 +164,6 @@ public final class JoinServer {
     Path folder = server.getServerDirectory().toAbsolutePath().normalize().getFileName();
     String name = folder == null ? "Minecraft server" : folder.toString();
     return name.length() > MAX_SERVER_NAME ? name.substring(0, MAX_SERVER_NAME) : name;
-  }
-
-  private static String rloadedVersion() {
-    return FabricLoader.getInstance()
-        .getModContainer("rloaded")
-        .orElseThrow()
-        .getMetadata()
-        .getVersion()
-        .getFriendlyString();
   }
 
   /** Sends the hello and the manifest, then waits for the client's result. */

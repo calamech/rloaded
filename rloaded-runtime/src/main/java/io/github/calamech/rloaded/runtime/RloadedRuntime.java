@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.runtime;
 
+import io.github.calamech.rloaded.runtime.admin.AdminCommands;
 import io.github.calamech.rloaded.runtime.join.JoinPayloads;
 import io.github.calamech.rloaded.runtime.join.JoinServer;
 import net.fabricmc.api.EnvType;
@@ -17,6 +18,7 @@ public final class RloadedRuntime implements ModInitializer {
     JoinPayloads.register();
     if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
       JoinServer.register();
+      AdminCommands.register();
     }
     if (AgentBridge.instrumentation().isEmpty()) {
       LOGGER.warn("Runtime started without the agent: mods cannot be added while the game runs");

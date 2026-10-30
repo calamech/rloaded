@@ -52,7 +52,7 @@ val libraryClasspath =
     }
 
 dependencies {
-    libraries("io.github.calamech.rloaded:rloaded-modrinth")
+    libraries("io.github.calamech.rloaded:rloaded-admin")
 }
 
 // One line per nested library: its mod id, its version and its file name. Built in a function so

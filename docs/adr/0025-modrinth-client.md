@@ -44,3 +44,5 @@ Amendment of 2026-10-30, project details: `Modrinth.projects(ids)` returns the t
 ## Enforcement
 
 `ModrinthTest` (recorded answers, unknown ids, invalid ids, rate limit, malformed answers) and `FileCheckTest` (each disagreement refused), run by `check`.
+
+Amended 2026-10-31: version records also carry the version number, release channel, publication date, game versions, loaders, dependencies and primary file, and a project's versions can be listed (ADR 0036).
