@@ -1,12 +1,13 @@
 package io.github.calamech.rloaded.gametests
 
 import io.github.calamech.rloaded.bootstrap.LockfileMods
+import io.github.calamech.rloaded.bootstrap.RolloutSection
+import io.github.calamech.rloaded.bootstrap.ServerConfig
 import io.github.calamech.rloaded.core.download.ArtifactStore
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.Origin
 import io.github.calamech.rloaded.core.download.UrlPolicy
-import io.github.calamech.rloaded.core.join.JoinDeadlines
 import io.github.calamech.rloaded.launcher.ClientDirectories
 import io.github.calamech.rloaded.modrinth.ModInstaller
 import io.github.calamech.rloaded.modrinth.Modrinth
@@ -76,7 +77,7 @@ public fun main(arguments: Array<String>) {
         .resolve("lockfile.json")
         .writeText(lockfile(mods))
     val lockfileMods = lockfileMods(serverDirectory, serverModrinth.url)
-    val timeout = mapOf(JoinDeadlines.TIMEOUT_PROPERTY to TIMEOUT_SECONDS.toString())
+    val timeout = ServerConfig(rollout = RolloutSection(TIMEOUT_SECONDS)).gameProperties()
     val serverProcess = startServer(server, agent, serverMods + lockfileMods, serverDirectory, timeout)
     processes += serverProcess
     waitForPort(port, serverProcess, deadline)

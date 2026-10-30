@@ -12,6 +12,7 @@ import io.github.calamech.rloaded.core.download.Downloads
 import io.github.calamech.rloaded.core.lockfile.LockedMod
 import io.github.calamech.rloaded.core.lockfile.Lockfile
 import io.github.calamech.rloaded.core.lockfile.LockfileError
+import io.github.calamech.rloaded.modrinth.ModrinthError
 import io.github.calamech.rloaded.modrinth.ModrinthFile
 import io.github.calamech.rloaded.modrinth.ModrinthVersion
 import io.github.calamech.rloaded.protocol.ModEntry
@@ -35,6 +36,12 @@ public fun interface ServerJarCheck {
     /** Why the server cannot load [jars] together with its mods, or null when it can. */
     public fun refusal(jars: List<Path>): String?
 }
+
+/** The rules a mod's jar must pass: the static classifier, then the server's own check of what it would load. */
+public data class JarRules(
+    val classifier: JarClassifier,
+    val serverCheck: ServerJarCheck,
+)
 
 /** Where the server's lockfile is, and what a server without one starts from. */
 public data class LockfileLocation(
@@ -80,6 +87,20 @@ public sealed interface AddRefusal {
         override val reason: String get() = "version $versionId has no primary file"
     }
 
+    /** Versions or projects are not proven enough; every one is listed. */
+    public data class Unproven(
+        val failures: List<ReputationFailure>,
+    ) : AddRefusal {
+        override val reason: String get() = failures.joinToString("; ") { it.reason }
+    }
+
+    /** Modrinth's project records could not be read to check downloads. */
+    public data class ProjectRecords(
+        val error: ModrinthError,
+    ) : AddRefusal {
+        override val reason: String get() = "Modrinth's project records cannot be read: $error"
+    }
+
     /** Files could not be downloaded or did not match their hash. */
     public data class NotDownloaded(
         val failures: DownloadFailures,
@@ -117,15 +138,16 @@ public sealed interface AddRefusal {
 }
 
 /**
- * Adds a mod from Modrinth to the server's lockfile, with what it needs: resolves it, downloads the
- * files into [store], refuses any jar the rules or the server refuse, then writes every entry to the
- * lockfile in one step. The only writer of the lockfile; one add runs at a time.
+ * Adds a mod from Modrinth to the server's lockfile, with what it needs: resolves it, refuses
+ * versions that are not proven enough, downloads the files into [store], refuses any jar the rules or
+ * the server refuse, then writes every entry to the lockfile in one step. The only writer of the
+ * lockfile; one add runs at a time.
  */
 public class AdmissionService(
     private val resolver: Resolver,
+    private val reputation: Reputation,
     private val store: ArtifactStore,
-    private val classifier: JarClassifier,
-    private val serverCheck: ServerJarCheck,
+    private val jarRules: JarRules,
     private val lockfile: LockfileLocation,
     private val clock: Clock,
 ) {
@@ -146,6 +168,7 @@ public class AdmissionService(
                 resolver
                     .resolve(project, version, installed)
                     .mapError<List<ModrinthVersion>, ResolveError, AddRefusal> { AddRefusal.Unresolved(it) }
+                    .flatMap { versions -> proven(versions) }
                     .flatMap { versions -> download(versions) }
                     .flatMap { downloaded -> admit(downloaded) }
                     .flatMap { admitted -> write(current, admitted, addedBy) }
@@ -169,6 +192,12 @@ public class AdmissionService(
             Outcome.Ok(lockfile.whenMissing)
         }
 
+    private suspend fun proven(versions: List<ModrinthVersion>): Outcome<List<ModrinthVersion>, AddRefusal> =
+        reputation
+            .failures(versions)
+            .mapError<List<ReputationFailure>, ModrinthError, AddRefusal> { AddRefusal.ProjectRecords(it) }
+            .flatMap { failures -> if (failures.isEmpty()) Outcome.Ok(versions) else Outcome.Err(AddRefusal.Unproven(failures)) }
+
     private class Downloaded(
         val version: ModrinthVersion,
         val file: ModrinthFile,
@@ -190,7 +219,7 @@ public class AdmissionService(
     private fun admit(downloaded: List<Downloaded>): Outcome<List<AddedMod>, AddRefusal> =
         downloaded
             .traverse { mod ->
-                classifier
+                jarRules.classifier
                     .classify(mod.jar)
                     .mapError<JarReport, JarProblem, AddRefusal> { AddRefusal.Unreadable(it) }
                     .flatMap { report ->
@@ -202,7 +231,7 @@ public class AdmissionService(
                     }
             }.flatMap { admitted ->
                 // The server checks what it loads itself; mods for the client only are the players' to load.
-                val refusal = serverCheck.refusal(admitted.filter { it.second.entry.side != Side.CLIENT }.map { it.first })
+                val refusal = jarRules.serverCheck.refusal(admitted.filter { it.second.entry.side != Side.CLIENT }.map { it.first })
                 if (refusal == null) Outcome.Ok(admitted.map { it.second }) else Outcome.Err(AddRefusal.ServerRefused(refusal))
             }
 

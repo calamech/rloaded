@@ -35,6 +35,34 @@ class ServerConfigTest {
     }
 
     @Test
+    fun `reads the reputation rules, zero turning one off, and refuses values out of range`() {
+        assertEquals(
+            Outcome.Ok(ServerConfig(reputation = ReputationSection(0, 50))),
+            ServerConfig.parse("[reputation]\nminVersionAgeHours = 0\nminProjectDownloads = 50\n"),
+        )
+        assertEquals(
+            Outcome.Err("reputation.minVersionAgeHours must be between 0 and 8760"),
+            ServerConfig.parse("[reputation]\nminVersionAgeHours = 9000\n"),
+        )
+        assertEquals(
+            Outcome.Err("reputation.minProjectDownloads must be between 0 and 1000000000"),
+            ServerConfig.parse("[reputation]\nminProjectDownloads = -1\n"),
+        )
+    }
+
+    @Test
+    fun `passes the settings the game reads as system properties`() {
+        assertEquals(
+            mapOf(
+                "rloaded.client-timeout-seconds" to "120",
+                "rloaded.reputation.min-version-age-hours" to "72",
+                "rloaded.reputation.min-project-downloads" to "1000",
+            ),
+            ServerConfig().gameProperties(),
+        )
+    }
+
+    @Test
     fun `refuses memory out of range`() {
         assertEquals(
             Outcome.Err("server.maxMemoryMiB must be between 512 and 65536"),

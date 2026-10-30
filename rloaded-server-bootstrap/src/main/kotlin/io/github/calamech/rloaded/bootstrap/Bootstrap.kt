@@ -1,6 +1,5 @@
 package io.github.calamech.rloaded.bootstrap
 
-import io.github.calamech.rloaded.core.join.JoinDeadlines
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.flatMap
 import io.github.calamech.rloaded.protocol.map
@@ -94,7 +93,7 @@ public class Bootstrap(
                                         agent,
                                         listOf(runtime) + mods,
                                         config.server.maxMemoryMiB,
-                                        mapOf(JoinDeadlines.TIMEOUT_PROPERTY to config.rollout.clientTimeoutSeconds.toString()),
+                                        config.gameProperties(),
                                     )
                                 }
                             }

@@ -16,10 +16,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
@@ -31,11 +34,12 @@ import net.minecraft.server.MinecraftServer;
 
 /**
  * Runs {@code rloaded add} the way the server console does, against a fake Modrinth on the loopback
- * interface: a plain mod is written to the lockfile with its side, and a mod with biome entries is
- * refused with the reason, leaving the lockfile as it was.
+ * interface: a plain mod is written to the lockfile with its side, while a mod with biome entries
+ * and a version published a moment ago are refused with the reason, leaving the lockfile as it was.
  */
 public final class AdminAddGameTest {
-  private static final int MAX_TICKS = 400;
+  private static final int MAX_TICKS = 600;
+  private static final Instant OLD = Instant.parse("2026-10-01T00:00:00Z");
 
   @GameTest(maxTicks = MAX_TICKS)
   public void consoleAddWritesTheLockfileOrSaysWhyNot(GameTestHelper helper) throws Exception {
@@ -45,32 +49,71 @@ public final class AdminAddGameTest {
     HttpServer modrinth =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     String url = "http://127.0.0.1:" + modrinth.getAddress().getPort();
-    publish(modrinth, url, "admintest", jar("admin-test", Map.of()));
+    publish(modrinth, url, "admintest", jar("admin-test", Map.of()), OLD);
     publish(
         modrinth,
         url,
         "admintestworld",
-        jar("admin-test-world", Map.of("data/admin-test-world/worldgen/biome/hot.json", "{}")));
+        jar("admin-test-world", Map.of("data/admin-test-world/worldgen/biome/hot.json", "{}")),
+        OLD);
+    publish(modrinth, url, "admintestfresh", jar("admin-test-fresh", Map.of()), Instant.now());
+    // Every project has enough downloads and no team members.
+    modrinth.createContext(
+        "/v2/projects",
+        exchange -> {
+          String asked = exchange.getRequestURI().getQuery();
+          String projects =
+              Stream.of("admintest", "admintestworld", "admintestfresh")
+                  .filter(id -> asked.contains("\"" + id + "\""))
+                  .map(
+                      id ->
+                          "{\"id\": \""
+                              + id
+                              + "\", \"title\": \""
+                              + id
+                              + "\", \"downloads\": 5000, \"team\": \"t"
+                              + id
+                              + "\"}")
+                  .collect(Collectors.joining(",", "[", "]"));
+          respond(exchange, projects.getBytes(StandardCharsets.UTF_8));
+        });
+    modrinth.createContext(
+        "/v2/teams", exchange -> respond(exchange, "[]".getBytes(StandardCharsets.UTF_8)));
     modrinth.start();
     System.setProperty("rloaded.test.modrinth", url);
 
     List<String> messages = new CopyOnWriteArrayList<>();
     CommandSourceStack console = server.createCommandSourceStack().withSource(capturing(messages));
-    server.getCommands().performPrefixedCommand(console, "rloaded add admintest");
-    boolean[] refusedAsked = {false};
+    List<String> projects = List.of("admintest", "admintestworld", "admintestfresh");
+    int[] sent = {0};
     helper.succeedWhen(
         () -> {
-          if (!refusedAsked[0] && messages.stream().anyMatch(m -> m.startsWith("Added "))) {
-            refusedAsked[0] = true;
-            server.getCommands().performPrefixedCommand(console, "rloaded add admintestworld");
+          // One add at a time: the next starts once the previous one answered.
+          long answered =
+              messages.stream()
+                  .filter(m -> m.startsWith("Added ") || m.contains(" was not added: "))
+                  .count();
+          if (answered == sent[0] && sent[0] < projects.size()) {
+            server
+                .getCommands()
+                .performPrefixedCommand(console, "rloaded add " + projects.get(sent[0]));
+            sent[0]++;
           }
+          helper.assertTrue(answered == projects.size(), "adds still running: " + messages);
           helper.assertTrue(
               messages.stream()
                   .anyMatch(
                       m ->
                           m.startsWith("admintestworld was not added: ")
                               && m.contains("adds data pack entries to worldgen/biome")),
-              "no refusal of the biome mod yet: " + messages);
+              "the biome mod was not refused by the classifier: " + messages);
+          helper.assertTrue(
+              messages.stream()
+                  .anyMatch(
+                      m ->
+                          m.startsWith("admintestfresh was not added: ")
+                              && m.contains("less than 72 hours ago")),
+              "the new version was not refused as too recent: " + messages);
           List<LockedMod> mods = mods(lockfile);
           helper.assertValueEqual(
               mods.stream().map(mod -> mod.getEntry().getProjectId()).toList(),
@@ -119,7 +162,8 @@ public final class AdminAddGameTest {
   }
 
   // One release of the project for Fabric 26.3, the way Modrinth lists it.
-  private static void publish(HttpServer modrinth, String url, String project, byte[] jar)
+  private static void publish(
+      HttpServer modrinth, String url, String project, byte[] jar, Instant published)
       throws NoSuchAlgorithmException {
     String sha512 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-512").digest(jar));
     String version =
@@ -128,7 +172,9 @@ public final class AdminAddGameTest {
             + "\", \"project_id\": \""
             + project
             + "\", \"version_number\": \"1.0.0\", \"version_type\": \"release\","
-            + " \"date_published\": \"2026-10-01T00:00:00Z\", \"game_versions\": [\"26.3\"],"
+            + " \"date_published\": \""
+            + published
+            + "\", \"game_versions\": [\"26.3\"],"
             + " \"loaders\": [\"fabric\"], \"dependencies\": [], \"files\": [{\"url\": \""
             + url
             + "/cdn/"

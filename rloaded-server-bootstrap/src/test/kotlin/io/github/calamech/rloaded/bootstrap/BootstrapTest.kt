@@ -121,6 +121,7 @@ class BootstrapTest {
             assertTrue(Path.of(command.first()).endsWith(Path.of("jbr", "Contents", "Home", "bin", "java")))
             assertEquals(listOf("-Xmx4096M", "-XX:+AllowEnhancedClassRedefinition"), command.subList(1, 3))
             assertTrue("-Drloaded.client-timeout-seconds=120" in command)
+            assertTrue("-Drloaded.reputation.min-version-age-hours=72" in command)
             assertEquals(
                 "io.github.calamech.rloaded.agent.RloadedAgent",
                 JarFile(agent.toFile()).use {
