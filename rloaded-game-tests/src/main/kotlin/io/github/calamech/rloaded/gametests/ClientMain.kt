@@ -53,7 +53,7 @@ public fun main(arguments: Array<String>) {
     run.createDirectories()
     run.resolve("eula.txt").writeText("eula=true\n")
     val profile = (OfflineProfile.of(PLAYER) as? Outcome.Ok)?.value ?: fail("invalid player name $PLAYER")
-    val settings = LaunchSettings(profile, run, null, agent, runtimeMod, "client-game-test")
+    val settings = LaunchSettings(profile, run, null, agent, runtimeMod, "client-game-test", directories.mods, directories.trustStore)
     val command =
         when (val built = ClientCommand.build(installed, settings, directories.assets, run.resolve("natives"))) {
             is Outcome.Ok -> withTestMods(built.value, testMods, clientGameTestProperties(report, hotAddMods))

@@ -95,8 +95,10 @@ public class ModInstaller(
         }
     }
 
-    private companion object {
-        const val DEFAULT_PARALLELISM = 4
-        const val JAR = ".jar"
+    /** Defaults, for callers that cannot use default arguments. */
+    public companion object {
+        /** Files downloaded at the same time by default. */
+        public const val DEFAULT_PARALLELISM: Int = 4
+        private const val JAR = ".jar"
     }
 }

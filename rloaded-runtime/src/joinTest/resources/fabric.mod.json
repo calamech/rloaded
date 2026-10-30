@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "rloaded-join-test",
+  "version": "${version}",
+  "name": "Rloaded join test",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": ["io.github.calamech.rloaded.testmods.jointest.JoinClientGameTest"]
+  },
+  "depends": {
+    "rloaded": "*",
+    "fabric-client-gametest-api-v1": "*"
+  }
+}

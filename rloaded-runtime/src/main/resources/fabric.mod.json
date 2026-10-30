@@ -12,7 +12,8 @@
   "mixins": ["rloaded.mixins.json"],
   "jars": [${jars}],
   "entrypoints": {
-    "main": ["io.github.calamech.rloaded.runtime.RloadedRuntime"]
+    "main": ["io.github.calamech.rloaded.runtime.RloadedRuntime"],
+    "client": ["io.github.calamech.rloaded.runtime.RloadedClient"]
   },
   "depends": {
     "fabricloader": ">=0.20.1",

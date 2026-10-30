@@ -25,6 +25,9 @@ public class ClientDirectories(
     /** Mod jars, by SHA-512. */
     public val mods: Path get() = root.resolve("store/sha512")
 
+    /** The servers the player trusts, by key. */
+    public val trustStore: Path get() = root.resolve("trust.json")
+
     /** The game directory of a server or a world: options, saves and logs. */
     public fun profile(name: String): Path = root.resolve("profiles").resolve(name)
 }

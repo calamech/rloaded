@@ -87,7 +87,16 @@ class GameInstallerTest {
             val installed = install(mac, setOf(LaunchFeatures.QUICK_PLAY_MULTIPLAYER))
             val gameDirectory = directories.profile("local")
             val settings =
-                LaunchSettings(profile, gameDirectory, ServerAddress("localhost"), Path.of("/agent.jar"), Path.of("/rloaded.jar"), "0.1.0")
+                LaunchSettings(
+                    profile,
+                    gameDirectory,
+                    ServerAddress("localhost"),
+                    Path.of("/agent.jar"),
+                    Path.of("/rloaded.jar"),
+                    "0.1.0",
+                    directories.mods,
+                    directories.trustStore,
+                )
 
             val command =
                 (
@@ -107,6 +116,8 @@ class GameInstallerTest {
                     "-XX:+AllowEnhancedClassRedefinition",
                     "-javaagent:${Path.of("/agent.jar")}",
                     "-Dfabric.addMods=${installed.mods.single()}${File.pathSeparator}${Path.of("/rloaded.jar")}",
+                    "-Drloaded.mod-store=${directories.mods}",
+                    "-Drloaded.trust-store=${directories.trustStore}",
                     "-XstartOnFirstThread",
                     "-Djava.library.path=${gameDirectory.resolve("natives")}",
                     "-cp",
@@ -144,6 +155,8 @@ class GameInstallerTest {
                     Path.of("/agent.jar"),
                     Path.of("/rloaded.jar"),
                     "0.1.0",
+                    directories.mods,
+                    directories.trustStore,
                 )
 
             assertEquals(

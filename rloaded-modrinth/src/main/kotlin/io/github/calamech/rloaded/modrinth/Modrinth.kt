@@ -7,12 +7,16 @@ import io.github.calamech.rloaded.protocol.flatMap
 import io.github.calamech.rloaded.protocol.map
 import io.github.calamech.rloaded.protocol.mapError
 import io.github.calamech.rloaded.protocol.traverse
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.future
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CompletableFuture
 
 /** Where Modrinth's API is, and the limits applied to its answers. */
 public data class ModrinthSettings(
@@ -57,6 +61,10 @@ public class Modrinth(
                     }
                 }
             }
+
+    /** [projects] for Java callers: runs on the IO dispatcher and completes with the outcome. */
+    public fun projectsAsync(ids: Collection<String>): CompletableFuture<Outcome<Map<String, ModrinthProject>, ModrinthError>> =
+        CoroutineScope(Dispatchers.IO).future { projects(ids) }
 
     // Team members in Modrinth's order, by team id. A team Modrinth does not return has no members.
     private suspend fun members(teams: List<String>): Outcome<Map<String, List<String>>, ModrinthError> {
