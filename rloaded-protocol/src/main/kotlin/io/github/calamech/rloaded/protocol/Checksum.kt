@@ -1,6 +1,5 @@
-package io.github.calamech.rloaded.core.download
+package io.github.calamech.rloaded.protocol
 
-import io.github.calamech.rloaded.protocol.Outcome
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.io.path.inputStream

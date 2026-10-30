@@ -1,8 +1,8 @@
 package io.github.calamech.rloaded.core.mojang
 
 import io.github.calamech.rloaded.core.download.Artifact
-import io.github.calamech.rloaded.core.download.Checksum
-import io.github.calamech.rloaded.core.download.HashAlgorithm
+import io.github.calamech.rloaded.protocol.Checksum
+import io.github.calamech.rloaded.protocol.HashAlgorithm
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.flatMap
 import io.github.calamech.rloaded.protocol.map

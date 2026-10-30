@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Amended: 2026-10-30, `Checksum`, `HashAlgorithm` and `InvalidChecksum` move to the same package, as messages carry SHA-512 hashes of mod files
 
 ## Context
 

@@ -1,10 +1,10 @@
 package io.github.calamech.rloaded.core.runtime
 
-import io.github.calamech.rloaded.core.download.HashAlgorithm
 import io.github.calamech.rloaded.core.download.UrlPolicy
 import io.github.calamech.rloaded.core.mojang.Architecture
 import io.github.calamech.rloaded.core.mojang.OperatingSystem
 import io.github.calamech.rloaded.core.mojang.Platform
+import io.github.calamech.rloaded.protocol.HashAlgorithm
 import kotlinx.serialization.SerializationException
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
