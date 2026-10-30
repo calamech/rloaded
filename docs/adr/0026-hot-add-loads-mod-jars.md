@@ -50,3 +50,5 @@ Amendment of 2026-10-30, client side: `HotAddClientGameTest` loads both test mod
 ## Enforcement
 
 `HotAddGameTest` and `HotAddRefusalGameTest`, run by the `game-test` CI job.
+
+Amended 2026-10-30: the `preLaunch` and language adapter checks moved to the jar classifier, which `HotAdd` calls (ADR 0034).

@@ -1,5 +1,8 @@
 package io.github.calamech.rloaded.runtime.engine;
 
+import io.github.calamech.rloaded.core.admission.JarProblem;
+import io.github.calamech.rloaded.core.admission.Refusal;
+import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.runtime.engine.LoaderBridge.ModJar;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
@@ -12,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.api.EnvType;
@@ -95,13 +99,19 @@ public final class HotAdd {
           mod.path(),
           "it widens access to game classes, which cannot be done in a running game yet");
     }
-    if (!mod.metadata().getLanguageAdapterDefinitions().isEmpty()) {
-      throw new HotAddRefusal(
-          mod.path(), "it brings a language adapter, which only works from startup");
-    }
-    if (mod.metadata().getEntrypointKeys().contains("preLaunch")) {
-      throw new HotAddRefusal(
-          mod.path(), "it has a preLaunch entrypoint, which runs before the game starts");
+    switch (Admission.classifier().classify(mod.path())) {
+      case Outcome.Ok<?> ok -> {
+        List<?> refusals = (List<?>) ok.getValue();
+        if (!refusals.isEmpty()) {
+          throw new HotAddRefusal(
+              mod.path(),
+              refusals.stream()
+                  .map(refusal -> ((Refusal) refusal).getReason())
+                  .collect(Collectors.joining("; ")));
+        }
+      }
+      case Outcome.Err<?> err ->
+          throw new HotAddRefusal(mod.path(), ((JarProblem) err.getError()).getDescription());
     }
   }
 
