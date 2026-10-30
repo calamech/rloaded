@@ -124,7 +124,10 @@ class ModInstallerTest {
         val versions =
             files.joinToString(",", "[", "]") { (entry, path) ->
                 """{"id": "${entry.versionId}", "project_id": "${entry.projectId}", "files": [{"url": "${server.url(path)}", """ +
-                    """"filename": "${entry.fileName}", "size": ${entry.size}, "hashes": {"sha512": "${entry.sha512.hex}"}}]}"""
+                    """"filename": "${entry.fileName}", "size": ${entry.size}, "hashes": {"sha512": "${entry.sha512.hex}"}, """ +
+                    """"primary": true}], "version_number": "1.0.0", "version_type": "release", """ +
+                    """"date_published": "2026-10-01T00:00:00Z", """ +
+                    """"game_versions": ["26.3"], "loaders": ["fabric"], "dependencies": []}"""
             }
         server.serve("/v2/versions", versions.toByteArray())
     }

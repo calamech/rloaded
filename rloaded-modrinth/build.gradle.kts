@@ -1,5 +1,6 @@
 plugins {
     id("rloaded.kotlin-library")
+    `java-test-fixtures`
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 

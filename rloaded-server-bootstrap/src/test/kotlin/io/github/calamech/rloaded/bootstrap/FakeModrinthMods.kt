@@ -35,7 +35,10 @@ class FakeModrinthMods(
                 mods.filter { "\"${it.versionId}\"" in asked }.joinToString(",", "[", "]") { mod ->
                     val url = server.url("/cdn/${mod.fileName}")
                     """{"id": "${mod.versionId}", "project_id": "${mod.projectId}", "files": [{"url": "$url", """ +
-                        """"filename": "${mod.fileName}", "size": ${mod.bytes.size}, "hashes": {"sha512": "${mod.sha512}"}}]}"""
+                        """"filename": "${mod.fileName}", "size": ${mod.bytes.size}, "hashes": {"sha512": "${mod.sha512}"}, """ +
+                        """"primary": true}], "version_number": "1.0.0", "version_type": "release", """ +
+                        """"date_published": "2026-10-01T00:00:00Z", """ +
+                        """"game_versions": ["26.3"], "loaders": ["fabric"], "dependencies": []}"""
                 }
             exchange.respond(OK, versions.toByteArray())
         }

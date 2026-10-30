@@ -62,6 +62,40 @@ public class Modrinth(
                 }
             }
 
+    /**
+     * Returns every version of [project], an id or a slug, made for Fabric and [gameVersion], newest
+     * first. Fails with [ModrinthError.UnknownProjects] when Modrinth has no such project, and refuses
+     * an answer that lists a version of another project or for another loader or game version.
+     */
+    public suspend fun projectVersions(
+        project: String,
+        gameVersion: String,
+    ): Outcome<List<ModrinthVersion>, ModrinthError> {
+        val invalid = listOf(project, gameVersion).firstOrNull { !SLUG.matches(it) }
+        if (invalid != null) return Outcome.Err(ModrinthError.InvalidId(invalid))
+        val filters = "loaders=${encode("[\"$FABRIC\"]")}&game_versions=${encode("[\"$gameVersion\"]")}&include_changelog=false"
+        val url = "${settings.apiUrl}/project/$project/version?$filters"
+        return http
+            .text(url, settings.maxResponseBytes)
+            .mapError { error ->
+                if (error is DownloadError.HttpStatus && error.status == NOT_FOUND) {
+                    ModrinthError.UnknownProjects(listOf(project))
+                } else {
+                    classify(url, error)
+                }
+            }.flatMap { decode(it, ListSerializer(VersionJson.serializer())) }
+            .flatMap { versions -> versions.traverse { it.toVersion() } }
+            .flatMap { versions ->
+                val stray = versions.firstOrNull { FABRIC !in it.loaders || gameVersion !in it.gameVersions }
+                val projects = versions.map { it.projectId }.toSet()
+                when {
+                    stray != null -> Outcome.Err(ModrinthError.Malformed("version ${stray.id} is not for Fabric $gameVersion"))
+                    projects.size > 1 -> Outcome.Err(ModrinthError.Malformed("versions of several projects: ${projects.sorted()}"))
+                    else -> Outcome.Ok(versions.sortedByDescending { it.publishedAt })
+                }
+            }
+    }
+
     /** [projects] for Java callers: runs on the IO dispatcher and completes with the outcome. */
     public fun projectsAsync(ids: Collection<String>): CompletableFuture<Outcome<Map<String, ModrinthProject>, ModrinthError>> =
         CoroutineScope(Dispatchers.IO).future { projects(ids) }
@@ -124,12 +158,20 @@ public class Modrinth(
         batch: List<String>,
     ): Outcome<String, ModrinthError> {
         val ids = batch.joinToString(",", "[", "]") { "\"$it\"" }
-        val url = "${settings.apiUrl}/$path?ids=${URLEncoder.encode(ids, StandardCharsets.UTF_8)}"
+        val url = "${settings.apiUrl}/$path?ids=${encode(ids)}"
         return http.text(url, settings.maxResponseBytes).mapError { classify(url, it) }
     }
 
     private companion object {
         val ID = Regex("[A-Za-z0-9]{1,16}")
+
+        // Project slugs and game versions, kept to characters that need no care in a URL path.
+        val SLUG = Regex("[A-Za-z0-9_.+-]{1,64}")
+        const val FABRIC = "fabric"
+        const val NOT_FOUND = 404
+
+        fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
+
         val JSON = Json { ignoreUnknownKeys = true }
         val VERSIONS = Endpoint("versions", "version", ListSerializer(VersionJson.serializer())) { it.id }
         val PROJECTS = Endpoint("projects", "project", ListSerializer(ProjectJson.serializer())) { it.id }

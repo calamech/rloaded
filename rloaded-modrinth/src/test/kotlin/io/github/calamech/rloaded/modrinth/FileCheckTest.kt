@@ -6,14 +6,33 @@ import io.github.calamech.rloaded.protocol.ModEntry
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.Side
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import kotlin.test.assertEquals
 
 class FileCheckTest {
     private val sha = checksum('a')
-    private val file = ModrinthFile("https://cdn.modrinth.com/data/P7dR8mSH/versions/EQKgpeKu/mod.jar", "mod.jar", 100, sha)
+    private val file =
+        ModrinthFile("https://cdn.modrinth.com/data/P7dR8mSH/versions/EQKgpeKu/mod.jar", "mod.jar", 100, sha, primary = true)
     private val other =
-        ModrinthFile("https://cdn.modrinth.com/data/P7dR8mSH/versions/EQKgpeKu/sources.jar", "sources.jar", 50, checksum('c'))
-    private val version = ModrinthVersion("EQKgpeKu", "P7dR8mSH", listOf(other, file))
+        ModrinthFile(
+            "https://cdn.modrinth.com/data/P7dR8mSH/versions/EQKgpeKu/sources.jar",
+            "sources.jar",
+            50,
+            checksum('c'),
+            primary = false,
+        )
+    private val version =
+        ModrinthVersion(
+            "EQKgpeKu",
+            "P7dR8mSH",
+            listOf(other, file),
+            "0.165.0+26.3",
+            VersionType.RELEASE,
+            Instant.parse("2026-10-23T08:35:46Z"),
+            listOf("26.3"),
+            listOf("fabric"),
+            emptyList(),
+        )
 
     @Test
     fun `returns the file when the record agrees with the entry`() {
