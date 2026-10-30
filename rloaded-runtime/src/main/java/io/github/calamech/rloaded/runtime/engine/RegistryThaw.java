@@ -44,12 +44,16 @@ public final class RegistryThaw {
   public static <T> void freeze(Registry<T> registry) {
     MappedRegistryAccess<T> access = access(registry);
     if (access.rloaded$frozen()) {
-      throw new IllegalStateException("registry " + registry.key().identifier() + " is already frozen");
+      throw new IllegalStateException(
+          "registry " + registry.key().identifier() + " is already frozen");
     }
     Map<T, Holder.Reference<T>> unregistered = access.rloaded$unregisteredIntrusiveHolders();
     if (unregistered != null && !unregistered.isEmpty()) {
       throw new IllegalStateException(
-          "values created holders in registry " + registry.key().identifier() + " but were never registered: " + unregistered.keySet());
+          "values created holders in registry "
+              + registry.key().identifier()
+              + " but were never registered: "
+              + unregistered.keySet());
     }
     access.rloaded$byValue().forEach(RegistryThaw::bindValue);
     access.rloaded$setUnregisteredIntrusiveHolders(null);

@@ -13,7 +13,8 @@ public final class LateMixinGameTest {
   @GameTest
   public void lateMixinAddsMembersToLoadedClass(GameTestHelper helper) throws Exception {
     Object existing = LateMixinTarget.EXISTING;
-    helper.assertTrue(!(existing instanceof LateGreeting), "the target already implements LateGreeting");
+    helper.assertTrue(
+        !(existing instanceof LateGreeting), "the target already implements LateGreeting");
 
     List<String> redefined;
     List<String> errors;
@@ -23,12 +24,17 @@ public final class LateMixinGameTest {
     }
 
     helper.assertValueEqual(errors, List.of(), "error-level log lines");
-    helper.assertValueEqual(redefined, List.of(LateMixinTarget.class.getName()), "redefined classes");
-    helper.assertTrue(existing instanceof LateGreeting, "the existing instance does not implement LateGreeting");
+    helper.assertValueEqual(
+        redefined, List.of(LateMixinTarget.class.getName()), "redefined classes");
+    helper.assertTrue(
+        existing instanceof LateGreeting, "the existing instance does not implement LateGreeting");
     LateGreeting greeting = (LateGreeting) existing;
     helper.assertValueEqual(greeting.rloadedGreeting(), "hello from target #1", "first greeting");
     helper.assertValueEqual(greeting.rloadedGreeting(), "hello from target #2", "second greeting");
-    helper.assertValueEqual(((LateGreeting) (Object) new LateMixinTarget()).rloadedGreeting(), "hello from target #1", "new instance");
+    helper.assertValueEqual(
+        ((LateGreeting) (Object) new LateMixinTarget()).rloadedGreeting(),
+        "hello from target #1",
+        "new instance");
     helper.succeed();
   }
 }

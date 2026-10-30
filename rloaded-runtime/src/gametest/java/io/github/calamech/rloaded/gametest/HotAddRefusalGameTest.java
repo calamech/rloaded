@@ -17,15 +17,26 @@ import net.minecraft.gametest.framework.GameTestHelper;
 
 /**
  * Checks that mods {@link HotAdd} cannot load are refused with a reason before anything of them is
- * registered. Each jar holds only a {@code fabric.mod.json}: refusals happen before any class loads.
+ * registered. Each jar holds only a {@code fabric.mod.json}: refusals happen before any class
+ * loads.
  */
 public final class HotAddRefusalGameTest {
   @GameTest
   public void unsupportedModsAreRefusedBeforeAnythingRuns(GameTestHelper helper) throws Exception {
     Path directory = Files.createTempDirectory("rloaded-refused");
     List<String> mismatches = new ArrayList<>();
-    expect(mismatches, directory, "already.jar", mod("fabric-api", ""), "already.jar is refused: a mod with id fabric-api is already loaded");
-    expect(mismatches, directory, "client.jar", mod("only-client", "\"environment\": \"client\","), "client.jar is refused: it does not load on the server");
+    expect(
+        mismatches,
+        directory,
+        "already.jar",
+        mod("fabric-api", ""),
+        "already.jar is refused: a mod with id fabric-api is already loaded");
+    expect(
+        mismatches,
+        directory,
+        "client.jar",
+        mod("only-client", "\"environment\": \"client\","),
+        "client.jar is refused: it does not load on the server");
     expect(
         mismatches,
         directory,
@@ -62,16 +73,24 @@ public final class HotAddRefusalGameTest {
         "breaks.jar",
         mod("breaks", "\"breaks\": {\"fabric-api\": \"*\"},"),
         "breaks.jar is refused: it breaks with fabric-api, which is loaded");
-    expect(mismatches, directory, "empty.jar", null, "empty.jar is refused: it has no fabric.mod.json");
+    expect(
+        mismatches,
+        directory,
+        "empty.jar",
+        null,
+        "empty.jar is refused: it has no fabric.mod.json");
 
     helper.assertValueEqual(mismatches, List.of(), "refusals that differ from the expected ones");
-    for (String id : List.of("only-client", "nested", "widener", "adapter", "prelaunch", "depends", "breaks")) {
-      helper.assertTrue(!FabricLoader.getInstance().isModLoaded(id), "the refused mod " + id + " was registered");
+    for (String id :
+        List.of("only-client", "nested", "widener", "adapter", "prelaunch", "depends", "breaks")) {
+      helper.assertTrue(
+          !FabricLoader.getInstance().isModLoaded(id), "the refused mod " + id + " was registered");
     }
     helper.succeed();
   }
 
-  private static void expect(List<String> mismatches, Path directory, String name, String metadata, String refusal)
+  private static void expect(
+      List<String> mismatches, Path directory, String name, String metadata, String refusal)
       throws IOException, ReflectiveOperationException {
     Path jar = directory.resolve(name);
     try (OutputStream file = Files.newOutputStream(jar);
@@ -92,6 +111,12 @@ public final class HotAddRefusalGameTest {
   }
 
   private static String mod(String id, String extra) {
-    return "{\"schemaVersion\": 1, \"id\": \"" + id + "\", \"version\": \"1.0.0\", " + extra + " \"name\": \"" + id + "\"}";
+    return "{\"schemaVersion\": 1, \"id\": \""
+        + id
+        + "\", \"version\": \"1.0.0\", "
+        + extra
+        + " \"name\": \""
+        + id
+        + "\"}";
   }
 }

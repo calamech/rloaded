@@ -20,7 +20,11 @@ final class ClientTestReport {
     }
     try {
       Files.writeString(
-          Path.of(file), test + System.lineSeparator(), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+          Path.of(file),
+          test + System.lineSeparator(),
+          StandardCharsets.UTF_8,
+          StandardOpenOption.CREATE,
+          StandardOpenOption.APPEND);
     } catch (IOException e) {
       throw new IllegalStateException("cannot write the client game test report " + file, e);
     }

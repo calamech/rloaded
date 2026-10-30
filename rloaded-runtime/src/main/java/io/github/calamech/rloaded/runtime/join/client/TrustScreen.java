@@ -21,8 +21,8 @@ import net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen;
 import net.minecraft.network.chat.Component;
 
 /**
- * Asks the player whether to trust a server and install its mods. Client-only mods have a box, ticked
- * by default, that leaves them out when cleared; mods both sides need cannot be left out.
+ * Asks the player whether to trust a server and install its mods. Client-only mods have a box,
+ * ticked by default, that leaves them out when cleared; mods both sides need cannot be left out.
  */
 final class TrustScreen extends Screen {
   private static final int HEADER_HEIGHT = 64;
@@ -37,7 +37,8 @@ final class TrustScreen extends Screen {
   private final Consumer<Set<String>> onInstall;
   private final Runnable onLeave;
   private final Set<String> optedOut = new LinkedHashSet<>();
-  private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this, HEADER_HEIGHT, HEADER_HEIGHT / 2);
+  private final HeaderAndFooterLayout layout =
+      new HeaderAndFooterLayout(this, HEADER_HEIGHT, HEADER_HEIGHT / 2);
 
   TrustScreen(
       Screen parent,
@@ -67,7 +68,11 @@ final class TrustScreen extends Screen {
     LinearLayout header = layout.addToHeader(LinearLayout.vertical().spacing(SPACING));
     header.defaultCellSetting().alignHorizontallyCenter();
     header.addChild(new StringWidget(getTitle(), font));
-    header.addChild(new StringWidget(Component.translatable(mods.isEmpty() ? "rloaded.trust.subtitle.none" : "rloaded.trust.subtitle"), font));
+    header.addChild(
+        new StringWidget(
+            Component.translatable(
+                mods.isEmpty() ? "rloaded.trust.subtitle.none" : "rloaded.trust.subtitle"),
+            font));
 
     LinearLayout rows = LinearLayout.vertical().spacing(SPACING);
     for (ModEntry mod : mods) {
@@ -77,8 +82,14 @@ final class TrustScreen extends Screen {
     layout.addToContents(new ScrollableLayout(minecraft, rows, layout.getContentHeight()));
 
     LinearLayout footer = layout.addToFooter(LinearLayout.horizontal().spacing(SPACING * 2));
-    footer.addChild(Button.builder(Component.translatable("rloaded.trust.install"), button -> onInstall.accept(Set.copyOf(optedOut))).build());
-    footer.addChild(Button.builder(Component.translatable("rloaded.trust.leave"), button -> onLeave.run()).build());
+    footer.addChild(
+        Button.builder(
+                Component.translatable("rloaded.trust.install"),
+                button -> onInstall.accept(Set.copyOf(optedOut)))
+            .build());
+    footer.addChild(
+        Button.builder(Component.translatable("rloaded.trust.leave"), button -> onLeave.run())
+            .build());
     layout.visitWidgets(this::addRenderableWidget);
     repositionElements();
   }
@@ -89,7 +100,9 @@ final class TrustScreen extends Screen {
     LinearLayout row = LinearLayout.horizontal().spacing(SPACING * 2);
     if (mod.getSide() == Side.CLIENT) {
       row.addChild(
-          Checkbox.builder(name.copy().append(" ").append(Component.translatable("rloaded.trust.client")), font)
+          Checkbox.builder(
+                  name.copy().append(" ").append(Component.translatable("rloaded.trust.client")),
+                  font)
               .selected(true)
               .onValueChange(
                   (box, selected) -> {
@@ -105,7 +118,10 @@ final class TrustScreen extends Screen {
     }
     if (project != null) {
       row.addChild(new StringWidget(authors(project.getAuthors()), font));
-      row.addChild(new StringWidget(Component.translatable("rloaded.trust.downloads", downloads(project.getDownloads())), font));
+      row.addChild(
+          new StringWidget(
+              Component.translatable("rloaded.trust.downloads", downloads(project.getDownloads())),
+              font));
     }
     return row;
   }
@@ -116,7 +132,9 @@ final class TrustScreen extends Screen {
     }
     String shown = String.join(", ", authors.subList(0, Math.min(SHOWN_AUTHORS, authors.size())));
     int more = authors.size() - SHOWN_AUTHORS;
-    return more > 0 ? Component.translatable("rloaded.trust.by_more", shown, more) : Component.translatable("rloaded.trust.by", shown);
+    return more > 0
+        ? Component.translatable("rloaded.trust.by_more", shown, more)
+        : Component.translatable("rloaded.trust.by", shown);
   }
 
   private static String downloads(long count) {
@@ -139,7 +157,8 @@ final class TrustScreen extends Screen {
     return false;
   }
 
-  // The connection is ticked by the screen it was opened from; keep ticking it while the player reads.
+  // The connection is ticked by the screen it was opened from; keep ticking it while the player
+  // reads.
   @Override
   public void tick() {
     super.tick();

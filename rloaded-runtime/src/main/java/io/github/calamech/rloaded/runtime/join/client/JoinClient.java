@@ -31,7 +31,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
@@ -64,15 +66,21 @@ public final class JoinClient {
   private JoinClient() {}
 
   /** What the client needs from its launcher to install mods. */
-  private record Connection(Path trustStore, KtorHttp http, Modrinth modrinth, ModInstaller installer) {}
+  private record Connection(
+      Path trustStore, KtorHttp http, Modrinth modrinth, ModInstaller installer) {}
 
   /** Registers the join on the client side. */
   public static void register() {
     ClientConfigurationNetworking.registerGlobalReceiver(
-        JoinPayloads.Hello.TYPE, (payload, context) -> context.client().execute(() -> onHello(payload, context.responseSender())));
+        JoinPayloads.Hello.TYPE,
+        (payload, context) ->
+            context.client().execute(() -> onHello(payload, context.responseSender())));
     ClientConfigurationNetworking.registerGlobalReceiver(
         JoinPayloads.Manifest.TYPE,
-        (payload, context) -> context.client().execute(() -> onManifest(payload, context.client(), context.responseSender())));
+        (payload, context) ->
+            context
+                .client()
+                .execute(() -> onManifest(payload, context.client(), context.responseSender())));
   }
 
   private static void onHello(JoinPayloads.Hello payload, PacketSender sender) {
@@ -86,11 +94,13 @@ public final class JoinClient {
     current = new ClientJoin(store, Map.copyOf(LOADED), rloadedVersion());
     switch (current.serverHello(payload.bytes())) {
       case Outcome.Ok<?> ok -> sender.sendPacket(new JoinPayloads.Hello((byte[]) ok.getValue()));
-      case Outcome.Err<?> err -> fail(sender, null, "the server's hello cannot be read: " + err.getError());
+      case Outcome.Err<?> err ->
+          fail(sender, null, "the server's hello cannot be read: " + err.getError());
     }
   }
 
-  private static void onManifest(JoinPayloads.Manifest payload, Minecraft client, PacketSender sender) {
+  private static void onManifest(
+      JoinPayloads.Manifest payload, Minecraft client, PacketSender sender) {
     Connection setup = connection();
     if (setup == null || current == null) {
       fail(sender, null, "start the game from the Rloaded launcher to join this server");
@@ -108,13 +118,16 @@ public final class JoinClient {
     }
   }
 
-  private static void askTrust(Connection setup, Minecraft client, PacketSender sender, ManifestStep.AskTrust ask) {
-    List<ModEntry> shown = ask.getEntries().stream().filter(entry -> entry.getSide() != Side.SERVER).toList();
+  private static void askTrust(
+      Connection setup, Minecraft client, PacketSender sender, ManifestStep.AskTrust ask) {
+    List<ModEntry> shown =
+        ask.getEntries().stream().filter(entry -> entry.getSide() != Side.SERVER).toList();
     List<String> ids = shown.stream().map(ModEntry::getProjectId).toList();
-    setup
-        .modrinth()
-        .projectsAsync(ids)
-        .thenAccept(projects -> client.execute(() -> showTrust(setup, client, sender, ask, shown, projects)));
+    onClientThread(
+        setup.modrinth().projectsAsync(ids),
+        client,
+        sender,
+        projects -> showTrust(setup, client, sender, ask, shown, projects));
   }
 
   private static void showTrust(
@@ -129,7 +142,8 @@ public final class JoinClient {
       return;
     }
     @SuppressWarnings("unchecked")
-    Map<String, ModrinthProject> details = (Map<String, ModrinthProject>) ((Outcome.Ok<?>) projects).getValue();
+    Map<String, ModrinthProject> details =
+        (Map<String, ModrinthProject>) ((Outcome.Ok<?>) projects).getValue();
     Screen previous = client.gui.screen();
     client.gui.setScreen(
         new TrustScreen(
@@ -141,30 +155,42 @@ public final class JoinClient {
               client.gui.setScreen(previous);
               switch (current.trust(ask.getEntries(), optedOut)) {
                 case Outcome.Ok<?> ok -> install(setup, client, sender, entries(ok.getValue()));
-                case Outcome.Err<?> err -> fail(sender, null, describe((JoinFailure) err.getError()));
+                case Outcome.Err<?> err ->
+                    fail(sender, null, describe((JoinFailure) err.getError()));
               }
             },
             () -> {
               client.gui.setScreen(previous);
-              sender.sendPacket(new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.RefusedByUser.INSTANCE)));
+              sender.sendPacket(
+                  new JoinPayloads.Result(
+                      ClientJoin.Companion.result(InstallResult.RefusedByUser.INSTANCE)));
             }));
   }
 
-  private static void install(Connection setup, Minecraft client, PacketSender sender, List<ModEntry> entries) {
+  private static void install(
+      Connection setup, Minecraft client, PacketSender sender, List<ModEntry> entries) {
     if (entries.isEmpty()) {
-      sender.sendPacket(new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE)));
+      sender.sendPacket(
+          new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE)));
       return;
     }
-    setup
-        .installer()
-        .installAsync(
-            entries,
-            (done, total) ->
-                sender.sendPacket(new JoinPayloads.Progress(ClientJoin.Companion.progress(InstallStage.DOWNLOAD, done * PERCENT / total))))
-        .thenAccept(outcome -> client.execute(() -> load(client, sender, outcome)));
+    onClientThread(
+        setup
+            .installer()
+            .installAsync(
+                entries,
+                (done, total) ->
+                    sender.sendPacket(
+                        new JoinPayloads.Progress(
+                            ClientJoin.Companion.progress(
+                                InstallStage.DOWNLOAD, done * PERCENT / total)))),
+        client,
+        sender,
+        outcome -> load(client, sender, outcome));
   }
 
-  private static void load(Minecraft client, PacketSender sender, Outcome<List<InstalledMod>, InstallError> outcome) {
+  private static void load(
+      Minecraft client, PacketSender sender, Outcome<List<InstalledMod>, InstallError> outcome) {
     if (outcome instanceof Outcome.Err<?> err) {
       fail(sender, null, "the mods cannot be downloaded: " + err.getError());
       return;
@@ -172,33 +198,74 @@ public final class JoinClient {
     @SuppressWarnings("unchecked")
     List<InstalledMod> mods = (List<InstalledMod>) ((Outcome.Ok<?>) outcome).getValue();
     try {
-      HotAdd.load(mods.stream().map(InstalledMod::getJar).toList(), AgentBridge.instrumentation().orElseThrow());
+      HotAdd.load(
+          mods.stream().map(InstalledMod::getJar).toList(),
+          AgentBridge.instrumentation().orElseThrow());
     } catch (HotAddRefusal refusal) {
       String failing =
-          mods.stream().filter(mod -> mod.getJar().equals(refusal.jar())).map(mod -> mod.getEntry().getProjectId()).findFirst().orElse(null);
+          mods.stream()
+              .filter(mod -> mod.getJar().equals(refusal.jar()))
+              .map(mod -> mod.getEntry().getProjectId())
+              .findFirst()
+              .orElse(null);
       fail(sender, failing, refusal.getMessage());
       return;
     }
     mods.forEach(mod -> LOADED.put(mod.getEntry().getProjectId(), mod.getEntry().getVersionId()));
-    client
-        .reloadResourcePacks()
-        .thenRun(() -> sender.sendPacket(new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE))));
+    onClientThread(
+        client.reloadResourcePacks(),
+        client,
+        sender,
+        reloaded ->
+            sender.sendPacket(
+                new JoinPayloads.Result(
+                    ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE))));
+  }
+
+  /**
+   * Runs {@code action} on the client thread once {@code future} completes. The futures here
+   * complete with an {@link Outcome}, so an exception is a defect: it ends the join rather than
+   * leaving the server waiting for a result that never comes.
+   */
+  private static <T> void onClientThread(
+      CompletableFuture<T> future, Minecraft client, PacketSender sender, Consumer<T> action) {
+    CompletableFuture<?> _ =
+        future.whenComplete(
+            (value, error) ->
+                client.execute(
+                    () -> {
+                      if (error == null) {
+                        action.accept(value);
+                      } else {
+                        LOGGER.error("Joining failed on an unexpected error", error);
+                        sendFailure(sender, null, "unexpected error: " + error);
+                      }
+                    }));
   }
 
   private static void fail(PacketSender sender, String failingMod, String report) {
     LOGGER.error("Joining failed: {}", report);
+    sendFailure(sender, failingMod, report);
+  }
+
+  private static void sendFailure(PacketSender sender, String failingMod, String report) {
     String bounded = report.length() > MAX_REPORT ? report.substring(0, MAX_REPORT) : report;
-    sender.sendPacket(new JoinPayloads.Result(ClientJoin.Companion.result(new InstallResult.Failed(failingMod, bounded))));
+    sender.sendPacket(
+        new JoinPayloads.Result(
+            ClientJoin.Companion.result(new InstallResult.Failed(failingMod, bounded))));
   }
 
   private static String describe(JoinFailure failure) {
     return switch (failure) {
-      case JoinFailure.Malformed malformed -> "the server sent a message that cannot be read: " + malformed.getReason();
+      case JoinFailure.Malformed malformed ->
+          "the server sent a message that cannot be read: " + malformed.getReason();
       case JoinFailure.NoHello noHello -> "the server sent its mods before saying who it is";
       case JoinFailure.BadSignature bad -> "the list of mods is not signed by the server's key";
       case JoinFailure.Conflicts conflicts ->
           "restart the game to change the version of "
-              + conflicts.getConflicts().stream().map(conflict -> conflict.getProjectId()).collect(Collectors.joining(", "));
+              + conflicts.getConflicts().stream()
+                  .map(conflict -> conflict.getProjectId())
+                  .collect(Collectors.joining(", "));
       case JoinFailure.Trust trust -> "your decision cannot be saved: " + trust.getError();
       default -> throw new IllegalStateException("unknown join failure " + failure);
     };
@@ -219,7 +286,8 @@ public final class JoinClient {
     };
   }
 
-  // The launcher passes where to keep mods and trust; without them the client cannot install anything.
+  // The launcher passes where to keep mods and trust; without them the client cannot install
+  // anything.
   private static synchronized Connection connection() {
     if (connection != null) {
       return connection;
@@ -235,17 +303,31 @@ public final class JoinClient {
     if (testModrinth != null) {
       URI uri = URI.create(testModrinth);
       LOGGER.warn("Reading mods from the test server {} instead of Modrinth", testModrinth);
-      settings = new ModrinthSettings(testModrinth + "/v2", settings.getMaxIdsPerRequest(), settings.getMaxResponseBytes());
+      settings =
+          new ModrinthSettings(
+              testModrinth + "/v2", settings.getMaxIdsPerRequest(), settings.getMaxResponseBytes());
       policy = new UrlPolicy(Set.of(new Origin(uri.getScheme(), uri.getHost(), uri.getPort())));
     }
     KtorHttp http = new KtorHttp(policy, new HttpSettings());
     Modrinth modrinth = new Modrinth(http, settings);
-    ArtifactStore store = new ArtifactStore(Path.of(modStore), http, new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES);
-    connection = new Connection(Path.of(trustStore), http, modrinth, new ModInstaller(modrinth, store, ModInstaller.DEFAULT_PARALLELISM));
+    ArtifactStore store =
+        new ArtifactStore(
+            Path.of(modStore), http, new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES);
+    connection =
+        new Connection(
+            Path.of(trustStore),
+            http,
+            modrinth,
+            new ModInstaller(modrinth, store, ModInstaller.DEFAULT_PARALLELISM));
     return connection;
   }
 
   private static String rloadedVersion() {
-    return FabricLoader.getInstance().getModContainer("rloaded").orElseThrow().getMetadata().getVersion().getFriendlyString();
+    return FabricLoader.getInstance()
+        .getModContainer("rloaded")
+        .orElseThrow()
+        .getMetadata()
+        .getVersion()
+        .getFriendlyString();
   }
 }

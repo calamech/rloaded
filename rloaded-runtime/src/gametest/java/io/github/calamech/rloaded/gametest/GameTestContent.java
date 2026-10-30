@@ -13,11 +13,13 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 
 /** Registers the blocks the game tests place, and the packets other mods would send. */
 public final class GameTestContent implements ModInitializer {
-  private static final Identifier FRAGILE_ID = Identifier.fromNamespaceAndPath("rloaded-gametest", "fragile");
+  private static final Identifier FRAGILE_ID =
+      Identifier.fromNamespaceAndPath("rloaded-gametest", "fragile");
 
   /** A block whose block entity cannot be read back from its saved data. */
   static final Block FRAGILE =
-      new FragileBlock(BlockBehaviour.Properties.of().setId(ResourceKey.create(Registries.BLOCK, FRAGILE_ID)));
+      new FragileBlock(
+          BlockBehaviour.Properties.of().setId(ResourceKey.create(Registries.BLOCK, FRAGILE_ID)));
 
   /** The block entity type of {@link #FRAGILE}. */
   static final BlockEntityType<FragileBlockEntity> FRAGILE_BLOCK_ENTITY =

@@ -9,8 +9,15 @@ public final class Agent {
 
   /** The agent's instrumentation; fails if the game was started without the agent. */
   public static Instrumentation instrumentation() throws ReflectiveOperationException {
-    Class<?> agentState = Class.forName("io.github.calamech.rloaded.agent.AgentState", true, ClassLoader.getSystemClassLoader());
-    Optional<?> instrumentation = (Optional<?>) agentState.getMethod("instrumentation").invoke(null);
-    return (Instrumentation) instrumentation.orElseThrow(() -> new IllegalStateException("start the server with the Rloaded agent"));
+    Class<?> agentState =
+        Class.forName(
+            "io.github.calamech.rloaded.agent.AgentState",
+            true,
+            ClassLoader.getSystemClassLoader());
+    Optional<?> instrumentation =
+        (Optional<?>) agentState.getMethod("instrumentation").invoke(null);
+    return (Instrumentation)
+        instrumentation.orElseThrow(
+            () -> new IllegalStateException("start the server with the Rloaded agent"));
   }
 }

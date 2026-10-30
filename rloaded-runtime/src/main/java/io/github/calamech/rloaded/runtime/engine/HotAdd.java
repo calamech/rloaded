@@ -40,7 +40,8 @@ public final class HotAdd {
    * @return the ids of the loaded mods, in the order their entrypoints ran
    * @throws HotAddRefusal if a jar is not a mod this method can load; nothing was changed then
    */
-  public static List<String> load(List<Path> jars, Instrumentation instrumentation) throws HotAddRefusal {
+  public static List<String> load(List<Path> jars, Instrumentation instrumentation)
+      throws HotAddRefusal {
     List<ModJar> mods = new ArrayList<>();
     for (Path jar : jars) {
       mods.add(LoaderBridge.read(jar));
@@ -82,37 +83,50 @@ public final class HotAdd {
   private static void refuseUnsupported(ModJar mod) throws HotAddRefusal {
     EnvType environment = LoaderBridge.environment();
     if (!mod.metadata().loadsInEnvironment(environment)) {
-      throw new HotAddRefusal(mod.path(), "it does not load on the " + environment.name().toLowerCase(Locale.ROOT));
+      throw new HotAddRefusal(
+          mod.path(), "it does not load on the " + environment.name().toLowerCase(Locale.ROOT));
     }
     if (!mod.metadata().getJars().isEmpty()) {
-      throw new HotAddRefusal(mod.path(), "it contains nested jars, which cannot be added to a running game yet");
+      throw new HotAddRefusal(
+          mod.path(), "it contains nested jars, which cannot be added to a running game yet");
     }
     if (mod.metadata().getClassTweaker() != null) {
-      throw new HotAddRefusal(mod.path(), "it widens access to game classes, which cannot be done in a running game yet");
+      throw new HotAddRefusal(
+          mod.path(),
+          "it widens access to game classes, which cannot be done in a running game yet");
     }
     if (!mod.metadata().getLanguageAdapterDefinitions().isEmpty()) {
-      throw new HotAddRefusal(mod.path(), "it brings a language adapter, which only works from startup");
+      throw new HotAddRefusal(
+          mod.path(), "it brings a language adapter, which only works from startup");
     }
     if (mod.metadata().getEntrypointKeys().contains("preLaunch")) {
-      throw new HotAddRefusal(mod.path(), "it has a preLaunch entrypoint, which runs before the game starts");
+      throw new HotAddRefusal(
+          mod.path(), "it has a preLaunch entrypoint, which runs before the game starts");
     }
   }
 
-  private static void refuseUnmetDependencies(ModJar mod, Map<String, ModJar> batch) throws HotAddRefusal {
+  private static void refuseUnmetDependencies(ModJar mod, Map<String, ModJar> batch)
+      throws HotAddRefusal {
     for (ModDependency dependency : mod.metadata().getDependencies()) {
       ModJar inBatch = batch.get(dependency.getModId());
       boolean satisfied =
-          inBatch != null ? dependency.matches(inBatch.metadata().getVersion()) : LoaderBridge.satisfiedByLoaded(dependency);
+          inBatch != null
+              ? dependency.matches(inBatch.metadata().getVersion())
+              : LoaderBridge.satisfiedByLoaded(dependency);
       if (dependency.getKind() == ModDependency.Kind.DEPENDS && !satisfied) {
-        throw new HotAddRefusal(mod.path(), "it depends on " + dependency.getModId() + " " + dependency.getVersionRequirements());
+        throw new HotAddRefusal(
+            mod.path(),
+            "it depends on " + dependency.getModId() + " " + dependency.getVersionRequirements());
       }
       if (dependency.getKind() == ModDependency.Kind.BREAKS && satisfied) {
-        throw new HotAddRefusal(mod.path(), "it breaks with " + dependency.getModId() + ", which is loaded");
+        throw new HotAddRefusal(
+            mod.path(), "it breaks with " + dependency.getModId() + ", which is loaded");
       }
     }
   }
 
-  // A mod runs after the mods of the same add it depends on, as Fabric orders entrypoints at startup.
+  // A mod runs after the mods of the same add it depends on, as Fabric orders entrypoints at
+  // startup.
   private static List<ModJar> dependencyOrder(Map<String, ModJar> batch) {
     Set<String> ordered = new LinkedHashSet<>();
     for (String id : batch.keySet()) {
@@ -121,12 +135,14 @@ public final class HotAdd {
     return ordered.stream().map(batch::get).toList();
   }
 
-  private static void visit(String id, Map<String, ModJar> batch, Set<String> ordered, Set<String> visiting) {
+  private static void visit(
+      String id, Map<String, ModJar> batch, Set<String> ordered, Set<String> visiting) {
     if (ordered.contains(id) || !visiting.add(id)) {
       return;
     }
     for (ModDependency dependency : batch.get(id).metadata().getDependencies()) {
-      if (dependency.getKind() == ModDependency.Kind.DEPENDS && batch.containsKey(dependency.getModId())) {
+      if (dependency.getKind() == ModDependency.Kind.DEPENDS
+          && batch.containsKey(dependency.getModId())) {
         visit(dependency.getModId(), batch, ordered, visiting);
       }
     }
@@ -142,9 +158,11 @@ public final class HotAdd {
         main.onInitialize();
       }
       if (LoaderBridge.environment() == EnvType.CLIENT) {
-        entrypoints("client", ClientModInitializer.class, mods).forEach(ClientModInitializer::onInitializeClient);
+        entrypoints("client", ClientModInitializer.class, mods)
+            .forEach(ClientModInitializer::onInitializeClient);
       } else {
-        entrypoints("server", DedicatedServerModInitializer.class, mods).forEach(DedicatedServerModInitializer::onInitializeServer);
+        entrypoints("server", DedicatedServerModInitializer.class, mods)
+            .forEach(DedicatedServerModInitializer::onInitializeServer);
       }
     } finally {
       registries.forEach(RegistryThaw::freeze);
@@ -156,7 +174,9 @@ public final class HotAdd {
     List<EntrypointContainer<T>> containers =
         FabricLoader.getInstance().getEntrypointContainers(key, type).stream()
             .filter(container -> order.contains(container.getProvider().getMetadata().getId()))
-            .sorted(Comparator.comparingInt(container -> order.indexOf(container.getProvider().getMetadata().getId())))
+            .sorted(
+                Comparator.comparingInt(
+                    container -> order.indexOf(container.getProvider().getMetadata().getId())))
             .toList();
     return containers.stream().map(EntrypointContainer::getEntrypoint).toList();
   }

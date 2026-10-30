@@ -27,9 +27,8 @@ import org.spongepowered.asm.service.IMixinService;
  * configuration is selected here by calling its processor directly. Each target that is already
  * loaded is then rebuilt from its pre-Mixin bytes with every Mixin that targets it, and redefined.
  * Mixin's check for targets loaded too early is skipped for such a configuration, since its loaded
- * targets are redefined here.
- * Adding methods, fields and interfaces to a loaded class needs the JetBrains Runtime started with
- * {@code -XX:+AllowEnhancedClassRedefinition}.
+ * targets are redefined here. Adding methods, fields and interfaces to a loaded class needs the
+ * JetBrains Runtime started with {@code -XX:+AllowEnhancedClassRedefinition}.
  */
 public final class LateMixins {
   private LateMixins() {}
@@ -53,12 +52,15 @@ public final class LateMixins {
     for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
       if (targets.contains(loaded.getName())) {
         byte[] preMixin = preMixinBytes(knotClassLoader, loaded.getName());
-        byte[] transformed = transformer.transformClassBytes(loaded.getName(), loaded.getName(), preMixin);
+        byte[] transformed =
+            transformer.transformClassBytes(loaded.getName(), loaded.getName(), preMixin);
         definitions.add(new ClassDefinition(loaded, transformed));
       }
     }
     instrumentation.redefineClasses(definitions.toArray(new ClassDefinition[0]));
-    return definitions.stream().map(definition -> definition.getDefinitionClass().getName()).toList();
+    return definitions.stream()
+        .map(definition -> definition.getDefinitionClass().getName())
+        .toList();
   }
 
   // MixinInfo refuses a mixin whose target is loaded, because Mixin alone could not apply it any
@@ -75,7 +77,8 @@ public final class LateMixins {
     IMixinService service = (IMixinService) serviceField.get(pending);
     IClassTracker tracker =
         new UnloadedClassTracker(
-            Objects.requireNonNull(service.getClassTracker(), "the Mixin service has no class tracker"));
+            Objects.requireNonNull(
+                service.getClassTracker(), "the Mixin service has no class tracker"));
     IMixinService withTracker =
         (IMixinService)
             Proxy.newProxyInstance(
@@ -112,7 +115,8 @@ public final class LateMixins {
     }
   }
 
-  private static Object processorOf(IMixinTransformer transformer) throws ReflectiveOperationException {
+  private static Object processorOf(IMixinTransformer transformer)
+      throws ReflectiveOperationException {
     Field processor = transformer.getClass().getDeclaredField("processor");
     processor.setAccessible(true);
     return processor.get(transformer);
@@ -126,19 +130,20 @@ public final class LateMixins {
   }
 
   // Selected configurations leave Mixins.getConfigs() for the processor's own list.
-  private static Set<String> targetsOf(Object processor, String config) throws ReflectiveOperationException {
+  private static Set<String> targetsOf(Object processor, String config)
+      throws ReflectiveOperationException {
     Field configs = processor.getClass().getDeclaredField("configs");
     configs.setAccessible(true);
     return ((List<?>) configs.get(processor))
         .stream()
-        .map(IMixinConfig.class::cast)
-        .filter(candidate -> candidate.getName().equals(config))
-        .findFirst()
-        .orElseThrow(() -> new IllegalStateException("Mixin did not select " + config))
-        .getTargets()
-        .stream()
-        .map(name -> name.replace('/', '.'))
-        .collect(Collectors.toSet());
+            .map(IMixinConfig.class::cast)
+            .filter(candidate -> candidate.getName().equals(config))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("Mixin did not select " + config))
+            .getTargets()
+            .stream()
+            .map(name -> name.replace('/', '.'))
+            .collect(Collectors.toSet());
   }
 
   private static Object knotClassLoader() throws ReflectiveOperationException {

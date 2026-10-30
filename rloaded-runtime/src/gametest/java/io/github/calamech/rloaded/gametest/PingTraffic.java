@@ -12,8 +12,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Custom packets sent every tick in both directions, the way content mods keep clients in sync,
- * so reconfiguration is tested with traffic of other mods around it.
+ * Custom packets sent every tick in both directions, the way content mods keep clients in sync, so
+ * reconfiguration is tested with traffic of other mods around it.
  */
 public final class PingTraffic {
   /** Packets the server received from clients. */
@@ -27,7 +27,8 @@ public final class PingTraffic {
   /** A packet carrying the sender's tick count. */
   public record Ping(int tick) implements CustomPacketPayload {
     /** The payload type, in both directions. */
-    public static final Type<Ping> TYPE = new Type<>(Identifier.fromNamespaceAndPath("rloaded-gametest", "ping"));
+    public static final Type<Ping> TYPE =
+        new Type<>(Identifier.fromNamespaceAndPath("rloaded-gametest", "ping"));
 
     /** Writes the tick count as a variable-length integer. */
     public static final StreamCodec<RegistryFriendlyByteBuf, Ping> CODEC =
@@ -42,7 +43,8 @@ public final class PingTraffic {
   static void register() {
     PayloadTypeRegistry.clientboundPlay().register(Ping.TYPE, Ping.CODEC);
     PayloadTypeRegistry.serverboundPlay().register(Ping.TYPE, Ping.CODEC);
-    ServerPlayNetworking.registerGlobalReceiver(Ping.TYPE, (ping, context) -> RECEIVED_BY_SERVER.incrementAndGet());
+    ServerPlayNetworking.registerGlobalReceiver(
+        Ping.TYPE, (ping, context) -> RECEIVED_BY_SERVER.incrementAndGet());
     ServerTickEvents.END_SERVER_TICK.register(
         server -> {
           for (ServerPlayer player : server.getPlayerList().getPlayers()) {

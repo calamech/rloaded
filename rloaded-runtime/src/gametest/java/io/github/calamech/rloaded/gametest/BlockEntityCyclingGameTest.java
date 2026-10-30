@@ -22,13 +22,21 @@ public final class BlockEntityCyclingGameTest {
 
     LateMixins.apply("rloaded-gametest.block-entity-init.mixins.json", Agent.instrumentation());
 
-    helper.assertTrue(((FieldInitProbe) existing).rloadedMarker() == null, "the existing chest ran the new field initializer");
+    helper.assertTrue(
+        ((FieldInitProbe) existing).rloadedMarker() == null,
+        "the existing chest ran the new field initializer");
     BlockEntityCycling.Result result = BlockEntityCycling.cycle(helper.getLevel());
     ChestBlockEntity rebuilt = helper.getBlockEntity(HERE, ChestBlockEntity.class);
-    helper.assertTrue(rebuilt != existing, "the chest was not rebuilt");
+    // A rebuilt chest is a new instance: identity is what this checks.
+    @SuppressWarnings("ReferenceEquality")
+    boolean sameChest = rebuilt == existing;
+    helper.assertFalse(sameChest, "the chest was not rebuilt");
     helper.assertTrue(existing.isRemoved(), "the old chest is not marked removed");
-    helper.assertValueEqual(((FieldInitProbe) rebuilt).rloadedMarker(), "initialized", "marker of the rebuilt chest");
-    helper.assertTrue(ItemStack.matches(rebuilt.getItem(0), new ItemStack(Items.DIAMOND, 3)), "the rebuilt chest lost its items");
+    helper.assertValueEqual(
+        ((FieldInitProbe) rebuilt).rloadedMarker(), "initialized", "marker of the rebuilt chest");
+    helper.assertTrue(
+        ItemStack.matches(rebuilt.getItem(0), new ItemStack(Items.DIAMOND, 3)),
+        "the rebuilt chest lost its items");
     helper.assertTrue(result.rebuilt() > 0, "the cycle reports no rebuilt block entity");
     helper.succeed();
   }
@@ -40,8 +48,12 @@ public final class BlockEntityCyclingGameTest {
 
     BlockEntityCycling.Result result = BlockEntityCycling.cycle(helper.getLevel());
 
-    helper.assertTrue(result.notRebuilt().contains(helper.absolutePos(HERE)), "the cycle does not report the fragile block entity");
-    helper.assertTrue(helper.getBlockEntity(HERE, FragileBlockEntity.class) == existing, "the fragile block entity was replaced");
+    helper.assertTrue(
+        result.notRebuilt().contains(helper.absolutePos(HERE)),
+        "the cycle does not report the fragile block entity");
+    helper.assertTrue(
+        helper.getBlockEntity(HERE, FragileBlockEntity.class) == existing,
+        "the fragile block entity was replaced");
     helper.assertTrue(!existing.isRemoved(), "the fragile block entity is marked removed");
     helper.succeed();
   }

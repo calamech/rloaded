@@ -25,8 +25,10 @@ import net.minecraft.world.level.block.Block;
  */
 public final class HotAddClientGameTest implements FabricClientGameTest {
   private static final String MODS_PROPERTY = "rloaded.hot-add-mods";
-  private static final Identifier BASIC_BLOCK = Identifier.fromNamespaceAndPath("content-basic", "basic_block");
-  private static final Identifier NO_ITEM = Identifier.fromNamespaceAndPath("rloaded-gametest", "no_such_item");
+  private static final Identifier BASIC_BLOCK =
+      Identifier.fromNamespaceAndPath("content-basic", "basic_block");
+  private static final Identifier NO_ITEM =
+      Identifier.fromNamespaceAndPath("rloaded-gametest", "no_such_item");
   private static final int RELOAD_TICKS = 2400;
 
   @Override
@@ -45,19 +47,26 @@ public final class HotAddClientGameTest implements FabricClientGameTest {
     if (!loaded.stream().sorted().toList().equals(List.of("content-basic", "mixin-loaded-class"))) {
       throw new AssertionError("loaded mods: " + loaded);
     }
-    Block block = BuiltInRegistries.BLOCK.getOptional(BASIC_BLOCK).orElseThrow(() -> new AssertionError("no block " + BASIC_BLOCK));
+    Block block =
+        BuiltInRegistries.BLOCK
+            .getOptional(BASIC_BLOCK)
+            .orElseThrow(() -> new AssertionError("no block " + BASIC_BLOCK));
     boolean blockModel =
         context.computeOnClient(
             client -> {
               BlockStateModelSet models = client.getModelManager().getBlockStateModelSet();
-              return models.get(block.defaultBlockState()) != models.missingModel();
+              return !models.get(block.defaultBlockState()).equals(models.missingModel());
             });
     if (!blockModel) {
       throw new AssertionError("the new block has the missing model after the resource reload");
     }
     boolean itemModel =
         context.computeOnClient(
-            client -> client.getModelManager().getItemModel(BASIC_BLOCK) != client.getModelManager().getItemModel(NO_ITEM));
+            client ->
+                !client
+                    .getModelManager()
+                    .getItemModel(BASIC_BLOCK)
+                    .equals(client.getModelManager().getItemModel(NO_ITEM)));
     if (!itemModel) {
       throw new AssertionError("the new item has the missing model after the resource reload");
     }
@@ -77,9 +86,15 @@ public final class HotAddClientGameTest implements FabricClientGameTest {
     }
   }
 
+  // A missing method is what this test checks for: it fails the test, it is not a linkage defect.
+  @SuppressWarnings("RethrowReflectiveOperationExceptionAsLinkageError")
   private static Object greet(Item item) {
     try {
-      Class<?> greeting = Class.forName("io.github.calamech.rloaded.testmods.mixinloadedclass.ItemGreeting", true, Item.class.getClassLoader());
+      Class<?> greeting =
+          Class.forName(
+              "io.github.calamech.rloaded.testmods.mixinloadedclass.ItemGreeting",
+              true,
+              Item.class.getClassLoader());
       return greeting.getMethod("mixinLoadedClass$greet").invoke(item);
     } catch (ReflectiveOperationException e) {
       throw new AssertionError("stone does not answer the mixin's method", e);

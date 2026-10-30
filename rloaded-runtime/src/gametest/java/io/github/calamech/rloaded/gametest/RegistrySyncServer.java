@@ -16,9 +16,9 @@ import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 /**
  * The server side of the registry sync check, active when the harness starts the server for it.
  *
- * <p>Once every player registered the check's blocks on its side, the server registers them too,
- * as an add would, and sends every player through the configuration phase again so Fabric can sync
- * the raw ids. The harness stops the server once the clients wrote their ids.
+ * <p>Once every player registered the check's blocks on its side, the server registers them too, as
+ * an add would, and sends every player through the configuration phase again so Fabric can sync the
+ * raw ids. The harness stops the server once the clients wrote their ids.
  */
 public final class RegistrySyncServer implements DedicatedServerModInitializer {
   private static final String PLAYERS_PROPERTY = "rloaded.registry-sync.players";
@@ -34,7 +34,8 @@ public final class RegistrySyncServer implements DedicatedServerModInitializer {
               }
               Driver driver = new Driver(players, output);
               ServerPlayNetworking.registerGlobalReceiver(
-                  RegistrySyncCheck.BlocksRegistered.TYPE, (payload, context) -> driver.registered.add(context.player().getUUID()));
+                  RegistrySyncCheck.BlocksRegistered.TYPE,
+                  (payload, context) -> driver.registered.add(context.player().getUUID()));
               ServerTickEvents.END_SERVER_TICK.register(driver::tick);
             });
   }
@@ -62,7 +63,8 @@ public final class RegistrySyncServer implements DedicatedServerModInitializer {
       }
       if (added) {
         for (Connection connection : server.getConnection().getConnections()) {
-          if (connection.getPacketListener() instanceof ServerConfigurationPacketListenerImpl listener
+          if (connection.getPacketListener()
+                  instanceof ServerConfigurationPacketListenerImpl listener
               && reconfigured.add(listener.getOwner().id())) {
             restartConfiguration(listener);
           }

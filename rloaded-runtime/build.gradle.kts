@@ -4,6 +4,7 @@ import java.util.zip.ZipOutputStream
 
 plugins {
     alias(libs.plugins.fabric.loom)
+    id("rloaded.java-quality")
 }
 
 group = "io.github.calamech.rloaded"
@@ -17,9 +18,12 @@ java {
     }
 }
 
+// The game's libraries (Guava, Log4j) carry annotations whose classes the game does not ship. Once
+// Error Prone reads those annotations, javac warns about the missing classes in jars that are not
+// ours, so that one category of warning is off.
 tasks.withType<JavaCompile>().configureEach {
     options.release = 25
-    options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
+    options.compilerArgs.add("-Xlint:-classfile")
 }
 
 dependencies {
@@ -75,9 +79,18 @@ fun nestedLibraryLines(
                     .map { artifact ->
                         val (id, libraryVersion) =
                             when (val component = artifact.id.componentIdentifier) {
-                                is ProjectComponentIdentifier -> "io_github_calamech_rloaded_${component.projectName}" to projectVersion
-                                is ModuleComponentIdentifier -> "${component.group.replace('.', '_')}_${component.module}" to component.version
-                                else -> error("unexpected library ${artifact.id}")
+                                is ProjectComponentIdentifier -> {
+                                    "io_github_calamech_rloaded_${component.projectName}" to projectVersion
+                                }
+
+                                is ModuleComponentIdentifier -> {
+                                    "${component.group.replace('.', '_')}_${component.module}" to
+                                        component.version
+                                }
+
+                                else -> {
+                                    error("unexpected library ${artifact.id}")
+                                }
                             }
                         listOf(id, libraryVersion, artifact.file.name).joinToString("\t")
                     }.sorted()

@@ -21,7 +21,8 @@ import net.minecraft.world.level.block.Block;
  */
 public final class HotAddGameTest {
   private static final String MODS_PROPERTY = "rloaded.hot-add-mods";
-  private static final Identifier BASIC_BLOCK = Identifier.fromNamespaceAndPath("content-basic", "basic_block");
+  private static final Identifier BASIC_BLOCK =
+      Identifier.fromNamespaceAndPath("content-basic", "basic_block");
   private static final BlockPos HERE = new BlockPos(1, 1, 1);
 
   @GameTest
@@ -39,22 +40,41 @@ public final class HotAddGameTest {
     }
 
     helper.assertValueEqual(errors, List.of(), "error-level log lines");
-    helper.assertValueEqual(loaded.stream().sorted().toList(), List.of("content-basic", "mixin-loaded-class"), "loaded mods");
-    helper.assertTrue(FabricLoader.getInstance().isModLoaded("content-basic"), "the loader does not list content-basic");
+    helper.assertValueEqual(
+        loaded.stream().sorted().toList(),
+        List.of("content-basic", "mixin-loaded-class"),
+        "loaded mods");
     helper.assertTrue(
-        FabricLoader.getInstance().getModContainer("mixin-loaded-class").isPresent(), "the loader has no container for mixin-loaded-class");
+        FabricLoader.getInstance().isModLoaded("content-basic"),
+        "the loader does not list content-basic");
+    helper.assertTrue(
+        FabricLoader.getInstance().getModContainer("mixin-loaded-class").isPresent(),
+        "the loader has no container for mixin-loaded-class");
 
-    Block block = BuiltInRegistries.BLOCK.getOptional(BASIC_BLOCK).orElseThrow(() -> new AssertionError("no block " + BASIC_BLOCK));
-    Item item = BuiltInRegistries.ITEM.getOptional(BASIC_BLOCK).orElseThrow(() -> new AssertionError("no item " + BASIC_BLOCK));
-    helper.assertTrue(block.asItem() == item, "the block does not know its item");
+    Block block =
+        BuiltInRegistries.BLOCK
+            .getOptional(BASIC_BLOCK)
+            .orElseThrow(() -> new AssertionError("no block " + BASIC_BLOCK));
+    Item item =
+        BuiltInRegistries.ITEM
+            .getOptional(BASIC_BLOCK)
+            .orElseThrow(() -> new AssertionError("no item " + BASIC_BLOCK));
+    helper.assertValueEqual(block.asItem(), item, "item of the block");
     helper.setBlock(HERE, block);
     helper.assertBlockPresent(block, HERE);
 
-    Class<?> greeting = Class.forName("io.github.calamech.rloaded.testmods.mixinloadedclass.ItemGreeting", true, Item.class.getClassLoader());
-    helper.assertTrue(greeting.isInstance(stone), "an item that existed before the add does not implement ItemGreeting");
+    Class<?> greeting =
+        Class.forName(
+            "io.github.calamech.rloaded.testmods.mixinloadedclass.ItemGreeting",
+            true,
+            Item.class.getClassLoader());
+    helper.assertTrue(
+        greeting.isInstance(stone),
+        "an item that existed before the add does not implement ItemGreeting");
     Object first = greeting.getMethod("mixinLoadedClass$greet").invoke(stone);
     Object second = greeting.getMethod("mixinLoadedClass$greet").invoke(stone);
-    helper.assertValueEqual(List.of(first, second), List.of("hello #1", "hello #2"), "greetings of stone");
+    helper.assertValueEqual(
+        List.of(first, second), List.of("hello #1", "hello #2"), "greetings of stone");
     helper.succeed();
   }
 }

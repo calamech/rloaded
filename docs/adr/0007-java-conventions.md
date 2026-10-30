@@ -30,3 +30,5 @@ The Java agent, and later the mixins of the runtime mod, are written in Java: Mi
 ## Enforcement
 
 `JavaLibraryConventionTest` builds a fixture Java library and checks that the build passes on clean code, checks the Java 21 class file version, and fails on a formatting violation, an Error Prone error (`DeadException`), a javac warning and coverage under 85 %.
+
+Amended 2026-10-30: the formatting and lint gates moved to `rloaded.java-quality`, which the runtime mod applies too (ADR 0031).

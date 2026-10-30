@@ -32,22 +32,27 @@ public final class RegistryThawGameTest {
     ResourceKey<Block> key = key("late_block");
 
     RegistryThaw.thaw(blocks);
-    Block late = Registry.register(blocks, key, new LateBlock(BlockBehaviour.Properties.of().setId(key)));
+    Block late =
+        Registry.register(blocks, key, new LateBlock(BlockBehaviour.Properties.of().setId(key)));
     RegistryThaw.freeze(blocks);
 
     helper.assertValueEqual(blocks.getId(late), blockCount, "raw id of the new block");
     helper.assertValueEqual(blocks.getId(Blocks.STONE), stoneId, "raw id of stone");
     List<Integer> stateIds =
         StreamSupport.stream(Block.BLOCK_STATE_REGISTRY.spliterator(), false)
-            .filter(state -> state.getBlock() == late)
+            .filter(state -> state.is(late))
             .map(Block.BLOCK_STATE_REGISTRY::getId)
             .sorted()
             .toList();
-    helper.assertValueEqual(stateIds, IntStream.range(stateCount, stateCount + 4).boxed().toList(), "state ids of the new block");
+    helper.assertValueEqual(
+        stateIds,
+        IntStream.range(stateCount, stateCount + 4).boxed().toList(),
+        "state ids of the new block");
     Holder.Reference<Block> holder = blocks.getOrThrow(key);
-    helper.assertTrue(holder.value() == late, "the registered holder does not hold the new block");
+    helper.assertValueEqual(holder.value(), late, "block of the registered holder");
     helper.assertValueEqual(holder.tags().count(), 0L, "tags of the new block");
-    helper.assertTrue(refusesNewBlocks(), "the block registry accepts new blocks after freezing again");
+    helper.assertTrue(
+        refusesNewBlocks(), "the block registry accepts new blocks after freezing again");
 
     BlockState lit = late.defaultBlockState().setValue(BlockStateProperties.LIT, true);
     helper.setBlock(HERE, lit);
@@ -70,11 +75,14 @@ public final class RegistryThawGameTest {
     }
 
     helper.assertTrue(
-        refusal != null && refusal.startsWith("values created holders in registry minecraft:block but were never registered"),
+        refusal != null
+            && refusal.startsWith(
+                "values created holders in registry minecraft:block but were never registered"),
         "unexpected refusal: " + refusal);
     Registry.register(blocks, key, orphan);
     RegistryThaw.freeze(blocks);
-    helper.assertTrue(refusesNewBlocks(), "the block registry accepts new blocks after freezing again");
+    helper.assertTrue(
+        refusesNewBlocks(), "the block registry accepts new blocks after freezing again");
     helper.succeed();
   }
 
@@ -88,6 +96,7 @@ public final class RegistryThawGameTest {
   }
 
   private static ResourceKey<Block> key(String path) {
-    return ResourceKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath("rloaded-gametest", path));
+    return ResourceKey.create(
+        Registries.BLOCK, Identifier.fromNamespaceAndPath("rloaded-gametest", path));
   }
 }

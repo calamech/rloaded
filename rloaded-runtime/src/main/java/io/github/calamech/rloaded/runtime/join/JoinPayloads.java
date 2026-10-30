@@ -9,8 +9,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * The four configuration-phase channels of a join. Each payload carries one message of
- * {@code rloaded-protocol}, encoded by {@link ProtocolCodec}; the game only moves the bytes.
+ * The four configuration-phase channels of a join. Each payload carries one message of {@code
+ * rloaded-protocol}, encoded by {@link ProtocolCodec}; the game only moves the bytes.
  */
 public final class JoinPayloads {
   private JoinPayloads() {}
@@ -24,9 +24,12 @@ public final class JoinPayloads {
   }
 
   /** {@code ServerHello} from the server, {@code ClientHello} from the client. */
+  // Payloads are moved between the network and the protocol code, never compared or hashed.
+  @SuppressWarnings("ArrayRecordComponent")
   public record Hello(byte[] bytes) implements CustomPacketPayload {
     public static final Type<Hello> TYPE = typeOf("hello");
-    public static final StreamCodec<FriendlyByteBuf, Hello> CODEC = rawCodec().map(Hello::new, Hello::bytes);
+    public static final StreamCodec<FriendlyByteBuf, Hello> CODEC =
+        rawCodec().map(Hello::new, Hello::bytes);
 
     @Override
     public Type<Hello> type() {
@@ -35,9 +38,12 @@ public final class JoinPayloads {
   }
 
   /** The signed manifest, from the server. */
+  // Payloads are moved between the network and the protocol code, never compared or hashed.
+  @SuppressWarnings("ArrayRecordComponent")
   public record Manifest(byte[] bytes) implements CustomPacketPayload {
     public static final Type<Manifest> TYPE = typeOf("manifest");
-    public static final StreamCodec<FriendlyByteBuf, Manifest> CODEC = rawCodec().map(Manifest::new, Manifest::bytes);
+    public static final StreamCodec<FriendlyByteBuf, Manifest> CODEC =
+        rawCodec().map(Manifest::new, Manifest::bytes);
 
     @Override
     public Type<Manifest> type() {
@@ -46,9 +52,12 @@ public final class JoinPayloads {
   }
 
   /** Where the client's install is, from the client. */
+  // Payloads are moved between the network and the protocol code, never compared or hashed.
+  @SuppressWarnings("ArrayRecordComponent")
   public record Progress(byte[] bytes) implements CustomPacketPayload {
     public static final Type<Progress> TYPE = typeOf("progress");
-    public static final StreamCodec<FriendlyByteBuf, Progress> CODEC = rawCodec().map(Progress::new, Progress::bytes);
+    public static final StreamCodec<FriendlyByteBuf, Progress> CODEC =
+        rawCodec().map(Progress::new, Progress::bytes);
 
     @Override
     public Type<Progress> type() {
@@ -57,9 +66,12 @@ public final class JoinPayloads {
   }
 
   /** How the client's install ended, from the client. */
+  // Payloads are moved between the network and the protocol code, never compared or hashed.
+  @SuppressWarnings("ArrayRecordComponent")
   public record Result(byte[] bytes) implements CustomPacketPayload {
     public static final Type<Result> TYPE = typeOf("result");
-    public static final StreamCodec<FriendlyByteBuf, Result> CODEC = rawCodec().map(Result::new, Result::bytes);
+    public static final StreamCodec<FriendlyByteBuf, Result> CODEC =
+        rawCodec().map(Result::new, Result::bytes);
 
     @Override
     public Type<Result> type() {

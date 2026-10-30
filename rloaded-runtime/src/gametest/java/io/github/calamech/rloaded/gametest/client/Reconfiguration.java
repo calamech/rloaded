@@ -17,12 +17,15 @@ final class Reconfiguration {
   private Reconfiguration() {}
 
   /** Runs one reconfiguration and waits until the client has a new level. */
+  // A new level is a new object: identity is what the wait checks.
+  @SuppressWarnings("ReferenceEquality")
   static void cycle(ClientGameTestContext context, TestDedicatedServerContext server) {
     ClientLevel levelBefore = context.computeOnClient(client -> client.level);
     server.runOnServer(running -> onlyPlayer(running).connection.switchToConfig());
     server.waitFor(running -> configuringPlayer(running).isPresent());
     server.runOnServer(running -> configuringPlayer(running).orElseThrow().returnToWorld());
-    context.waitFor(client -> client.level != null && client.level != levelBefore && client.player != null);
+    context.waitFor(
+        client -> client.level != null && client.level != levelBefore && client.player != null);
   }
 
   static ServerPlayer onlyPlayer(MinecraftServer server) {
@@ -33,7 +36,8 @@ final class Reconfiguration {
     return players.getFirst();
   }
 
-  private static Optional<ServerConfigurationPacketListenerImpl> configuringPlayer(MinecraftServer server) {
+  private static Optional<ServerConfigurationPacketListenerImpl> configuringPlayer(
+      MinecraftServer server) {
     return server.getConnection().getConnections().stream()
         .map(connection -> connection.getPacketListener())
         .filter(ServerConfigurationPacketListenerImpl.class::isInstance)
