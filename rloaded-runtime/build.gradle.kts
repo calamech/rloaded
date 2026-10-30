@@ -139,6 +139,11 @@ val nestLibraries =
     }
 
 tasks.processResources {
+    // The compatibility database of this release, read by servers at start.
+    from("../compat") {
+        include("compat.json")
+        into("io/github/calamech/rloaded/runtime/admin")
+    }
     val version = project.version
     val jars =
         nestedLibraries.map { lines ->

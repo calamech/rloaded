@@ -72,4 +72,6 @@ public data class ModrinthProject(
     val title: String,
     val downloads: Long,
     val authors: List<String>,
+    /** Its categories, featured and additional, such as `optimization`. */
+    val categories: List<String>,
 )

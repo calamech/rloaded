@@ -34,8 +34,9 @@ import net.minecraft.server.MinecraftServer;
 
 /**
  * Runs {@code rloaded add} the way the server console does, against a fake Modrinth on the loopback
- * interface: a plain mod is written to the lockfile with its side, while a mod with biome entries
- * and a version published a moment ago are refused with the reason, leaving the lockfile as it was.
+ * interface: a plain mod is written to the lockfile with its side, while a mod with biome entries,
+ * a version published a moment ago and an optimization mod are refused with the reason, leaving the
+ * lockfile as it was.
  */
 public final class AdminAddGameTest {
   private static final int MAX_TICKS = 600;
@@ -57,13 +58,14 @@ public final class AdminAddGameTest {
         jar("admin-test-world", Map.of("data/admin-test-world/worldgen/biome/hot.json", "{}")),
         OLD);
     publish(modrinth, url, "admintestfresh", jar("admin-test-fresh", Map.of()), Instant.now());
+    publish(modrinth, url, "admintestfast", jar("admin-test-fast", Map.of()), OLD);
     // Every project has enough downloads and no team members.
     modrinth.createContext(
         "/v2/projects",
         exchange -> {
           String asked = exchange.getRequestURI().getQuery();
           String projects =
-              Stream.of("admintest", "admintestworld", "admintestfresh")
+              Stream.of("admintest", "admintestworld", "admintestfresh", "admintestfast")
                   .filter(id -> asked.contains("\"" + id + "\""))
                   .map(
                       id ->
@@ -73,7 +75,10 @@ public final class AdminAddGameTest {
                               + id
                               + "\", \"downloads\": 5000, \"team\": \"t"
                               + id
-                              + "\"}")
+                              + "\", \"categories\": [\""
+                              + (id.equals("admintestfast") ? "optimization" : "utility")
+                              + "\"],"
+                              + " \"additional_categories\": []}")
                   .collect(Collectors.joining(",", "[", "]"));
           respond(exchange, projects.getBytes(StandardCharsets.UTF_8));
         });
@@ -84,7 +89,8 @@ public final class AdminAddGameTest {
 
     List<String> messages = new CopyOnWriteArrayList<>();
     CommandSourceStack console = server.createCommandSourceStack().withSource(capturing(messages));
-    List<String> projects = List.of("admintest", "admintestworld", "admintestfresh");
+    List<String> projects =
+        List.of("admintest", "admintestworld", "admintestfresh", "admintestfast");
     int[] sent = {0};
     helper.succeedWhen(
         () -> {
@@ -114,6 +120,13 @@ public final class AdminAddGameTest {
                           m.startsWith("admintestfresh was not added: ")
                               && m.contains("less than 72 hours ago")),
               "the new version was not refused as too recent: " + messages);
+          helper.assertTrue(
+              messages.stream()
+                  .anyMatch(
+                      m ->
+                          m.startsWith("admintestfast was not added: ")
+                              && m.contains("is in the optimization category")),
+              "the optimization mod was not refused by the compatibility database: " + messages);
           List<LockedMod> mods = mods(lockfile);
           helper.assertValueEqual(
               mods.stream().map(mod -> mod.getEntry().getProjectId()).toList(),

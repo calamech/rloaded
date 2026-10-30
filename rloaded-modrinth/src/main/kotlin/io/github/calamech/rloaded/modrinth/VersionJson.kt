@@ -112,6 +112,8 @@ internal data class ProjectJson(
     val title: String,
     val downloads: Long,
     val team: String,
+    val categories: List<String>,
+    @SerialName("additional_categories") val additionalCategories: List<String>,
 )
 
 @Serializable

@@ -116,10 +116,10 @@ class AdmissionServiceTest {
         val refusal = (add("needsfresh") as Outcome.Err).error
 
         assertEquals(
-            AddRefusal.Unproven(
+            AddRefusal.Unsuitable(
                 listOf(
-                    ReputationFailure.TooRecent("fresh", "1.0.0", Instant.parse("2026-10-30T12:00:00Z"), Duration.ofHours(72)),
-                    ReputationFailure.TooFewDownloads("fresh", 10, 1_000),
+                    RecordFailure.TooRecent("fresh", "1.0.0", Instant.parse("2026-10-30T12:00:00Z"), Duration.ofHours(72)),
+                    RecordFailure.TooFewDownloads("fresh", 10, 1_000),
                 ),
             ),
             refusal,
@@ -129,6 +129,30 @@ class AdmissionServiceTest {
             refusal.reason,
         )
         assertFalse(lockfile.exists())
+    }
+
+    @Test
+    fun `refuses what the compatibility database rules out, before downloading anything`() {
+        publish("fast", jar("fast"))
+        categories["fast"] = "optimization"
+        publish("renderer", jar("renderer"))
+        publish("crashy", jar("crashy"))
+
+        assertEquals(
+            Outcome.Err(
+                AddRefusal.Unsuitable(listOf(RecordFailure.DeniedCategory("fast", "optimization", "it replaces systems built at start"))),
+            ),
+            add("fast"),
+        )
+        assertEquals(
+            Outcome.Err(AddRefusal.Unsuitable(listOf(RecordFailure.DeniedProject("renderer", "it replaces the renderer")))),
+            add("renderer"),
+        )
+        assertEquals(
+            "version vcrashy failed with Rloaded 0.1.0: crashes on join",
+            (add("crashy") as Outcome.Err).error.reason,
+        )
+        assertEquals(0, server.hits("/cdn/fast.jar") + server.hits("/cdn/renderer.jar") + server.hits("/cdn/crashy.jar"))
     }
 
     @Test
@@ -167,7 +191,7 @@ class AdmissionServiceTest {
         val clock = Clock.fixed(now, ZoneOffset.UTC)
         AdmissionService(
             Resolver(modrinth, "26.3"),
-            Reputation(modrinth, ReputationRules(Duration.ofHours(72), 1_000), clock),
+            RecordChecks(modrinth, ReputationRules(Duration.ofHours(72), 1_000), compat, clock),
             ArtifactStore(directory.resolve("store"), http, RetryPolicy(maxAttempts = 1)),
             JarRules(JarClassifier(emptySet(), setOf("default"))) { jars ->
                 serverChecks += jars.map { jar -> projectOf(jar) }
@@ -180,6 +204,13 @@ class AdmissionServiceTest {
     }
 
     private val downloads = mutableMapOf<String, Long>()
+    private val categories = mutableMapOf<String, String>()
+    private val compat =
+        CompatDatabase(
+            deniedCategories = mapOf("optimization" to "it replaces systems built at start"),
+            deniedProjects = mapOf("renderer" to "it replaces the renderer"),
+            versions = mapOf("vcrashy" to TestedVersion(CompatStatus.BROKEN, "0.1.0", "crashes on join")),
+        )
 
     init {
         // Modrinth's project records, with the download counts set in [downloads], and no team members.
@@ -189,7 +220,10 @@ class AdmissionServiceTest {
                 downloads
                     .filterKeys { "\"$it\"" in asked }
                     .entries
-                    .joinToString(",", "[", "]") { (id, count) -> """{"id": "$id", "title": "$id", "downloads": $count, "team": "t$id"}""" }
+                    .joinToString(",", "[", "]") { (id, count) ->
+                        """{"id": "$id", "title": "$id", "downloads": $count, "team": "t$id", """ +
+                            """"categories": ["${categories[id] ?: "utility"}"], "additional_categories": []}"""
+                    }
             exchange.respond(200, projects.toByteArray())
         }
         server.route("/v2/teams") { exchange, _ -> exchange.respond(200, "[]".toByteArray()) }

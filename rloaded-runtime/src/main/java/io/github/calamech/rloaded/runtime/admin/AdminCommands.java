@@ -5,8 +5,9 @@ import com.mojang.brigadier.context.CommandContext;
 import io.github.calamech.rloaded.admin.AddRefusal;
 import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
+import io.github.calamech.rloaded.admin.CompatDatabase;
 import io.github.calamech.rloaded.admin.JarRules;
-import io.github.calamech.rloaded.admin.Reputation;
+import io.github.calamech.rloaded.admin.RecordChecks;
 import io.github.calamech.rloaded.admin.ReputationRules;
 import io.github.calamech.rloaded.admin.Resolver;
 import io.github.calamech.rloaded.core.download.ArtifactStore;
@@ -17,6 +18,10 @@ import io.github.calamech.rloaded.runtime.ServerLockfile;
 import io.github.calamech.rloaded.runtime.engine.Admission;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
@@ -43,6 +48,7 @@ public final class AdminCommands {
   private static final String PROJECT = "project";
   private static final String VERSION = "version";
   private static volatile ReputationRules rules;
+  private static volatile CompatDatabase compat;
   private static AdmissionService service;
 
   private AdminCommands() {}
@@ -52,13 +58,15 @@ public final class AdminCommands {
     // The rules come from rloaded-server.toml through the bootstrap; a server without them does not
     // start.
     ServerLifecycleEvents.SERVER_STARTING.register(
-        server ->
-            rules =
-                switch (ReputationRules.Companion.fromProperties(System::getProperty)) {
-                  case Outcome.Ok<?> ok -> (ReputationRules) ok.getValue();
-                  case Outcome.Err<?> err ->
-                      throw new IllegalStateException(err.getError().toString());
-                });
+        server -> {
+          rules =
+              switch (ReputationRules.Companion.fromProperties(System::getProperty)) {
+                case Outcome.Ok<?> ok -> (ReputationRules) ok.getValue();
+                case Outcome.Err<?> err ->
+                    throw new IllegalStateException(err.getError().toString());
+              };
+          compat = bundledCompatDatabase();
+        });
     CommandRegistrationCallback.EVENT.register(
         (dispatcher, context, selection) ->
             dispatcher.register(
@@ -148,7 +156,7 @@ public final class AdminCommands {
       service =
           new AdmissionService(
               new Resolver(access.modrinth(), SharedConstants.getCurrentVersion().name()),
-              new Reputation(access.modrinth(), rules, clock),
+              new RecordChecks(access.modrinth(), rules, compat, clock),
               new ArtifactStore(
                   cache, access.http(), new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES),
               new JarRules(Admission.classifier(), AdminCommands::serverRefusal),
@@ -156,6 +164,23 @@ public final class AdminCommands {
               clock);
     }
     return service;
+  }
+
+  // The database ships in the mod jar; a broken one is a defect of the build.
+  private static CompatDatabase bundledCompatDatabase() {
+    try (InputStream input = AdminCommands.class.getResourceAsStream("compat.json")) {
+      if (input == null) {
+        throw new IllegalStateException("compat.json is missing from the runtime mod");
+      }
+      return switch (CompatDatabase.Companion.parse(
+          new String(input.readAllBytes(), StandardCharsets.UTF_8))) {
+        case Outcome.Ok<?> ok -> (CompatDatabase) ok.getValue();
+        case Outcome.Err<?> err ->
+            throw new IllegalStateException("compat.json cannot be read: " + err.getError());
+      };
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   // The rules the server applies to the mods it loads itself, without loading them.

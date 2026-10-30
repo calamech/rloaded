@@ -87,9 +87,9 @@ public sealed interface AddRefusal {
         override val reason: String get() = "version $versionId has no primary file"
     }
 
-    /** Versions or projects are not proven enough; every one is listed. */
-    public data class Unproven(
-        val failures: List<ReputationFailure>,
+    /** Modrinth's records of versions or projects rule them out; every one is listed. */
+    public data class Unsuitable(
+        val failures: List<RecordFailure>,
     ) : AddRefusal {
         override val reason: String get() = failures.joinToString("; ") { it.reason }
     }
@@ -139,13 +139,13 @@ public sealed interface AddRefusal {
 
 /**
  * Adds a mod from Modrinth to the server's lockfile, with what it needs: resolves it, refuses
- * versions that are not proven enough, downloads the files into [store], refuses any jar the rules or
+ * versions Modrinth's records rule out (reputation, compatibility database), downloads the files into [store], refuses any jar the rules or
  * the server refuse, then writes every entry to the lockfile in one step. The only writer of the
  * lockfile; one add runs at a time.
  */
 public class AdmissionService(
     private val resolver: Resolver,
-    private val reputation: Reputation,
+    private val recordChecks: RecordChecks,
     private val store: ArtifactStore,
     private val jarRules: JarRules,
     private val lockfile: LockfileLocation,
@@ -193,10 +193,10 @@ public class AdmissionService(
         }
 
     private suspend fun proven(versions: List<ModrinthVersion>): Outcome<List<ModrinthVersion>, AddRefusal> =
-        reputation
+        recordChecks
             .failures(versions)
-            .mapError<List<ReputationFailure>, ModrinthError, AddRefusal> { AddRefusal.ProjectRecords(it) }
-            .flatMap { failures -> if (failures.isEmpty()) Outcome.Ok(versions) else Outcome.Err(AddRefusal.Unproven(failures)) }
+            .mapError<List<RecordFailure>, ModrinthError, AddRefusal> { AddRefusal.ProjectRecords(it) }
+            .flatMap { failures -> if (failures.isEmpty()) Outcome.Ok(versions) else Outcome.Err(AddRefusal.Unsuitable(failures)) }
 
     private class Downloaded(
         val version: ModrinthVersion,

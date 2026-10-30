@@ -29,8 +29,16 @@ class ModrinthProjectsTest {
         assertEquals(
             Outcome.Ok(
                 mapOf(
-                    "P7dR8mSH" to ModrinthProject("P7dR8mSH", "Fabric API", 293_803_425, listOf("Player7457", "modmuss50")),
-                    "mOgUt4GM" to ModrinthProject("mOgUt4GM", "Mod Menu", 163_985_152, listOf("gniftygnome", "Prospector", "modmuss50")),
+                    "P7dR8mSH" to
+                        ModrinthProject("P7dR8mSH", "Fabric API", 293_803_425, listOf("Player7457", "modmuss50"), listOf("library")),
+                    "mOgUt4GM" to
+                        ModrinthProject(
+                            "mOgUt4GM",
+                            "Mod Menu",
+                            163_985_152,
+                            listOf("gniftygnome", "Prospector", "modmuss50"),
+                            listOf("utility"),
+                        ),
                 ),
             ),
             projects,
@@ -56,6 +64,9 @@ class ModrinthProjectsTest {
 
         val projects = runBlocking { Modrinth(http, recording.settings).projects(listOf("P7dR8mSH")) }
 
-        assertEquals(Outcome.Ok(mapOf("P7dR8mSH" to ModrinthProject("P7dR8mSH", "Fabric API", 293_803_425, emptyList()))), projects)
+        assertEquals(
+            Outcome.Ok(mapOf("P7dR8mSH" to ModrinthProject("P7dR8mSH", "Fabric API", 293_803_425, emptyList(), listOf("library")))),
+            projects,
+        )
     }
 }

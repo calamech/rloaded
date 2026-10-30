@@ -57,7 +57,13 @@ public class Modrinth(
             .flatMap { projects ->
                 members(projects.values.map { it.team }).map { byTeam ->
                     projects.mapValues { (_, project) ->
-                        ModrinthProject(project.id, project.title, project.downloads, byTeam[project.team].orEmpty())
+                        ModrinthProject(
+                            project.id,
+                            project.title,
+                            project.downloads,
+                            byTeam[project.team].orEmpty(),
+                            (project.categories + project.additionalCategories).distinct(),
+                        )
                     }
                 }
             }
