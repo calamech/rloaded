@@ -18,6 +18,7 @@ import java.io.File
 import java.io.PrintStream
 import java.nio.file.Path
 import java.util.jar.JarFile
+import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -29,6 +30,7 @@ class BootstrapTest {
     private val server = TestServer()
     private val http = KtorHttp(server.policy, HttpSettings())
     private val distribution = FakeDistribution(server)
+    private val modrinth = FakeModrinthMods(server)
     private val output = ByteArrayOutputStream()
 
     @TempDir
@@ -36,9 +38,10 @@ class BootstrapTest {
 
     private val folder get() = ServerFolder(root)
 
-    /** A server process that records each command and exits with the scripted codes. */
+    /** A server process that records each command, runs [whileRunning], and exits with the scripted codes. */
     private class ScriptedProcess(
         vararg codes: Int,
+        private val whileRunning: () -> Unit = {},
     ) : ServerProcess {
         private val remaining = codes.toMutableList()
         val commands = mutableListOf<List<String>>()
@@ -48,6 +51,7 @@ class BootstrapTest {
             directory: Path,
         ): Int {
             commands += command
+            whileRunning()
             return if (remaining.isEmpty()) ExitCode.OK else remaining.removeAt(0)
         }
     }
@@ -153,13 +157,68 @@ class BootstrapTest {
         }
 
     @Test
+    fun `starts the server with the lockfile's mods after the runtime mod`() =
+        runBlocking {
+            folder.initialize()
+            acceptEula()
+            val both = LockedJar("both", "BOTH")
+            val clientOnly = LockedJar("clientOnly", "CLIENT")
+            modrinth.publish(both, clientOnly)
+            writeLockfile(modrinth.lockfile(clientOnly, both))
+            val process = ScriptedProcess()
+
+            assertEquals(ExitCode.OK, bootstrap(process).run(emptyList()))
+
+            assertEquals(listOf("rloaded-runtime.jar", both.fileName), extraMods(process.commands.single()))
+        }
+
+    @Test
+    fun `reads the lockfile again when the server restarts`() =
+        runBlocking {
+            folder.initialize()
+            acceptEula()
+            val first = LockedJar("first", "SERVER")
+            val second = LockedJar("second", "BOTH")
+            modrinth.publish(first, second)
+            writeLockfile(modrinth.lockfile(first))
+            val process = ScriptedProcess(ExitCode.RESTART, whileRunning = { writeLockfile(modrinth.lockfile(second)) })
+
+            assertEquals(ExitCode.OK, bootstrap(process).run(emptyList()))
+
+            assertEquals(
+                listOf(listOf("rloaded-runtime.jar", first.fileName), listOf("rloaded-runtime.jar", second.fileName)),
+                process.commands.map { extraMods(it) },
+            )
+        }
+
+    @Test
+    fun `refuses to start when a mod of the lockfile cannot be obtained`() =
+        runBlocking {
+            folder.initialize()
+            acceptEula()
+            val both = LockedJar("both", "BOTH")
+            modrinth.publish(both)
+            server.serve("/cdn/${both.fileName}", ByteArray(0), status = 404)
+            writeLockfile(modrinth.lockfile(both))
+            val process = ScriptedProcess()
+
+            assertEquals(ExitCode.FAILED, bootstrap(process).run(emptyList()))
+
+            assertTrue("the mods of rloaded/lockfile.json cannot be obtained" in printed())
+            assertEquals(emptyList(), process.commands)
+        }
+
+    @Test
     fun `stops after too many restarts in a row`() =
         runBlocking {
             folder.initialize()
             acceptEula()
             val process = ScriptedProcess(*IntArray(10) { ExitCode.RESTART })
 
-            assertEquals(ExitCode.FAILED, Bootstrap(folder, installer(), process, PrintStream(output), maxRestarts = 3).run(emptyList()))
+            assertEquals(
+                ExitCode.FAILED,
+                Bootstrap(folder, installer(), lockfileMods(), process, PrintStream(output), maxRestarts = 3).run(emptyList()),
+            )
             assertEquals(4, process.commands.size)
             assertTrue("asked for 3 restarts in a row" in printed())
         }
@@ -216,7 +275,23 @@ class BootstrapTest {
             assertFalse(folder.data.resolve("agent/rloaded-agent.jar").exists())
         }
 
-    private fun bootstrap(process: ServerProcess) = Bootstrap(folder, installer(), process, PrintStream(output))
+    private fun bootstrap(process: ServerProcess) = Bootstrap(folder, installer(), lockfileMods(), process, PrintStream(output))
+
+    private fun lockfileMods() = modrinth.lockfileMods(http, folder.data.resolve("cache/mods"))
+
+    private fun writeLockfile(text: String) {
+        folder.lockfile.parent.createDirectories()
+        folder.lockfile.writeText(text)
+    }
+
+    // The names of the mods after the base set; lockfile mods are named by their hash in the store,
+    // so they are matched by content.
+    private fun extraMods(command: List<String>): List<String> {
+        val mods = command.single { it.startsWith("-Dfabric.addMods=") }.removePrefix("-Dfabric.addMods=").split(File.pathSeparator)
+        return mods.drop(1).map { Path.of(it) }.map { mod ->
+            if (mod.fileName.toString() == "rloaded-runtime.jar") "rloaded-runtime.jar" else mod.readText().removePrefix("jar of ") + ".jar"
+        }
+    }
 
     private fun installer() =
         ServerInstaller(

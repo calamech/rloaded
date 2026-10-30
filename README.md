@@ -34,7 +34,7 @@ You need a JDK 17 or newer to start Gradle. Gradle then downloads the JetBrains 
 
 The launcher keeps its data in `~/Library/Application Support/Rloaded` on macOS, `%APPDATA%\Rloaded` on Windows and `$XDG_DATA_HOME/rloaded` on Linux.
 
-To try a server, start `rloaded-server.jar` in an empty folder with Java 21 or newer. The first start sets the folder up and asks you to accept the Minecraft EULA in `eula.txt`. Start it again with `--dev` to accept the launcher's offline profiles on this machine.
+To try a server, start `rloaded-server.jar` in an empty folder with Java 21 or newer. The first start sets the folder up and asks you to accept the Minecraft EULA in `eula.txt`. Start it again with `--dev` to accept the launcher's offline profiles on this machine. At each start, the mods listed in `rloaded/lockfile.json` are checked against Modrinth, downloaded once and loaded; if one cannot be obtained, the server does not start.
 
 Before the first push, set up the Git identity and the pre-push hook as described in [ADR 0003](docs/adr/0003-git-identity.md).
 

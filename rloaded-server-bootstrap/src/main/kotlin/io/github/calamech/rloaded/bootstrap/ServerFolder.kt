@@ -27,6 +27,9 @@ public class ServerFolder(
     /** Rloaded's own data: cache, runtimes, agent. */
     public val data: Path get() = root.resolve("rloaded")
 
+    /** The mods the server runs and sends its players. */
+    public val lockfile: Path get() = data.resolve("lockfile.json")
+
     /** Writes the files of a first start. Returns false when the folder was already set up. */
     public fun initialize(): Boolean {
         if (config.exists()) return false

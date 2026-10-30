@@ -10,6 +10,7 @@ val runtimeModJar = configurations.resolvable("runtimeModJar") { extendsFrom(run
 
 dependencies {
     implementation(project(":rloaded-core"))
+    implementation(project(":rloaded-modrinth"))
     implementation(libs.ktoml.core)
     // Ktor logs through SLF4J; the bootstrap reports failures itself, so its logs are dropped.
     runtimeOnly(libs.slf4j.nop)

@@ -36,3 +36,5 @@ Checked on 2026-10-30 with `:rloaded-game-tests:joinTest`. It starts the pinned 
 ## Enforcement
 
 `JoinTest` (core: trust asked once, opted-out mods left out, bad signature, protocol version, conflicts), `ModInstallerTest`, and `:rloaded-game-tests:joinTest` in the `client-game-test` CI job.
+
+Amended 2026-10-30: the server now obtains and loads its lockfile's mods itself (ADR 0032, #59).
