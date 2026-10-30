@@ -6,8 +6,10 @@ import java.lang.instrument.UnmodifiableClassException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
@@ -15,6 +17,8 @@ import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.Mixins;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
+import org.spongepowered.asm.service.IClassTracker;
+import org.spongepowered.asm.service.IMixinService;
 
 /**
  * Applies a Mixin configuration after startup, including to classes that are already loaded.
@@ -22,6 +26,8 @@ import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
  * <p>Mixin selects its configurations once, before the first class is transformed, so a late
  * configuration is selected here by calling its processor directly. Each target that is already
  * loaded is then rebuilt from its pre-Mixin bytes with every Mixin that targets it, and redefined.
+ * Mixin's check for targets loaded too early is skipped for such a configuration, since its loaded
+ * targets are redefined here.
  * Adding methods, fields and interfaces to a loaded class needs the JetBrains Runtime started with
  * {@code -XX:+AllowEnhancedClassRedefinition}.
  */
@@ -36,6 +42,7 @@ public final class LateMixins {
   public static List<String> apply(String config, Instrumentation instrumentation)
       throws ReflectiveOperationException, UnmodifiableClassException {
     Mixins.addConfiguration(config);
+    skipLoadedTargetCheck(config);
     IMixinTransformer transformer =
         (IMixinTransformer) MixinEnvironment.getCurrentEnvironment().getActiveTransformer();
     Object processor = processorOf(transformer);
@@ -52,6 +59,57 @@ public final class LateMixins {
     }
     instrumentation.redefineClasses(definitions.toArray(new ClassDefinition[0]));
     return definitions.stream().map(definition -> definition.getDefinitionClass().getName()).toList();
+  }
+
+  // MixinInfo refuses a mixin whose target is loaded, because Mixin alone could not apply it any
+  // more. It asks the class tracker of its configuration's service, and nothing else in Mixin does.
+  private static void skipLoadedTargetCheck(String config) throws ReflectiveOperationException {
+    Object pending =
+        Mixins.getConfigs().stream()
+            .filter(candidate -> candidate.getName().equals(config))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("Mixin did not register " + config))
+            .getConfig();
+    Field serviceField = pending.getClass().getDeclaredField("service");
+    serviceField.setAccessible(true);
+    IMixinService service = (IMixinService) serviceField.get(pending);
+    IClassTracker tracker =
+        new UnloadedClassTracker(
+            Objects.requireNonNull(service.getClassTracker(), "the Mixin service has no class tracker"));
+    IMixinService withTracker =
+        (IMixinService)
+            Proxy.newProxyInstance(
+                IMixinService.class.getClassLoader(),
+                new Class<?>[] {IMixinService.class},
+                (proxy, method, arguments) -> {
+                  if (method.getName().equals("getClassTracker")) {
+                    return tracker;
+                  }
+                  try {
+                    return method.invoke(service, arguments);
+                  } catch (InvocationTargetException e) {
+                    throw e.getCause();
+                  }
+                });
+    serviceField.set(pending, withTracker);
+  }
+
+  /** Reports every class as not loaded, and forwards the rest to Mixin's own tracker. */
+  private record UnloadedClassTracker(IClassTracker delegate) implements IClassTracker {
+    @Override
+    public void registerInvalidClass(String className) {
+      delegate.registerInvalidClass(className);
+    }
+
+    @Override
+    public boolean isClassLoaded(String className) {
+      return false;
+    }
+
+    @Override
+    public String getClassRestrictions(String className) {
+      return delegate.getClassRestrictions(className);
+    }
   }
 
   private static Object processorOf(IMixinTransformer transformer) throws ReflectiveOperationException {
