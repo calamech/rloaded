@@ -16,8 +16,18 @@ internal fun withTestMods(
     return listOf(withMods.first()) + properties.map { (name, value) -> "-D$name=$value" } + withMods.drop(1)
 }
 
-/** The properties that run Fabric's client game tests and name the file passed tests go to. */
-internal fun clientGameTestProperties(report: Path): Map<String, String> =
-    mapOf("fabric.client.gametest" to "true", "rloaded.client-game-test.report" to report.toString())
+/**
+ * The properties that run Fabric's client game tests, name the file passed tests go to, and list
+ * the mod jars the tests load while the client runs, joined with the path separator.
+ */
+internal fun clientGameTestProperties(
+    report: Path,
+    hotAddMods: String,
+): Map<String, String> =
+    mapOf(
+        "fabric.client.gametest" to "true",
+        "rloaded.client-game-test.report" to report.toString(),
+        "rloaded.hot-add-mods" to hotAddMods,
+    )
 
 private const val ADD_MODS = "-Dfabric.addMods="

@@ -100,9 +100,11 @@ tasks.register<JavaExec>("clientGameTest") {
     val agentFile = files(agentJar)
     val runtimeFile = files(runtimeModJar)
     val modFiles = files(clientTestModJars)
+    val hotAddFiles = files(hotAddModJars)
     inputs.files(agentFile).withPropertyName("agent")
     inputs.files(runtimeFile).withPropertyName("runtimeMod")
     inputs.files(modFiles).withPropertyName("clientTestMods")
+    inputs.files(hotAddFiles).withPropertyName("hotAddMods")
     outputs.file(report)
     doFirst { report.get().asFile.delete() }
     argumentProviders.add {
@@ -112,6 +114,7 @@ tasks.register<JavaExec>("clientGameTest") {
             report.get().asFile.absolutePath,
             agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
+            hotAddFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         ) + modFiles.files.map { it.absolutePath }
     }
 }

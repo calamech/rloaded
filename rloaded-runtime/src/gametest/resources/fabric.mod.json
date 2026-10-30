@@ -11,7 +11,8 @@
     "server": ["io.github.calamech.rloaded.gametest.RegistrySyncServer"],
     "fabric-client-gametest": [
       "io.github.calamech.rloaded.gametest.client.ReconfigurationClientGameTest",
-      "io.github.calamech.rloaded.gametest.client.ReconfigurationStabilityClientGameTest"
+      "io.github.calamech.rloaded.gametest.client.ReconfigurationStabilityClientGameTest",
+      "io.github.calamech.rloaded.gametest.client.HotAddClientGameTest"
     ],
     "fabric-gametest": [
       "io.github.calamech.rloaded.gametest.BlockEntityCyclingGameTest",
