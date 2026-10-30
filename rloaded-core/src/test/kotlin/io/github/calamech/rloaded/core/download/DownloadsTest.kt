@@ -44,10 +44,14 @@ class DownloadsTest {
             val missing = Artifact(server.url("/missing"), good.checksum, good.size)
             val wrong = serve("/wrong", "wrong").copy(checksum = good.checksum)
             val progress = mutableListOf<Int>()
+            val ended = mutableListOf<Int>()
 
             val result =
-                Downloads.obtainAll(listOf(Download(store, missing), Download(store, good), Download(store, wrong)), 2) { done, _ ->
-                    synchronized(progress) { progress += done }
+                Downloads.obtainAll(listOf(Download(store, missing), Download(store, good), Download(store, wrong)), 2) { index, done, _ ->
+                    synchronized(progress) {
+                        progress += done
+                        ended += index
+                    }
                 }
 
             val failures = (result as Outcome.Err).error
@@ -55,6 +59,7 @@ class DownloadsTest {
             assertEquals(2, failures.failures.size)
             assertEquals(1, server.hits("/good"))
             assertEquals(listOf(1, 2, 3), progress.sorted())
+            assertEquals(listOf(0, 1, 2), ended.sorted())
         }
 
     private fun serve(

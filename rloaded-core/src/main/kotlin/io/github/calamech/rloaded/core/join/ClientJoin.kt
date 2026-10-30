@@ -75,6 +75,9 @@ public class ClientJoin(
 ) {
     private var hello: ServerHello? = null
 
+    /** The name the server gave in its hello, once it came. */
+    public val serverName: String? get() = hello?.serverName
+
     /** Reads the server's hello and returns the encoded answer. */
     public fun serverHello(bytes: ByteArray): Outcome<ByteArray, JoinFailure> =
         ProtocolCodec.decode(ServerHello.serializer(), bytes).mapError { JoinFailure.Malformed(it.toString()) }.map { received ->

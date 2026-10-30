@@ -33,7 +33,7 @@ public class LockfileMods(
             .mapError<Lockfile, LockfileError, String> { "rloaded/lockfile.json cannot be used: $it" }
             .flatMap { lockfile ->
                 installer
-                    .install(lockfile.entries().filter { it.side != Side.CLIENT }) { _, _ -> }
+                    .install(lockfile.entries().filter { it.side != Side.CLIENT }) { _, _, _ -> }
                     .mapError<List<InstalledMod>, InstallError, String> { "the mods of rloaded/lockfile.json cannot be obtained: $it" }
                     .map { mods -> mods.map { it.jar } }
             }

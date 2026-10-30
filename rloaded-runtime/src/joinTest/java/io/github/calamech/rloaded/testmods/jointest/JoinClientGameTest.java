@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -52,6 +53,7 @@ public final class JoinClientGameTest implements FabricClientGameTest {
     context.waitTicks(
         Integer.parseInt(required("rloaded.join-test.trust-seconds")) * TICKS_PER_SECOND);
     context.clickScreenButton("rloaded.trust.install");
+    context.waitFor(client -> screenNamed(client, "InstallScreen"), JOIN_TICKS);
     if (Boolean.getBoolean("rloaded.join-test.expect-disconnect")) {
       context.waitFor(client -> client.gui.screen() instanceof DisconnectedScreen, JOIN_TICKS);
       String reason =
@@ -60,6 +62,7 @@ public final class JoinClientGameTest implements FabricClientGameTest {
       context.runOnClient(client -> client.gui.setScreen(new TitleScreen()));
       return;
     }
+    context.takeScreenshot("rloaded-install-screen");
     context.waitFor(client -> client.level != null && client.player != null, JOIN_TICKS);
 
     if (BuiltInRegistries.BLOCK.getOptional(BASIC_BLOCK).isEmpty()) {
@@ -72,7 +75,13 @@ public final class JoinClientGameTest implements FabricClientGameTest {
     }
     context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
     context.waitFor(client -> client.level == null && client.gui.screen() instanceof TitleScreen);
-    write(report, "joined and loaded content-basic and mixin-loaded-class");
+    write(
+        report, "joined after the install screen and loaded content-basic and mixin-loaded-class");
+  }
+
+  private static boolean screenNamed(Minecraft client, String name) {
+    return client.gui.screen() != null
+        && client.gui.screen().getClass().getSimpleName().equals(name);
   }
 
   private static void write(Path report, String line) {

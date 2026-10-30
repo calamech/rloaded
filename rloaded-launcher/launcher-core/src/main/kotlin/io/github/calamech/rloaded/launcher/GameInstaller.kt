@@ -114,7 +114,7 @@ public class GameInstaller(
                         listOfNotNull(game.logging?.let { Download(libraries, it.config, ".xml") }) +
                         gameAssets.map { Download(assets, it.artifact) }
                 Downloads
-                    .obtainAll(downloads, parallelism, onProgress)
+                    .obtainAll(downloads, parallelism) { _, done, total -> onProgress(done, total) }
                     .mapError<List<Path>, DownloadFailures, InstallFailure> { InstallFailure.Downloads(it.failures, it.total) }
                     .flatMap { paths ->
                         copyAssetIndex(game).flatMap {

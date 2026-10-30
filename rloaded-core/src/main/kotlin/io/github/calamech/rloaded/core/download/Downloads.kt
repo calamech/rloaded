@@ -27,22 +27,22 @@ public object Downloads {
     /**
      * Obtains every download, at most [parallelism] at a time, and returns their paths in order.
      * Every download runs to its end; failures are all reported, none is dropped.
-     * [onProgress] receives the number of downloads done and the total.
+     * [onProgress] receives the index of the download that just ended, the number done and the total.
      */
     public suspend fun obtainAll(
         downloads: List<Download>,
         parallelism: Int,
-        onProgress: (Int, Int) -> Unit = { _, _ -> },
+        onProgress: (Int, Int, Int) -> Unit = { _, _, _ -> },
     ): Outcome<List<Path>, DownloadFailures> =
         coroutineScope {
             val permits = Semaphore(parallelism)
             val done = AtomicInteger()
             val results =
                 downloads
-                    .map { download ->
+                    .mapIndexed { index, download ->
                         async {
                             permits.withPermit { download.store.obtain(download.artifact, download.suffix) }.also {
-                                onProgress(done.incrementAndGet(), downloads.size)
+                                onProgress(index, done.incrementAndGet(), downloads.size)
                             }
                         }
                     }.awaitAll()

@@ -40,3 +40,5 @@ Checked on 2026-10-30 with `:rloaded-game-tests:joinTest`. It starts the pinned 
 Amended 2026-10-30: the server now obtains and loads its lockfile's mods itself (ADR 0032, #59).
 
 Amended 2026-10-30: the server ends a join whose client reports no progress for `rollout.clientTimeoutSeconds` (ADR 0033, #57).
+
+Amended 2026-10-30: the player watches the install on its own screen (ADR 0035, #58).
