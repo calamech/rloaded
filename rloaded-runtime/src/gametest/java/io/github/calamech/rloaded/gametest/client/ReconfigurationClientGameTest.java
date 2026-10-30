@@ -1,6 +1,5 @@
 package io.github.calamech.rloaded.gametest.client;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -11,7 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -31,10 +29,8 @@ public final class ReconfigurationClientGameTest implements FabricClientGameTest
       ClientLevel levelBefore = context.computeOnClient(client -> client.level);
       Entity standBefore = context.computeOnClient(client -> armorStand(client).orElseThrow());
 
-      server.runOnServer(running -> onlyPlayer(running).connection.switchToConfig());
-      server.waitFor(running -> configuringPlayer(running).isPresent());
-      server.runOnServer(running -> configuringPlayer(running).orElseThrow().returnToWorld());
-      context.waitFor(client -> client.level != null && client.level != levelBefore && armorStand(client).isPresent());
+      Reconfiguration.cycle(context, server);
+      context.waitFor(client -> armorStand(client).isPresent());
 
       Entity standAfter = context.computeOnClient(client -> armorStand(client).orElseThrow());
       if (standAfter == standBefore) {
@@ -51,27 +47,11 @@ public final class ReconfigurationClientGameTest implements FabricClientGameTest
   }
 
   private static void spawnArmorStandNextToPlayer(MinecraftServer server) {
-    ServerPlayer player = onlyPlayer(server);
+    ServerPlayer player = Reconfiguration.onlyPlayer(server);
     ArmorStand stand = new ArmorStand(player.level(), player.getX() + 2, player.getY(), player.getZ());
     if (!player.level().addFreshEntity(stand)) {
       throw new AssertionError("the server refused the armor stand");
     }
-  }
-
-  private static ServerPlayer onlyPlayer(MinecraftServer server) {
-    List<ServerPlayer> players = server.getPlayerList().getPlayers();
-    if (players.size() != 1) {
-      throw new AssertionError("expected one player, found " + players.size());
-    }
-    return players.getFirst();
-  }
-
-  private static Optional<ServerConfigurationPacketListenerImpl> configuringPlayer(MinecraftServer server) {
-    return server.getConnection().getConnections().stream()
-        .map(connection -> connection.getPacketListener())
-        .filter(ServerConfigurationPacketListenerImpl.class::isInstance)
-        .map(ServerConfigurationPacketListenerImpl.class::cast)
-        .findFirst();
   }
 
   private static Optional<Entity> armorStand(Minecraft client) {
