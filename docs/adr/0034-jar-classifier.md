@@ -30,3 +30,5 @@ Read in the sources of Minecraft 26.3 and Fabric API 0.165.0 on 2026-10-30: `Reg
 ## Enforcement
 
 `JarClassifierTest` (each rule, nested jars, unreadable jars, limits, reasons) and `HotAddRefusalGameTest` on the game test server, which now also refuses a mod with biome and enchantment entries and one whose entrypoint needs another adapter. With the classifier given no registries, the biome mod loaded and the game test failed.
+
+Amended 2026-10-31: the classifier also reports the mod id and the side the jar declares, which admission writes to the lockfile (ADR 0036).

@@ -25,31 +25,51 @@ internal object LockfileJson {
             prettyPrint = false
         }
 
+    private val pretty =
+        Json {
+            encodeDefaults = true
+            explicitNulls = true
+            prettyPrint = true
+        }
+
     fun parse(text: String): Outcome<Lockfile, LockfileError> =
         decode(text).flatMap { file ->
             if (file.schema != Lockfile.SCHEMA) Outcome.Err(LockfileError.UnsupportedSchema(file.schema)) else toLockfile(file)
         }
 
     fun canonical(lockfile: Lockfile): String =
-        compact.encodeToString(
-            HashedContent.serializer(),
-            HashedContent(
-                lockfile.baseSet.map { BaseSetJson(it.projectId, it.versionId, it.sha512.hex) },
-                lockfile.mods.map { mod ->
-                    val entry = mod.entry
-                    ModJson(
-                        entry.projectId,
-                        entry.versionId,
-                        entry.fileName,
-                        entry.sha512.hex,
-                        entry.size,
-                        entry.side,
-                        mod.addedAt.toString(),
-                        mod.addedBy,
-                    )
-                },
+        compact.encodeToString(HashedContent.serializer(), HashedContent(baseSetJson(lockfile), modsJson(lockfile)))
+
+    // One field per line, so an admin reads and diffs the file easily.
+    fun file(lockfile: Lockfile): String =
+        pretty.encodeToString(
+            FileJson.serializer(),
+            FileJson(
+                Lockfile.SCHEMA,
+                lockfile.minecraft,
+                lockfile.rloaded,
+                baseSetJson(lockfile),
+                modsJson(lockfile),
+                lockfile.pendingRemovals,
             ),
-        )
+        ) + "\n"
+
+    private fun baseSetJson(lockfile: Lockfile) = lockfile.baseSet.map { BaseSetJson(it.projectId, it.versionId, it.sha512.hex) }
+
+    private fun modsJson(lockfile: Lockfile) =
+        lockfile.mods.map { mod ->
+            val entry = mod.entry
+            ModJson(
+                entry.projectId,
+                entry.versionId,
+                entry.fileName,
+                entry.sha512.hex,
+                entry.size,
+                entry.side,
+                mod.addedAt.toString(),
+                mod.addedBy,
+            )
+        }
 
     private fun decode(text: String): Outcome<FileJson, LockfileError> =
         try {

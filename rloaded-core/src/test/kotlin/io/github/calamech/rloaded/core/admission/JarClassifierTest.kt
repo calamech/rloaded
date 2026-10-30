@@ -1,6 +1,8 @@
 package io.github.calamech.rloaded.core.admission
 
 import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.Side
+import io.github.calamech.rloaded.protocol.map
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayOutputStream
@@ -29,14 +31,14 @@ class JarClassifierTest {
                 "assets/plain/lang/en_us.json" to "{}",
             )
 
-        assertEquals(Outcome.Ok(emptyList()), classify(jar))
+        assertEquals(Outcome.Ok(emptyList()), refusals(jar))
     }
 
     @Test
     fun `refuses a preLaunch entrypoint`() {
         val jar = jar(mod("early", """"entrypoints": {"preLaunch": ["a.Early"]}"""))
 
-        assertEquals(Outcome.Ok(listOf(Refusal.PreLaunch("early"))), classify(jar))
+        assertEquals(Outcome.Ok(listOf(Refusal.PreLaunch("early"))), refusals(jar))
     }
 
     @Test
@@ -49,7 +51,7 @@ class JarClassifierTest {
                 ),
             )
 
-        assertEquals(Outcome.Ok(listOf(Refusal.LanguageAdapter("scala", listOf("clojure", "scala")))), classify(jar))
+        assertEquals(Outcome.Ok(listOf(Refusal.LanguageAdapter("scala", listOf("clojure", "scala")))), refusals(jar))
     }
 
     @Test
@@ -65,7 +67,7 @@ class JarClassifierTest {
 
         assertEquals(
             Outcome.Ok(listOf(Refusal.DatapackRegistry("worldly", listOf("dimension", "spell", "worldgen/biome")))),
-            classify(jar),
+            refusals(jar),
         )
     }
 
@@ -74,7 +76,7 @@ class JarClassifierTest {
         val inner = jarBytes(mod("inner", """"entrypoints": {"preLaunch": ["b.Early"]}"""))
         val jar = jar(mod("outer", """"jars": [{"file": "META-INF/jars/inner.jar"}]"""), "META-INF/jars/inner.jar" to inner)
 
-        assertEquals(Outcome.Ok(listOf(Refusal.PreLaunch("inner"))), classify(jar))
+        assertEquals(Outcome.Ok(listOf(Refusal.PreLaunch("inner"))), refusals(jar))
     }
 
     @Test
@@ -132,7 +134,23 @@ class JarClassifierTest {
         )
     }
 
+    @Test
+    fun `reads where the mod runs from its environment`() {
+        val sides =
+            listOf("\"environment\": \"client\"", "\"environment\": \"server\"", "\"environment\": \"*\"", "").map { field ->
+                (classify(jar(mod("sided", field))) as Outcome.Ok).value.side
+            }
+
+        assertEquals(listOf(Side.CLIENT, Side.SERVER, Side.BOTH, Side.BOTH), sides)
+        assertEquals(
+            Outcome.Err(JarProblem.Malformed("mod.jar", "unknown environment both")),
+            classify(jar(mod("sided", "\"environment\": \"both\""))),
+        )
+    }
+
     private fun classify(jar: Path) = classifier.classify(jar)
+
+    private fun refusals(jar: Path) = classifier.classify(jar).map { it.refusals }
 
     private fun mod(
         id: String,

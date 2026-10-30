@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.core.lockfile
 
+import io.github.calamech.rloaded.core.trust.AtomicFiles
 import io.github.calamech.rloaded.protocol.Checksum
 import io.github.calamech.rloaded.protocol.HashAlgorithm
 import io.github.calamech.rloaded.protocol.ModEntry
@@ -32,6 +33,18 @@ public data class Lockfile(
             is Outcome.Err -> error("SHA-256 produced ${hex.length} hexadecimal digits")
         }
     }
+
+    /**
+     * Writes this lockfile to [path], replacing it in one step: a crash leaves the old file or the
+     * new one. Fails with the reason when the file cannot be written.
+     */
+    public fun write(path: Path): Outcome<Unit, LockfileError> =
+        try {
+            AtomicFiles.write(path, LockfileJson.file(this).encodeToByteArray())
+            Outcome.Ok(Unit)
+        } catch (e: IOException) {
+            Outcome.Err(LockfileError.Unwritable(path, e.message ?: e.javaClass.simpleName))
+        }
 
     /** Reading lockfiles. */
     public companion object {
@@ -76,6 +89,12 @@ public data class LockedMod(
 public sealed interface LockfileError {
     /** The file cannot be read. */
     public data class Unreadable(
+        val path: Path,
+        val reason: String,
+    ) : LockfileError
+
+    /** The file cannot be written. */
+    public data class Unwritable(
         val path: Path,
         val reason: String,
     ) : LockfileError

@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.runtime.engine;
 
 import io.github.calamech.rloaded.core.admission.JarProblem;
+import io.github.calamech.rloaded.core.admission.JarReport;
 import io.github.calamech.rloaded.core.admission.Refusal;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.runtime.engine.LoaderBridge.ModJar;
@@ -46,11 +47,7 @@ public final class HotAdd {
    */
   public static List<String> load(List<Path> jars, Instrumentation instrumentation)
       throws HotAddRefusal {
-    List<ModJar> mods = new ArrayList<>();
-    for (Path jar : jars) {
-      mods.add(LoaderBridge.read(jar));
-    }
-    List<ModJar> ordered = dependencyOrder(checked(mods));
+    List<ModJar> ordered = dependencyOrder(checked(read(jars)));
     try {
       for (ModJar mod : ordered) {
         LoaderBridge.register(mod);
@@ -65,6 +62,23 @@ public final class HotAdd {
     }
     runEntrypoints(ordered);
     return ids(ordered);
+  }
+
+  /**
+   * Checks that {@link #load} would accept {@code jars}, without loading anything.
+   *
+   * @throws HotAddRefusal with the reason it would refuse them
+   */
+  public static void check(List<Path> jars) throws HotAddRefusal {
+    checked(read(jars));
+  }
+
+  private static List<ModJar> read(List<Path> jars) throws HotAddRefusal {
+    List<ModJar> mods = new ArrayList<>();
+    for (Path jar : jars) {
+      mods.add(LoaderBridge.read(jar));
+    }
+    return mods;
   }
 
   private static Map<String, ModJar> checked(List<ModJar> mods) throws HotAddRefusal {
@@ -101,13 +115,11 @@ public final class HotAdd {
     }
     switch (Admission.classifier().classify(mod.path())) {
       case Outcome.Ok<?> ok -> {
-        List<?> refusals = (List<?>) ok.getValue();
+        List<Refusal> refusals = ((JarReport) ok.getValue()).getRefusals();
         if (!refusals.isEmpty()) {
           throw new HotAddRefusal(
               mod.path(),
-              refusals.stream()
-                  .map(refusal -> ((Refusal) refusal).getReason())
-                  .collect(Collectors.joining("; ")));
+              refusals.stream().map(Refusal::getReason).collect(Collectors.joining("; ")));
         }
       }
       case Outcome.Err<?> err ->
