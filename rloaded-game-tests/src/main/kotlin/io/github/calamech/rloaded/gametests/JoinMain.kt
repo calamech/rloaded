@@ -118,7 +118,10 @@ private fun passed(
         "Join check: $joined; $cached jars in the cache; trust store written: ${"\"key\"" in trust}; " +
             "server loaded $serverLoaded; stalled player: $disconnected",
     )
-    return cached == modCount && "\"key\"" in trust && serverLoaded.size == modCount && joined.startsWith("joined") &&
+    return cached == modCount && "\"key\"" in trust && serverLoaded.size == modCount &&
+        joined.startsWith(
+            "joined after the install screen",
+        ) &&
         disconnected.endsWith(TIMEOUT_MESSAGE)
 }
 

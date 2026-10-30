@@ -7,6 +7,7 @@ import io.github.calamech.rloaded.core.download.Origin;
 import io.github.calamech.rloaded.core.download.RetryPolicy;
 import io.github.calamech.rloaded.core.download.UrlPolicy;
 import io.github.calamech.rloaded.core.join.ClientJoin;
+import io.github.calamech.rloaded.core.join.InstallProgress;
 import io.github.calamech.rloaded.core.join.JoinFailure;
 import io.github.calamech.rloaded.core.join.ManifestStep;
 import io.github.calamech.rloaded.core.trust.TrustStore;
@@ -35,6 +36,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.loader.api.FabricLoader;
@@ -61,6 +63,8 @@ public final class JoinClient {
   private static final Map<String, String> LOADED = new ConcurrentHashMap<>();
 
   private static ClientJoin current;
+  // Set when the player leaves or the server ends the join: what is still in flight is dropped.
+  private static volatile boolean ended;
   private static Connection connection;
 
   private JoinClient() {}
@@ -71,6 +75,7 @@ public final class JoinClient {
 
   /** Registers the join on the client side. */
   public static void register() {
+    ClientConfigurationConnectionEvents.DISCONNECT.register((listener, client) -> ended = true);
     ClientConfigurationNetworking.registerGlobalReceiver(
         JoinPayloads.Hello.TYPE,
         (payload, context) ->
@@ -91,6 +96,7 @@ public final class JoinClient {
       current = null;
       return;
     }
+    ended = false;
     current = new ClientJoin(store, Map.copyOf(LOADED), rloadedVersion());
     switch (current.serverHello(payload.bytes())) {
       case Outcome.Ok<?> ok -> sender.sendPacket(new JoinPayloads.Hello((byte[]) ok.getValue()));
@@ -110,7 +116,8 @@ public final class JoinClient {
       case Outcome.Err<?> err -> fail(sender, null, describe((JoinFailure) err.getError()));
       case Outcome.Ok<?> ok -> {
         switch ((ManifestStep) ok.getValue()) {
-          case ManifestStep.Install install -> install(setup, client, sender, install.getEntries());
+          case ManifestStep.Install install ->
+              install(setup, client, sender, install.getEntries(), Map.of());
           case ManifestStep.AskTrust ask -> askTrust(setup, client, sender, ask);
           default -> throw new IllegalStateException("unknown manifest step");
         }
@@ -154,46 +161,77 @@ public final class JoinClient {
             optedOut -> {
               client.gui.setScreen(previous);
               switch (current.trust(ask.getEntries(), optedOut)) {
-                case Outcome.Ok<?> ok -> install(setup, client, sender, entries(ok.getValue()));
+                case Outcome.Ok<?> ok ->
+                    install(setup, client, sender, entries(ok.getValue()), titles(details));
                 case Outcome.Err<?> err ->
                     fail(sender, null, describe((JoinFailure) err.getError()));
               }
             },
-            () -> {
-              client.gui.setScreen(previous);
-              sender.sendPacket(
-                  new JoinPayloads.Result(
-                      ClientJoin.Companion.result(InstallResult.RefusedByUser.INSTANCE)));
-            },
+            () -> leave(client, sender, previous),
             () -> progress(sender, InstallStage.TRUST, 0)));
   }
 
+  private static Map<String, String> titles(Map<String, ModrinthProject> projects) {
+    return projects.values().stream()
+        .collect(Collectors.toUnmodifiableMap(ModrinthProject::getId, ModrinthProject::getTitle));
+  }
+
+  private static void leave(Minecraft client, PacketSender sender, Screen previous) {
+    ended = true;
+    client.gui.setScreen(previous);
+    sender.sendPacket(
+        new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.RefusedByUser.INSTANCE)));
+  }
+
   private static void install(
-      Connection setup, Minecraft client, PacketSender sender, List<ModEntry> entries) {
+      Connection setup,
+      Minecraft client,
+      PacketSender sender,
+      List<ModEntry> entries,
+      Map<String, String> titles) {
     if (entries.isEmpty()) {
       sender.sendPacket(
           new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE)));
       return;
     }
+    Screen previous = client.gui.screen();
+    InstallProgress shown = new InstallProgress(entries);
+    String serverName = current.getServerName();
+    client.gui.setScreen(
+        new InstallScreen(
+            previous,
+            serverName == null ? "" : serverName,
+            entries,
+            titles,
+            shown,
+            () -> leave(client, sender, previous)));
     onClientThread(
         setup
             .installer()
             .installAsync(
                 entries,
-                (done, total) -> progress(sender, InstallStage.DOWNLOAD, done * PERCENT / total)),
+                (entry, done, total) -> {
+                  shown.downloaded(entry);
+                  progress(sender, InstallStage.DOWNLOAD, done * PERCENT / total);
+                }),
         client,
         sender,
-        outcome -> load(client, sender, outcome));
+        outcome -> load(client, sender, outcome, shown, previous));
   }
 
   private static void load(
-      Minecraft client, PacketSender sender, Outcome<List<InstalledMod>, InstallError> outcome) {
+      Minecraft client,
+      PacketSender sender,
+      Outcome<List<InstalledMod>, InstallError> outcome,
+      InstallProgress shown,
+      Screen previous) {
     if (outcome instanceof Outcome.Err<?> err) {
       fail(sender, null, "the mods cannot be downloaded: " + err.getError());
       return;
     }
     @SuppressWarnings("unchecked")
     List<InstalledMod> mods = (List<InstalledMod>) ((Outcome.Ok<?>) outcome).getValue();
+    shown.stage(InstallStage.LOAD);
     progress(sender, InstallStage.LOAD, 0);
     try {
       HotAdd.load(
@@ -210,15 +248,17 @@ public final class JoinClient {
       return;
     }
     mods.forEach(mod -> LOADED.put(mod.getEntry().getProjectId(), mod.getEntry().getVersionId()));
+    shown.stage(InstallStage.RELOAD);
     progress(sender, InstallStage.RELOAD, 0);
     onClientThread(
         client.reloadResourcePacks(),
         client,
         sender,
-        reloaded ->
-            sender.sendPacket(
-                new JoinPayloads.Result(
-                    ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE))));
+        reloaded -> {
+          client.gui.setScreen(previous);
+          sender.sendPacket(
+              new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE)));
+        });
   }
 
   /**
@@ -233,7 +273,9 @@ public final class JoinClient {
             (value, error) ->
                 client.execute(
                     () -> {
-                      if (error == null) {
+                      if (ended) {
+                        LOGGER.info("The join ended; the rest of the install is dropped");
+                      } else if (error == null) {
                         action.accept(value);
                       } else {
                         LOGGER.error("Joining failed on an unexpected error", error);

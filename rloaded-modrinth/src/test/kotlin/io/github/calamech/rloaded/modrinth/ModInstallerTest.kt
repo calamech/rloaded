@@ -44,12 +44,22 @@ class ModInstallerTest {
         server.serve("/cdn/a.jar", jarA)
         server.serve("/cdn/b.jar", jarB)
         val progress = mutableListOf<Pair<Int, Int>>()
+        val ended = mutableListOf<String>()
 
-        val installed = ok(install(listOf(entryB, entryA)) { done, total -> synchronized(progress) { progress += done to total } })
+        val installed =
+            ok(
+                install(listOf(entryB, entryA)) { entry, done, total ->
+                    synchronized(progress) {
+                        progress += done to total
+                        ended += entry.projectId
+                    }
+                },
+            )
 
         assertEquals(listOf(entryB, entryA), installed.map { it.entry })
         assertEquals(listOf(jarB.toList(), jarA.toList()), installed.map { it.jar.readBytes().toList() })
         assertEquals(listOf(1 to 2, 2 to 2), progress.sortedBy { it.first })
+        assertEquals(listOf("projA", "projB"), ended.sorted())
     }
 
     @Test
@@ -103,7 +113,7 @@ class ModInstallerTest {
 
     private fun install(
         entries: List<ModEntry>,
-        progress: DownloadProgress = DownloadProgress { _, _ -> },
+        progress: DownloadProgress = DownloadProgress { _, _, _ -> },
     ): Outcome<List<InstalledMod>, InstallError> {
         val store = ArtifactStore(Files.createDirectories(directory.resolve("store")), http, RetryPolicy(maxAttempts = 1))
         val installer = ModInstaller(Modrinth(http, ModrinthSettings(apiUrl = server.url("/v2"))), store)

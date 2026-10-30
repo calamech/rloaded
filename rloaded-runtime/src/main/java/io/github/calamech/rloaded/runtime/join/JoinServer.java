@@ -141,7 +141,7 @@ public final class JoinServer {
       case InstallResult.RefusedByUser refused ->
           listener.disconnect(
               Component.translatableWithFallback(
-                  "rloaded.disconnect.declined", "You did not accept this server's mods."));
+                  "rloaded.disconnect.declined", "You chose not to install this server's mods."));
       case InstallResult.Failed failed ->
           listener.disconnect(
               Component.translatableWithFallback(

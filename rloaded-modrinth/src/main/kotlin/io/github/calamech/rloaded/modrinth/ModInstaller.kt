@@ -40,10 +40,11 @@ public sealed interface InstallError {
     ) : InstallError
 }
 
-/** Told how many files are downloaded, out of how many. */
+/** Told which file is downloaded, and how many are, out of how many. */
 public fun interface DownloadProgress {
-    /** Called after each file, from a download thread. */
+    /** Called after the file of [entry], from a download thread. */
     public fun onProgress(
+        entry: ModEntry,
         done: Int,
         total: Int,
     )
@@ -71,7 +72,7 @@ public class ModInstaller(
             .flatMap { files ->
                 val downloads = files.map { Download(store, Artifact(it.url, it.sha512, it.size), JAR) }
                 Downloads
-                    .obtainAll(downloads, parallelism) { done, total -> progress.onProgress(done, total) }
+                    .obtainAll(downloads, parallelism) { index, done, total -> progress.onProgress(entries[index], done, total) }
                     .mapError<List<Path>, DownloadFailures, InstallError> { InstallError.Downloads(it) }
                     .map { jars -> entries.zip(jars) { entry, jar -> InstalledMod(entry, jar) } }
             }
