@@ -40,3 +40,5 @@ The tests failed when tags were not given to holders, and when the unregistered 
 ## Enforcement
 
 `RegistryThawGameTest`, in the runtime mod's `gametest` source set, run by the `game-test` CI job.
+
+Amended 2026-10-31: `thaw` recreates the map of intrusive holders only for the registries that had one at start, so registries such as creative tabs accept new entries (ADR 0042).

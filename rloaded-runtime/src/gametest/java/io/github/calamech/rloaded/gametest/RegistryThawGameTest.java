@@ -11,8 +11,10 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -57,6 +59,29 @@ public final class RegistryThawGameTest {
     BlockState lit = late.defaultBlockState().setValue(BlockStateProperties.LIT, true);
     helper.setBlock(HERE, lit);
     helper.assertBlockState(HERE, lit);
+    helper.succeed();
+  }
+
+  // Creative tabs make no holder of their own: their registry must accept them without one.
+  @GameTest
+  public void creativeTabRegisteredAfterStartup(GameTestHelper helper) {
+    Registry<CreativeModeTab> tabs = BuiltInRegistries.CREATIVE_MODE_TAB;
+    ResourceKey<CreativeModeTab> key =
+        ResourceKey.create(
+            Registries.CREATIVE_MODE_TAB,
+            Identifier.fromNamespaceAndPath("rloaded-gametest", "late_tab"));
+
+    RegistryThaw.thaw(tabs);
+    CreativeModeTab tab =
+        Registry.register(
+            tabs,
+            key,
+            CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
+                .title(Component.literal("Late tab"))
+                .build());
+    RegistryThaw.freeze(tabs);
+
+    helper.assertValueEqual(tabs.getValue(key), tab, "registered tab");
     helper.succeed();
   }
 

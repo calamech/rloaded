@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.Minecraft;
@@ -19,24 +20,28 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Joins a server running in another process, which this player already trusts, and stays in the
- * world while the server's admin adds content-basic, then mixin-field-init. After each add, it
- * checks that it is back in the world on the same connection, that the mod works, and that a toast
- * named the new mod; after the first, it waits for the new item the server gives; it reports each
- * step in {@code rloaded.add-test.report} and leaves once the file {@code rloaded.add-test.done}
- * exists.
+ * world while the server's admin adds content-basic, mixin-field-init, then keybind-and-tab. After
+ * each add, it checks that it is back in the world on the same connection, that the mod works, and
+ * that a toast named the new mod; after the first, it waits for the new item the server gives; it
+ * reports each step in {@code rloaded.add-test.report} and leaves once the file {@code
+ * rloaded.add-test.done} exists.
  */
 public final class AddClientGameTest implements FabricClientGameTest {
   private static final Identifier BASIC_BLOCK =
       Identifier.fromNamespaceAndPath("content-basic", "basic_block");
   private static final int STEP_TICKS = 20 * 60 * 5;
   private static final int MIN_ENTITIES = 3;
+  private static final Identifier KEYBIND_AND_TAB =
+      Identifier.fromNamespaceAndPath("keybind-and-tab", "tab");
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded add test");
 
   /** The log line after which the add check counts errors: what came before is not about adds. */
@@ -82,6 +87,11 @@ public final class AddClientGameTest implements FabricClientGameTest {
     sameConnection(context, connection);
     append(report, "mixin-field-init added");
 
+    context.waitFor(
+        client -> inWorld(client) && hasKeyMapping(client) && hasTab(client), STEP_TICKS);
+    sameConnection(context, connection);
+    append(report, "keybind-and-tab added");
+
     context.waitFor(client -> Files.exists(done), STEP_TICKS);
     context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
     context.waitFor(client -> client.level == null && client.gui.screen() instanceof TitleScreen);
@@ -89,6 +99,25 @@ public final class AddClientGameTest implements FabricClientGameTest {
 
   private static boolean inWorld(Minecraft client) {
     return client.level != null && client.player != null && client.gui.screen() == null;
+  }
+
+  // In the options' list, which the controls screen shows and options.txt saves.
+  private static boolean hasKeyMapping(Minecraft client) {
+    return Arrays.stream(client.options.keyMappings)
+        .anyMatch(mapping -> mapping.getName().equals("key.keybind-and-tab.wave"));
+  }
+
+  // Listed among the creative tabs, with its item, once the tabs are built for this world.
+  private static boolean hasTab(Minecraft client) {
+    CreativeModeTabs.tryRebuildTabContents(
+        client.player.connection.enabledFeatures(), true, client.level.registryAccess());
+    return BuiltInRegistries.CREATIVE_MODE_TAB
+        .getOptional(KEYBIND_AND_TAB)
+        .filter(
+            tab ->
+                CreativeModeTabs.allTabs().contains(tab)
+                    && tab.getDisplayItems().stream().anyMatch(stack -> stack.is(Items.DIAMOND)))
+        .isPresent();
   }
 
   private static boolean toastShown(Minecraft client) {

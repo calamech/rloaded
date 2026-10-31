@@ -60,7 +60,7 @@ dependencies {
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-add-test") }
     }
     addClientMods(libs.fabric.client.gametest.api) { isTransitive = false }
-    for (mod in listOf("content-basic", "mixin-field-init")) {
+    for (mod in listOf("content-basic", "mixin-field-init", "keybind-and-tab")) {
         addServedMods("io.github.calamech.rloaded:rloaded-runtime") {
             isTransitive = false
             capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }

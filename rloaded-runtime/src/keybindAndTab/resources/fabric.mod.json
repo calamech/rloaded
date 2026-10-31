@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "keybind-and-tab",
+  "version": "${version}",
+  "name": "Key mapping and creative tab (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.calamech.rloaded.testmods.keybindandtab.KeybindAndTab"],
+    "client": ["io.github.calamech.rloaded.testmods.keybindandtab.KeybindAndTabClient"]
+  },
+  "depends": {
+    "minecraft": "26.3",
+    "fabric-api": "*"
+  }
+}
