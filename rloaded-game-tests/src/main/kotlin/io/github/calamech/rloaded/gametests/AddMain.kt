@@ -66,16 +66,7 @@ public fun main(arguments: Array<String>) {
             player.name to startClient(launch, player.directory.resolve("game"), player.name, null, properties)
         }
     processes += clients.values
-    val steps =
-        listOf(
-            "in the world" to emptyList(),
-            // An entity from before the adds, which the server must rebuild for mixin-field-init.
-            "content-basic added" to listOf("summon minecraft:armor_stand 0 -60 0", "rloaded add cbProject"),
-            // The server makes the new item for players: it needs the item's components.
-            "content-basic item received" to players.map { "give ${it.name} content-basic:basic_block" },
-            "mixin-field-init added" to listOf("rloaded add mfiProject"),
-        )
-    for ((step, commands) in steps) {
+    for ((step, commands) in steps(players)) {
         commands.forEach { console.write("$it\n") }
         console.flush()
         waitForStep(players, step, clients, serverProcess, deadline)
@@ -94,6 +85,17 @@ public fun main(arguments: Array<String>) {
     errors.forEach { println("  $it") }
     exitProcess(if (rollouts == mods.size && errors.isEmpty() && FIELD_INIT_PASSED.containsMatchIn(fieldInit)) 0 else 1)
 }
+
+// What each player reaches, and the console commands that lead there.
+private fun steps(players: List<AddPlayer>): List<Pair<String, List<String>>> =
+    listOf(
+        "in the world" to emptyList(),
+        // An entity from before the adds, which the server must rebuild for mixin-field-init.
+        "content-basic added" to listOf("summon minecraft:armor_stand 0 -60 0", "rloaded add cbProject"),
+        // The server makes the new item for players: it needs the item's components.
+        "content-basic item received" to players.map { "give ${it.name} content-basic:basic_block" },
+        "mixin-field-init added" to listOf("rloaded add mfiProject"),
+    )
 
 // Errors before the first add come from starting the games offline, not from adds.
 private fun errorsFromFirstAdd(
