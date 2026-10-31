@@ -12,6 +12,9 @@ import net.minecraft.network.chat.Component;
  * announces that each of them left the game and joined it again, though nobody really left: those
  * two messages are skipped for a player sent back to configuration, and announced as usual for real
  * joins and leaves. A player who disconnects before coming back did leave, and is announced then.
+ *
+ * <p>Such a player is not asked again what it answered when it joined either: the code of conduct
+ * and the server resource pack, which its game keeps loaded through the configuration phase.
  */
 public final class Reconfigurations {
   // Players sent to configuration and not back in the world yet. Written on the server thread,
@@ -45,6 +48,11 @@ public final class Reconfigurations {
    */
   public static void disconnectedFromWorld(UUID player) {
     AWAY.remove(player);
+  }
+
+  /** Whether {@code player} is in the configuration phase for an add, and comes back after it. */
+  public static boolean isAway(UUID player) {
+    return AWAY.contains(player);
   }
 
   /** Whether the game announces that {@code player} left the world. */

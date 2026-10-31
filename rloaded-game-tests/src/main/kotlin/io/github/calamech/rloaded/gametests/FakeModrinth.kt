@@ -27,10 +27,11 @@ internal data class FakeMod(
 /**
  * Stands in for Modrinth on the loopback interface, for mods that are not on Modrinth: the versions,
  * project versions, projects and teams endpoints Rloaded reads, answering the way Modrinth does (unknown ids left out),
- * and the files.
+ * and the files. It also serves [files] that are not mods, under `/files/<name>`.
  */
 internal class FakeModrinth(
     private val mods: List<FakeMod>,
+    private val files: Map<String, ByteArray> = emptyMap(),
 ) : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress(LOOPBACK, 0), 0)
 
@@ -69,6 +70,11 @@ internal class FakeModrinth(
             val body = mod?.jar?.readBytes() ?: ByteArray(0)
             exchange.sendResponseHeaders(if (mod == null) NOT_FOUND else OK, if (body.isEmpty()) -1 else body.size.toLong())
             exchange.responseBody.use { it.write(body) }
+        }
+        server.createContext("/files/") { exchange ->
+            val body = files[exchange.requestURI.path.removePrefix("/files/")]
+            exchange.sendResponseHeaders(if (body == null) NOT_FOUND else OK, body?.size?.toLong() ?: -1)
+            exchange.responseBody.use { it.write(body ?: ByteArray(0)) }
         }
         server.executor = executor
         server.start()
