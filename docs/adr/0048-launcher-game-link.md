@@ -31,3 +31,5 @@ A player adds a mod to the singleplayer world they have open from the launcher's
 ## Enforcement
 
 `LinkTest` (round trip, loopback only, wrong token, other version, oversized message, timeouts, no launcher) and `LinkMessagesTest` (round trips and bounds) in `check`, and `singleplayerTest` in the `client-game-test` CI job, where the check plays the launcher's end against a real game.
+
+Amended 2026-10-31: superseded by ADR 0051; the launcher no longer links to the game.

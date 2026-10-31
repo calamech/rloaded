@@ -27,11 +27,14 @@ internal data class FakeMod(
 /**
  * Stands in for Modrinth on the loopback interface, for mods that are not on Modrinth: the versions,
  * project versions, projects and teams endpoints Rloaded reads, answering the way Modrinth does (unknown ids left out),
- * and the files. It also serves [files] that are not mods, under `/files/<name>`.
+ * and the files. It also serves [files] that are not mods, under `/files/<name>`. Its search lists
+ * the mods whose title has the query in it, then the [unlisted] project ids, which a search still
+ * shows though Modrinth has removed them.
  */
 internal class FakeModrinth(
     private val mods: List<FakeMod>,
     private val files: Map<String, ByteArray> = emptyMap(),
+    private val unlisted: List<String> = emptyList(),
 ) : AutoCloseable {
     private val server = HttpServer.create(InetSocketAddress(LOOPBACK, 0), 0)
 
@@ -59,6 +62,18 @@ internal class FakeModrinth(
         }
         server.createContext("/v2/projects") { exchange ->
             json(exchange, wanted(exchange, FakeMod::projectId).joinToString(",", "[", "]") { project(it) })
+        }
+        server.createContext("/v2/search") { exchange ->
+            val query =
+                URLDecoder.decode(exchange.requestURI.rawQuery, Charsets.UTF_8).substringAfter("query=").substringBefore("&")
+            val hits =
+                mods.filter { it.title.contains(query, ignoreCase = true) }.map { it.projectId to it.title } + unlisted.map { it to it }
+            json(
+                exchange,
+                hits.joinToString(",", """{"hits": [""", "]}") { (id, title) ->
+                    """{"project_id": "$id", "slug": "$id", "title": "$title", "author": "Tester", "downloads": 1234}"""
+                },
+            )
         }
         server.createContext("/v2/teams") { exchange ->
             val teams = mods.filter { "team${it.projectId}" in ids(exchange) }
