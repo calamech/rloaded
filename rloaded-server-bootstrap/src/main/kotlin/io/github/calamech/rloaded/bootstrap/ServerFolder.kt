@@ -27,6 +27,9 @@ public class ServerFolder(
     /** Rloaded's own data: cache, runtimes, agent. */
     public val data: Path get() = root.resolve("rloaded")
 
+    /** How the bootstrap last started the server, for the server to start a staging server alike. */
+    public val serverLaunch: Path get() = data.resolve("server-launch.json")
+
     /** The mods the server runs and sends its players. */
     public val lockfile: Path get() = data.resolve("lockfile.json")
 

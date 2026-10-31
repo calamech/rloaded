@@ -16,14 +16,18 @@ import kotlin.io.path.deleteIfExists
 import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
 import kotlin.io.path.readText
+import kotlin.io.path.writeText
 import kotlin.system.exitProcess
 
 /**
  * Installs the pinned server into a cache directory, starts a game test server in a fresh run
- * directory with the agent and the test mods, and fails unless every game test passed.
+ * directory with the agent, the runtime mod and the test mods, and fails unless every game test
+ * passed. The launch it describes for staging servers leaves the test mods out, like a real server.
+ * The project owner accepted the Minecraft EULA for the run directory, which staging servers copy.
  *
- * Arguments: cache directory, run directory, report file, agent jar, the jars the tests load while
- * the server runs (joined with the path separator), then the mod jars the server starts with.
+ * Arguments: cache directory, run directory, report file, agent jar, runtime mod jar, the jar that
+ * staging must refuse, the jars the tests load while the server runs (joined with the path
+ * separator), then the test mod jars the server starts with.
  */
 @OptIn(kotlin.io.path.ExperimentalPathApi::class)
 public fun main(arguments: Array<String>) {
@@ -32,8 +36,10 @@ public fun main(arguments: Array<String>) {
     val run = paths[1]
     val report = paths[2]
     val agent = paths[AGENT_ARGUMENT]
+    val runtime = Path.of(arguments[RUNTIME_ARGUMENT])
+    val stagingRefused = arguments[RUNTIME_ARGUMENT + 1]
     val hotAddMods = arguments[FIXED_ARGUMENTS - 1]
-    val mods = arguments.drop(FIXED_ARGUMENTS).map { Path.of(it) }
+    val testMods = arguments.drop(FIXED_ARGUMENTS).map { Path.of(it) }
     val platform = (Platforms.current() as? Outcome.Ok)?.value ?: fail("unsupported platform")
     val installed =
         KtorHttp(UrlPolicy.PRODUCTION, HttpSettings()).use { http ->
@@ -44,16 +50,25 @@ public fun main(arguments: Array<String>) {
         }
     if (run.exists()) run.deleteRecursively()
     run.createDirectories()
+    run.resolve("eula.txt").writeText("eula=true\n")
     report.deleteIfExists()
-    val properties =
+    val production = ServerCommand.launch(installed, agent, listOf(runtime), MAX_MEMORY_MIB, ServerConfig().gameProperties())
+    val described = describe(production, run)
+    val testProperties =
         mapOf(
             "fabric-api.gametest" to "true",
             "fabric-api.gametest.report-file" to report.toString(),
             "rloaded.hot-add-mods" to hotAddMods,
-        ) + ServerConfig().gameProperties()
-    val command = ServerCommand.build(installed, agent, mods, MAX_MEMORY_MIB, properties)
+            "rloaded.staging-refused-mod" to stagingRefused,
+        )
+    val gameTestLaunch =
+        described.copy(
+            mods = described.mods + testMods.map { it.toString() },
+            properties =
+                described.properties + testProperties,
+        )
     val exit =
-        ProcessBuilder(command)
+        ProcessBuilder(gameTestLaunch.command())
             .directory(run.toFile())
             .inheritIO()
             .start()
@@ -75,7 +90,8 @@ public fun main(arguments: Array<String>) {
 
 private const val MAX_MEMORY_MIB = 2048
 private const val AGENT_ARGUMENT = 3
-private const val FIXED_ARGUMENTS = 5
+private const val RUNTIME_ARGUMENT = 4
+private const val FIXED_ARGUMENTS = 7
 
 private fun fail(message: String): Nothing {
     println("Game tests could not run: $message")

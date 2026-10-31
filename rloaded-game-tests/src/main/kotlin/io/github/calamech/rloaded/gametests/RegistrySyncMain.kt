@@ -24,8 +24,8 @@ import kotlin.system.exitProcess
  *
  * The project owner accepted the Minecraft EULA for the server directory this check creates.
  *
- * Arguments: client cache, server cache, run directory, agent jar, runtime mod jar, then the server
- * mod jars and the client mod jars, each list joined with the path separator.
+ * Arguments: client cache, server cache, run directory, agent jar, runtime mod jar, then the server's
+ * test mod jars and the client mod jars, each list joined with the path separator.
  */
 @OptIn(kotlin.io.path.ExperimentalPathApi::class)
 public fun main(arguments: Array<String>) {
@@ -47,7 +47,7 @@ public fun main(arguments: Array<String>) {
     trustServer(serverDirectory, launcherData, "server")
     val clientLaunch = ClientLaunch(client, directories, launcherData, agent, paths[RUNTIME_MOD_ARGUMENT], clientMods)
     val serverProperties = checkProperties(serverDirectory, SERVER_ORDER) + ("rloaded.registry-sync.players" to "${CLIENT_ORDERS.size}")
-    val serverProcess = startServer(server, agent, serverMods, serverDirectory, serverProperties)
+    val serverProcess = startServer(server, agent, listOf(paths[RUNTIME_MOD_ARGUMENT]) + serverMods, serverDirectory, serverProperties)
     processes += serverProcess
     waitForPort(port, serverProcess, deadline)
 

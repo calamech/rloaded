@@ -51,12 +51,27 @@ class ServerConfigTest {
     }
 
     @Test
+    fun `reads the staging settings, turned off explicitly, and refuses a timeout out of range`() {
+        assertEquals(
+            Outcome.Ok(ServerConfig(staging = StagingSection(false, 600))),
+            ServerConfig.parse("[staging]\nenabled = false\ntimeoutSeconds = 600\n"),
+        )
+        assertEquals(
+            Outcome.Err("staging.timeoutSeconds must be between 30 and 3600"),
+            ServerConfig.parse("[staging]\ntimeoutSeconds = 10\n"),
+        )
+        assertTrue(ServerConfig.parse("[staging]\nenabled = \"no\"\n") is Outcome.Err)
+    }
+
+    @Test
     fun `passes the settings the game reads as system properties`() {
         assertEquals(
             mapOf(
                 "rloaded.client-timeout-seconds" to "120",
                 "rloaded.reputation.min-version-age-hours" to "72",
                 "rloaded.reputation.min-project-downloads" to "1000",
+                "rloaded.staging.enabled" to "true",
+                "rloaded.staging.timeout-seconds" to "180",
             ),
             ServerConfig().gameProperties(),
         )

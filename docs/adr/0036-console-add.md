@@ -35,3 +35,5 @@ Checked on 2026-10-31 with `AdminAddGameTest` on the game test server: against a
 ## Enforcement
 
 `ModrinthProjectVersionsTest` (recorded answers of 2026-10-31), `ResolverTest`, `AdmissionServiceTest`, `JarClassifierTest`, `LockfileTest`, and `AdminAddGameTest` in the `game-test` CI job.
+
+Amended 2026-10-31: the staging dry-run is described in ADR 0039; the reputation guard and the compatibility database in ADR 0037 and ADR 0038.

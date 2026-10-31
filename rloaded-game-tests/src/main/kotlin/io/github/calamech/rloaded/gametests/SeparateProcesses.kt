@@ -88,26 +88,24 @@ internal fun trustServer(
     if (trusted is Outcome.Err) failCheck("cannot trust the server: ${trusted.error}")
 }
 
-/** Starts the server with the settings of a new server; [properties] may set others. */
+/**
+ * Starts the server with the settings of a new server, [properties] setting others, and describes
+ * its launch in its folder as the bootstrap does.
+ */
 internal fun startServer(
     installed: InstalledServer,
     agent: Path,
     mods: List<Path>,
     directory: Path,
     properties: Map<String, String>,
-): Process =
-    ProcessBuilder(
-        ServerCommand.build(
-            installed,
-            agent,
-            mods,
-            SERVER_MEMORY_MIB,
-            ServerConfig().gameProperties() + properties,
-        ),
-    ).directory(directory.toFile())
+): Process {
+    val launch = ServerCommand.launch(installed, agent, mods, SERVER_MEMORY_MIB, ServerConfig().gameProperties() + properties)
+    return ProcessBuilder(describe(launch, directory).command())
+        .directory(directory.toFile())
         .redirectOutput(ProcessBuilder.Redirect.INHERIT)
         .redirectError(ProcessBuilder.Redirect.INHERIT)
         .start()
+}
 
 internal fun waitForPort(
     port: Int,

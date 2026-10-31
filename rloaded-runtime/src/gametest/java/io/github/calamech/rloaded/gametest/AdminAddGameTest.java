@@ -34,12 +34,17 @@ import net.minecraft.server.MinecraftServer;
 
 /**
  * Runs {@code rloaded add} the way the server console does, against a fake Modrinth on the loopback
- * interface: a plain mod is written to the lockfile with its side, while a mod with biome entries,
- * a version published a moment ago and an optimization mod are refused with the reason, leaving the
- * lockfile as it was.
+ * interface: a plain mod passes a staging server and is written to the lockfile with its side,
+ * while a mod with biome entries, a version published a moment ago, an optimization mod and a mod
+ * that throws as it starts on the staging server are refused with the reason, leaving the lockfile
+ * as it was.
  */
 public final class AdminAddGameTest {
-  private static final int MAX_TICKS = 600;
+  // The game test server ticks without waiting, so the test paces it at 20 ticks a second while
+  // two staging servers start and stop one after the other: 8 minutes at most.
+  private static final int MAX_TICKS = 20 * 60 * 8;
+  private static final long TICK_MILLIS = 50;
+  private static final String STAGING_REFUSED_PROPERTY = "rloaded.staging-refused-mod";
   private static final Instant OLD = Instant.parse("2026-10-01T00:00:00Z");
 
   @GameTest(maxTicks = MAX_TICKS)
@@ -59,13 +64,22 @@ public final class AdminAddGameTest {
         OLD);
     publish(modrinth, url, "admintestfresh", jar("admin-test-fresh", Map.of()), Instant.now());
     publish(modrinth, url, "admintestfast", jar("admin-test-fast", Map.of()), OLD);
+    String throwsOnInit = System.getProperty(STAGING_REFUSED_PROPERTY);
+    helper.assertTrue(
+        throwsOnInit != null, "run with the " + STAGING_REFUSED_PROPERTY + " property");
+    publish(modrinth, url, "throwsoninit", Files.readAllBytes(Path.of(throwsOnInit)), OLD);
     // Every project has enough downloads and no team members.
     modrinth.createContext(
         "/v2/projects",
         exchange -> {
           String asked = exchange.getRequestURI().getQuery();
           String projects =
-              Stream.of("admintest", "admintestworld", "admintestfresh", "admintestfast")
+              Stream.of(
+                      "admintest",
+                      "admintestworld",
+                      "admintestfresh",
+                      "admintestfast",
+                      "throwsoninit")
                   .filter(id -> asked.contains("\"" + id + "\""))
                   .map(
                       id ->
@@ -90,7 +104,7 @@ public final class AdminAddGameTest {
     List<String> messages = new CopyOnWriteArrayList<>();
     CommandSourceStack console = server.createCommandSourceStack().withSource(capturing(messages));
     List<String> projects =
-        List.of("admintest", "admintestworld", "admintestfresh", "admintestfast");
+        List.of("admintest", "admintestworld", "admintestfresh", "admintestfast", "throwsoninit");
     int[] sent = {0};
     helper.succeedWhen(
         () -> {
@@ -104,6 +118,9 @@ public final class AdminAddGameTest {
                 .getCommands()
                 .performPrefixedCommand(console, "rloaded add " + projects.get(sent[0]));
             sent[0]++;
+          }
+          if (answered < projects.size()) {
+            pace();
           }
           helper.assertTrue(answered == projects.size(), "adds still running: " + messages);
           helper.assertTrue(
@@ -127,6 +144,18 @@ public final class AdminAddGameTest {
                           m.startsWith("admintestfast was not added: ")
                               && m.contains("is in the optimization category")),
               "the optimization mod was not refused by the compatibility database: " + messages);
+          helper.assertTrue(
+              messages.stream()
+                  .anyMatch(
+                      m ->
+                          m.startsWith(
+                                  "throwsoninit was not added: it failed on the staging server: ")
+                              && m.contains(
+                                  "loading the mods threw java.lang.IllegalStateException:"
+                                      + " throws-on-init fails as it starts, on purpose")
+                              && m.contains("latest.log")),
+              "the mod that throws as it starts was not refused by the staging server: "
+                  + messages);
           List<LockedMod> mods = mods(lockfile);
           helper.assertValueEqual(
               mods.stream().map(mod -> mod.getEntry().getProjectId()).toList(),
@@ -141,6 +170,15 @@ public final class AdminAddGameTest {
             throw new IllegalStateException(e);
           }
         });
+  }
+
+  private static void pace() {
+    try {
+      Thread.sleep(TICK_MILLIS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("interrupted while waiting for the adds", e);
+    }
   }
 
   private static List<LockedMod> mods(Path lockfile) {

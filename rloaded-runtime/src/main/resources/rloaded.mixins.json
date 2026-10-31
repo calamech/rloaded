@@ -11,6 +11,9 @@
     "PersistentEntitySectionManagerAccess",
     "ServerLevelAccess"
   ],
+  "server": [
+    "DedicatedServerMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
