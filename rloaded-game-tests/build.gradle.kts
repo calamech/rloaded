@@ -72,7 +72,7 @@ dependencies {
         isTransitive = false
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-fails-on-client-once") }
     }
-    for (mod in listOf("content-basic", "mixin-field-init", "keybind-and-tab")) {
+    for (mod in listOf("content-basic", "mixin-field-init", "keybind-and-tab", "late-item")) {
         addServedMods("io.github.calamech.rloaded:rloaded-runtime") {
             isTransitive = false
             capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }

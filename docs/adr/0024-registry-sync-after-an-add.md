@@ -44,3 +44,5 @@ Measured on 2026-10-30 on macOS with JetBrains Runtime 25.0.4.1 build 508.40, th
 ## Enforcement
 
 `:rloaded-game-tests:registrySyncTest`, run by the `client-game-test` CI job. `RegistryIdsTest` checks the comparison, including a run where no client diverged, which proves nothing and fails.
+
+Amended 2026-10-31: a game that loaded mods while in a world now restarts before it joins a server again, since Fabric's restored copy can lack what those mods registered (ADR 0047).

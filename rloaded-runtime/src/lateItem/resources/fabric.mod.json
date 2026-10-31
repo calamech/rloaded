@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "late-item",
+  "version": "${version}",
+  "name": "Late item (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.calamech.rloaded.testmods.lateitem.LateItem"]
+  },
+  "depends": {
+    "minecraft": "26.3"
+  }
+}
