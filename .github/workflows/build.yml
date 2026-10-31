@@ -95,3 +95,5 @@ jobs:
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:joinTest --stacktrace
       - name: In-session add
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:addTest --stacktrace
+      - name: Twenty adds in a row
+        run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:soakTest --stacktrace

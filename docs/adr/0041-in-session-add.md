@@ -41,3 +41,5 @@ Checked on 2026-10-31 with `addTest` (CI job `client-game-test`): a server in it
 Amended 2026-10-31: `addTest` now adds content-basic, then mixin-field-init, whose mixin gives every entity a field set by its constructor. An armor stand is summoned before the adds; after them, all 15 entities of the server have the field (`/fieldinit`), and so do the clients' entities. With the entities not rebuilt, 11 of 15 lacked it and the check failed.
 
 Amended 2026-10-31: `addTest` now adds content-basic, mixin-field-init, then keybind-and-tab to two connected players, with no crash and no error line (ADR 0042).
+
+Amended 2026-10-31: `soakTest` (CI job `client-game-test`) adds 20 generated mods in a row, without code and with staging off, while two players are connected: 20 rollouts, no error line, about a minute in local.

@@ -31,6 +31,7 @@ You need a JDK 17 or newer to start Gradle. Gradle then downloads the JetBrains 
 ./gradlew :rloaded-game-tests:registrySyncTest   # a server and two clients agree on raw ids after an add
 ./gradlew :rloaded-game-tests:joinTest           # a client joins a server and installs its mods
 ./gradlew :rloaded-game-tests:addTest            # mods added from the console reach two connected players
+./gradlew :rloaded-game-tests:soakTest           # twenty adds in a row with two connected players
 ./gradlew :rloaded-launcher:launcher-app:run     # the launcher window
 ./gradlew :rloaded-server-bootstrap:serverJar    # rloaded-server-bootstrap/build/libs/rloaded-server.jar
 ```
