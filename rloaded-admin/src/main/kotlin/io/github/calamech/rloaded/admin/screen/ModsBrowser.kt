@@ -208,6 +208,8 @@ public class ModsBrowser(
 
     private fun known(hit: ModrinthHit) = Known(hit.title, hit.author.ifEmpty { null }, hit.downloads)
 
+    // Under the lock, the views reach the screen in the order the changes happened.
+    @Synchronized
     private fun change(transform: (State) -> State) {
         onChange(render(state.updateAndGet(transform)))
     }
