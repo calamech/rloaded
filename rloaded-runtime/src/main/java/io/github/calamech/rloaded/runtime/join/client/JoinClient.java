@@ -120,6 +120,14 @@ public final class JoinClient {
                 .execute(() -> onManifest(payload, context.client(), context.responseSender())));
   }
 
+  /**
+   * Records that this game loaded mods into the world it has open: like an add on a server, it
+   * restarts before it joins a world or a server again.
+   */
+  public static void loadedInWorld() {
+    addedInSession = true;
+  }
+
   private static void onHello(JoinPayloads.Hello payload, PacketSender sender) {
     Connection setup = connection();
     TrustStore store = setup == null ? null : open(setup.trustStore());

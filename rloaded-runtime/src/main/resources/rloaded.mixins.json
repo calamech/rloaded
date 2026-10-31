@@ -8,6 +8,7 @@
     "ConnectionMixin",
     "HolderReferenceAccess",
     "MappedRegistryAccess",
+    "MinecraftServerMixin",
     "PersistentEntitySectionManagerAccess",
     "PlayerListMixin",
     "ServerConfigurationPacketListenerImplMixin",

@@ -74,10 +74,27 @@ public fun interface LiveApply {
     }
 }
 
-/** Where an admitted add lands: the running server first, then its lockfile. */
+/** The game an add loads mods into, which decides the jars it checks, tries and loads itself. */
+public enum class LiveGame {
+    /** A dedicated server: it runs every mod but those for the client only, which its players load. */
+    DEDICATED_SERVER,
+
+    /** The world a game has open: the game is both the server and its player's client, and loads every mod. */
+    SINGLEPLAYER,
+    ;
+
+    internal fun loads(side: Side): Boolean =
+        when (this) {
+            DEDICATED_SERVER -> side != Side.CLIENT
+            SINGLEPLAYER -> true
+        }
+}
+
+/** Where an admitted add lands: the running [game] first, then its lockfile. */
 public data class AddTarget(
     val lockfile: LockfileLocation,
     val live: LiveApply,
+    val game: LiveGame,
 )
 
 /** A mod an add wrote to the lockfile. */
@@ -190,11 +207,11 @@ public sealed interface AddRefusal {
 }
 
 /**
- * Adds a mod from Modrinth to the server's lockfile, with what it needs: resolves it, refuses
- * versions Modrinth's records rule out (reputation, compatibility database), downloads the files
- * into [store], refuses any jar the rules or the server refuse, tries the jars the server would
- * load on a staging server, loads them into the running server, then writes every entry to the
- * lockfile in one step. The only writer of the lockfile; one add runs at a time.
+ * Adds a mod from Modrinth to the lockfile of a server or a singleplayer world, with what it needs:
+ * resolves it, refuses versions Modrinth's records rule out (reputation, compatibility database),
+ * downloads the files into [store], refuses any jar the rules or the game refuse, tries the jars the
+ * game would load on a staging server, loads them into the running game, then writes every entry
+ * to the lockfile in one step. The only writer of the lockfile; one add runs at a time.
  */
 public class AdmissionService(
     private val resolver: Resolver,
@@ -285,7 +302,7 @@ public class AdmissionService(
                         }
                     }
             }.flatMap { admitted ->
-                val refusal = jarRules.serverCheck.refusal(serverJars(admitted))
+                val refusal = jarRules.serverCheck.refusal(loadedJars(admitted, target.game))
                 if (refusal == null) Outcome.Ok(admitted) else Outcome.Err(AddRefusal.ServerRefused(refusal))
             }
 
@@ -294,12 +311,12 @@ public class AdmissionService(
         current: Lockfile,
         admitted: List<Admitted>,
     ): Outcome<List<Admitted>, AddRefusal> {
-        val jars = serverJars(admitted)
+        val jars = loadedJars(admitted, target.game)
         if (jars.isEmpty()) return Outcome.Ok(admitted)
         val installed =
             current.mods
                 .map { it.entry }
-                .filter { it.side != Side.CLIENT }
+                .filter { target.game.loads(it.side) }
                 .map { store.pathOf(it.sha512, JAR) }
         return jarRules.staging
             .tryOut(installed, jars)
@@ -309,7 +326,7 @@ public class AdmissionService(
 
     private suspend fun apply(admitted: List<Admitted>): Outcome<List<AddedMod>, AddRefusal> =
         target.live
-            .apply(serverJars(admitted))
+            .apply(loadedJars(admitted, target.game))
             .await()
             .mapError<Unit, String, AddRefusal> { AddRefusal.NotApplied(it) }
             .map { admitted.map { it.mod } }
@@ -347,5 +364,8 @@ private class Admitted(
     val mod: AddedMod,
 )
 
-// The server checks, tries and loads what it runs itself; mods for the client only are the players' to load.
-private fun serverJars(admitted: List<Admitted>): List<Path> = admitted.filter { it.mod.entry.side != Side.CLIENT }.map { it.jar }
+// The game checks, tries and loads what it runs itself; on a dedicated server, mods for the client only are the players' to load.
+private fun loadedJars(
+    admitted: List<Admitted>,
+    game: LiveGame,
+): List<Path> = admitted.filter { game.loads(it.mod.entry.side) }.map { it.jar }

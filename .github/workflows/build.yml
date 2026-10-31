@@ -101,3 +101,5 @@ jobs:
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:soakTest --stacktrace
       - name: Restart and rejoin after a failed install
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:recoveryTest --stacktrace
+      - name: Add from the launcher to an open singleplayer world
+        run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:singleplayerTest --stacktrace
