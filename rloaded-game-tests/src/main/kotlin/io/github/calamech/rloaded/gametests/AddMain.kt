@@ -2,11 +2,16 @@ package io.github.calamech.rloaded.gametests
 
 import io.github.calamech.rloaded.launcher.ClientDirectories
 import java.io.BufferedWriter
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.ServerSocket
 import java.nio.file.Path
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.appendText
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
@@ -44,7 +49,7 @@ public fun main(arguments: Array<String>) {
     val passed =
         runAddCheck(
             arguments,
-            AddPlan(mods, emptyMap(), ::steps, listOf("fieldinit")) { serverLog ->
+            AddPlan(mods, emptyMap(), ::steps, listOf("fieldinit"), askedAtJoin = true) { serverLog ->
                 val fieldInit = serverLog.lines().lastOrNull { "field-init:" in it }.orEmpty()
                 println("Add check: ${fieldInit.substringAfter("field-init: ")}")
                 FIELD_INIT_PASSED.containsMatchIn(fieldInit)
@@ -56,13 +61,16 @@ public fun main(arguments: Array<String>) {
 /**
  * What an add check does: the [mods] the fake Modrinth serves, the [serverProperties] the server
  * starts with, the [steps] both players must reach with the console commands that lead there, the
- * commands typed once all passed ([finally]), and what the server's log must show ([serverChecks]).
+ * commands typed once all passed ([finally]), whether the server has a code of conduct and a
+ * resource pack that players answer when they join ([askedAtJoin]), and what the server's log must
+ * show ([serverChecks]).
  */
 internal class AddPlan(
     val mods: List<FakeMod>,
     val serverProperties: Map<String, String>,
     val steps: (List<AddPlayer>) -> List<Pair<String, List<String>>>,
     val finally: List<String>,
+    val askedAtJoin: Boolean = false,
     val serverChecks: (String) -> Boolean,
 )
 
@@ -91,10 +99,12 @@ internal fun runAddCheck(
     val deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(CHECK_TIMEOUT_MINUTES)
 
     // The check ends the process, which stops the fake Modrinth with it.
-    val modrinth = FakeModrinth(plan.mods)
+    val pack = resourcePack()
+    val modrinth = FakeModrinth(plan.mods, mapOf(PACK to pack))
     val port = ServerSocket(0).use { it.localPort }
     val serverDirectory = run.resolve("server")
     prepareServer(serverDirectory, port)
+    if (plan.askedAtJoin) askAtJoin(serverDirectory, "${modrinth.url}/files/$PACK", pack)
     val done = run.resolve("done")
     val players = listOf("Alice", "Bob").map { name -> AddPlayer(name, run.resolve(name.lowercase())) }
     players.forEach { trustServer(serverDirectory, it.launcherData, "server") }
@@ -120,8 +130,14 @@ internal fun runAddCheck(
     done.writeText("done\n")
     waitForClients(clients, serverProcess, deadline) { true }
     stopServer(serverProcess)
+    return passed(plan, players, serverDirectory.resolve("logs").resolve("latest.log").readText())
+}
 
-    val serverLog = serverDirectory.resolve("logs").resolve("latest.log").readText()
+private fun passed(
+    plan: AddPlan,
+    players: List<AddPlayer>,
+    serverLog: String,
+): Boolean {
     val rollouts = serverLog.lines().count { "Every player has the new mods" in it }
     val errors = errorsFromFirstAdd(serverLog, players)
     // An add is no reason to tell the chat that players left and joined: each did once, for real.
@@ -131,7 +147,45 @@ internal fun runAddCheck(
         }
     println("Add check: $rollouts rollouts; ${errors.size} error lines; joins and leaves announced: $announced")
     errors.forEach { println("  $it") }
-    return rollouts == plan.mods.size && errors.isEmpty() && announced.values.all { it == listOf(1, 1) } && plan.serverChecks(serverLog)
+    // Answered once each, at join; a step fails as soon as a player is asked again.
+    val answered =
+        players.all { player ->
+            player.report
+                .readText()
+                .lines()
+                .first() == IN_WORLD + (if (plan.askedAtJoin) ANSWERED else "")
+        }
+    println("Add check: players answered what the server asks at join, and only then: $answered")
+    return rollouts == plan.mods.size && errors.isEmpty() && announced.values.all { it == listOf(1, 1) } && answered &&
+        plan.serverChecks(serverLog)
+}
+
+// A code of conduct and an optional resource pack, which a player answers when it joins.
+private fun askAtJoin(
+    serverDirectory: Path,
+    packUrl: String,
+    pack: ByteArray,
+) {
+    serverDirectory
+        .resolve("codeofconduct")
+        .createDirectories()
+        .resolve("en_us.txt")
+        .writeText("Be kind to the other players.\n")
+    val sha1 = MessageDigest.getInstance("SHA-1").digest(pack).toHexString()
+    serverDirectory
+        .resolve("server.properties")
+        .appendText("enable-code-of-conduct=true\nresource-pack=$packUrl\nresource-pack-sha1=$sha1\nrequire-resource-pack=false\n")
+}
+
+// A resource pack for the game's format, with nothing in it.
+private fun resourcePack(): ByteArray {
+    val bytes = ByteArrayOutputStream()
+    ZipOutputStream(bytes).use { zip ->
+        zip.putNextEntry(ZipEntry("pack.mcmeta"))
+        zip.write("""{"pack": {"description": "Add check", "min_format": 97, "max_format": 97}}""".toByteArray())
+        zip.closeEntry()
+    }
+    return bytes.toByteArray()
 }
 
 private fun type(
@@ -225,6 +279,8 @@ internal class AddPlayer(
 // The players and the armor stand at least, every one with the field.
 private val FIELD_INIT_PASSED = Regex("""field-init: ([3-9]|\d{2,}) entities, 0 without the field""")
 private const val IN_WORLD = "in the world"
+private const val ANSWERED = "; answered the code of conduct and the resource pack"
+private const val PACK = "add-check-pack.zip"
 private const val MODRINTH_PROPERTY = "rloaded.test.modrinth"
 private const val ERROR = "/ERROR]"
 private const val POLL_MILLIS = 500L

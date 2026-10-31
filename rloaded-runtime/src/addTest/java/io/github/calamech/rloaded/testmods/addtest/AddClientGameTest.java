@@ -8,14 +8,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.multiplayer.CodeOfConductScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -44,6 +49,8 @@ public final class AddClientGameTest implements FabricClientGameTest {
   private static final Identifier KEYBIND_AND_TAB =
       Identifier.fromNamespaceAndPath("keybind-and-tab", "tab");
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded add test");
+  private static final String CODE_OF_CONDUCT = "the code of conduct";
+  private static final String RESOURCE_PACK = "the resource pack";
 
   /** The log line after which the add check counts errors: what came before is not about adds. */
   private static final String IN_WORLD_MARK = "In the world, before any add";
@@ -63,10 +70,10 @@ public final class AddClientGameTest implements FabricClientGameTest {
                 new ServerData("Add test", address, ServerData.Type.OTHER),
                 false,
                 null));
-    context.waitFor(client -> client.level != null && client.player != null, STEP_TICKS);
+    String answered = answerAtJoin(context);
     Object connection = context.computeOnClient(client -> client.getConnection().getConnection());
     LOGGER.info(IN_WORLD_MARK);
-    append(report, "in the world");
+    append(report, answered.isEmpty() ? "in the world" : "in the world; answered " + answered);
 
     for (String step : required("rloaded.add-test.steps").split(",", -1)) {
       String details = step(context, step);
@@ -120,8 +127,39 @@ public final class AddClientGameTest implements FabricClientGameTest {
     };
   }
 
+  // Accepts the server's code of conduct and resource pack if it has them, and says which it did.
+  private static String answerAtJoin(ClientGameTestContext context) {
+    List<String> answered = new ArrayList<>();
+    while (true) {
+      context.waitFor(
+          client ->
+              (client.level != null && client.player != null && client.gui.screen() == null)
+                  || question(client) != null,
+          STEP_TICKS);
+      String question = context.computeOnClient(AddClientGameTest::question);
+      if (question == null) {
+        return String.join(" and ", answered);
+      }
+      context.clickScreenButton(question.equals(CODE_OF_CONDUCT) ? "gui.acknowledge" : "gui.yes");
+      answered.add(question);
+    }
+  }
+
+  // An add must not ask again what the player answered when it joined.
   private static boolean inWorld(Minecraft client) {
+    String question = question(client);
+    if (question != null) {
+      throw new AssertionError("the player was asked about " + question + " again");
+    }
     return client.level != null && client.player != null && client.gui.screen() == null;
+  }
+
+  private static String question(Minecraft client) {
+    Screen screen = client.gui.screen();
+    if (screen instanceof CodeOfConductScreen) {
+      return CODE_OF_CONDUCT;
+    }
+    return screen instanceof ConfirmScreen ? RESOURCE_PACK : null;
   }
 
   // In the options' list, which the controls screen shows and options.txt saves.

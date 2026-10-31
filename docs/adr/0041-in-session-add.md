@@ -49,3 +49,5 @@ Amended 2026-10-31: a player whose game fails to install the mods of an add is n
 Amended 2026-10-31: an add no longer announces players leaving and joining (ADR 0044).
 
 Amended 2026-10-31: the restart after a failure past the point of no return is now checked by `restartTest` (CI job `game-test`): fails-in-running-server, which fails as it starts only in the running server's folder, passes the staging server; the running server then stops with exit code 75, its lockfile does not list the mod, and started again it runs without it. With the restart left out, the server kept running and the check failed.
+
+Amended 2026-10-31: an add no longer offers the code of conduct and the server resource pack again (ADR 0045).

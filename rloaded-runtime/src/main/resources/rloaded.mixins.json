@@ -10,6 +10,7 @@
     "MappedRegistryAccess",
     "PersistentEntitySectionManagerAccess",
     "PlayerListMixin",
+    "ServerConfigurationPacketListenerImplMixin",
     "ServerGamePacketListenerImplMixin",
     "ServerLevelAccess",
     "UnconfiguredOutboundMixin"
