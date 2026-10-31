@@ -23,6 +23,7 @@ import io.github.calamech.rloaded.runtime.AgentBridge;
 import io.github.calamech.rloaded.runtime.ModrinthAccess;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
+import io.github.calamech.rloaded.runtime.engine.LateKeyMappings;
 import io.github.calamech.rloaded.runtime.join.JoinPayloads;
 import java.nio.file.Path;
 import java.util.List;
@@ -238,6 +239,7 @@ public final class JoinClient {
     List<InstalledMod> mods = (List<InstalledMod>) ((Outcome.Ok<?>) outcome).getValue();
     shown.stage(InstallStage.LOAD);
     progress(sender, InstallStage.LOAD, 0);
+    LateKeyMappings.open();
     try {
       HotAdd.load(
           mods.stream().map(InstalledMod::getJar).toList(),
@@ -251,6 +253,8 @@ public final class JoinClient {
               .orElse(null);
       fail(sender, failing, refusal.getMessage());
       return;
+    } finally {
+      LateKeyMappings.close(client);
     }
     mods.forEach(mod -> LOADED.put(mod.getEntry().getProjectId(), mod.getEntry().getVersionId()));
     shown.stage(InstallStage.RELOAD);

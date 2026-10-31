@@ -11,6 +11,9 @@
     "PersistentEntitySectionManagerAccess",
     "ServerLevelAccess"
   ],
+  "client": [
+    "KeyMappingRegistryMixin"
+  ],
   "server": [
     "DedicatedServerMixin"
   ],

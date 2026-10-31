@@ -4,9 +4,13 @@ import io.github.calamech.rloaded.runtime.mixin.HolderReferenceAccess;
 import io.github.calamech.rloaded.runtime.mixin.MappedRegistryAccess;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.component.DataComponentLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceKey;
 
 /**
  * Opens a frozen registry for new entries and freezes it again.
@@ -17,11 +21,28 @@ import net.minecraft.core.component.DataComponentLookup;
  * new entry until tags reload. Entries are only appended; existing raw ids never change.
  */
 public final class RegistryThaw {
+  // Registries whose values create their holder in their constructor, such as blocks. The game
+  // forgets which ones once they freeze, so they are noted before.
+  private static final Set<ResourceKey<? extends Registry<?>>> INTRUSIVE =
+      ConcurrentHashMap.newKeySet();
+
   private RegistryThaw() {}
 
   /**
+   * Notes which built-in registries create holders in their values' constructors. Must run before
+   * the registries freeze; the runtime mod calls it as it starts.
+   */
+  public static void rememberIntrusiveRegistries() {
+    for (Registry<?> registry : BuiltInRegistries.REGISTRY) {
+      if (access(registry).rloaded$unregisteredIntrusiveHolders() != null) {
+        INTRUSIVE.add(registry.key());
+      }
+    }
+  }
+
+  /**
    * Lets {@code registry} accept new entries, including entries such as blocks that create their
-   * holder in their constructor.
+   * holder in their constructor, in the registries noted by {@link #rememberIntrusiveRegistries}.
    *
    * @throws IllegalStateException if the registry is not frozen
    */
@@ -30,7 +51,9 @@ public final class RegistryThaw {
     if (!access.rloaded$frozen()) {
       throw new IllegalStateException("registry " + registry.key().identifier() + " is not frozen");
     }
-    access.rloaded$setUnregisteredIntrusiveHolders(new IdentityHashMap<>());
+    if (INTRUSIVE.contains(registry.key())) {
+      access.rloaded$setUnregisteredIntrusiveHolders(new IdentityHashMap<>());
+    }
     access.rloaded$setFrozen(false);
   }
 

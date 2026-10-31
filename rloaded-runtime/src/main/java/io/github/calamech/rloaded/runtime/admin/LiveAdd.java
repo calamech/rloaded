@@ -90,7 +90,9 @@ final class LiveAdd implements LiveApply {
     } catch (HotAddRefusal e) {
       thaw();
       return Optional.of(e.getMessage());
-    } catch (RuntimeException e) {
+    } catch (RuntimeException | AssertionError e) {
+      // The game checks its registries with assertions: a mod that breaks them fails like one
+      // that throws.
       restart("loading the mods failed", e);
       return Optional.of("loading them threw " + e + "; the server restarts without them");
     }

@@ -123,7 +123,9 @@ public final class StagingDryRun {
     } catch (HotAddRefusal refusal) {
       fail("the mods were refused: " + refusal.getMessage());
       finish(server);
-    } catch (RuntimeException e) {
+    } catch (RuntimeException | AssertionError e) {
+      // The game checks its registries with assertions: a mod that breaks them fails like one
+      // that throws.
       LOGGER.error("Loading the mods failed", e);
       fail("loading the mods threw " + e);
       finish(server);

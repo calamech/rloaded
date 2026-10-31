@@ -16,7 +16,7 @@ import kotlin.system.exitProcess
 /**
  * Adds mods while players are connected, end to end: a server in its own process, two clients that
  * already trust it and stay in the world, and `rloaded add` typed into the server console for
- * content-basic, then mixin-field-init, served by a fake Modrinth. Before the adds the console
+ * content-basic, mixin-field-init, then keybind-and-tab, served by a fake Modrinth. Before the adds the console
  * summons an armor stand; between them it gives each player content-basic's block. Fails unless both
  * players got each mod without leaving their connection, the server says every player got them each
  * time, every entity of the server has mixin-field-init's field, and no log line is an error from
@@ -24,8 +24,8 @@ import kotlin.system.exitProcess
  * check creates.
  *
  * Arguments: client cache, server cache, run directory, agent jar, runtime mod jar, then the client
- * mod jars and the jars to serve as content-basic and mixin-field-init, each list joined with the
- * path separator.
+ * mod jars and the jars to serve as content-basic, mixin-field-init and keybind-and-tab, each list
+ * joined with the path separator.
  */
 @OptIn(ExperimentalPathApi::class)
 public fun main(arguments: Array<String>) {
@@ -45,6 +45,12 @@ public fun main(arguments: Array<String>) {
         listOf(
             FakeMod("cbProject", "cbVersion", "Content basic", served.single { "contentBasic" in it.fileName.toString() }),
             FakeMod("mfiProject", "mfiVersion", "Mixin field initializer", served.single { "mixinFieldInit" in it.fileName.toString() }),
+            FakeMod(
+                "kbtProject",
+                "kbtVersion",
+                "Key mapping and creative tab",
+                served.single { "keybindAndTab" in it.fileName.toString() },
+            ),
         )
     // The check ends the process, which stops the fake Modrinth with it.
     val modrinth = FakeModrinth(mods)
@@ -95,6 +101,7 @@ private fun steps(players: List<AddPlayer>): List<Pair<String, List<String>>> =
         // The server makes the new item for players: it needs the item's components.
         "content-basic item received" to players.map { "give ${it.name} content-basic:basic_block" },
         "mixin-field-init added" to listOf("rloaded add mfiProject"),
+        "keybind-and-tab added" to listOf("rloaded add kbtProject"),
     )
 
 // Errors before the first add come from starting the games offline, not from adds.
