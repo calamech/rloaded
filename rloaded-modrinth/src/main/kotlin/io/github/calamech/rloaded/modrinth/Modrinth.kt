@@ -102,6 +102,40 @@ public class Modrinth(
             }
     }
 
+    /**
+     * Searches Modrinth's Fabric mods for [gameVersion] matching [query], most relevant first, and
+     * returns at most [limit] of them. A query is 1 to [MAX_QUERY] characters; [limit] is 1 to
+     * [MAX_HITS].
+     */
+    public suspend fun search(
+        query: String,
+        gameVersion: String,
+        limit: Int,
+    ): Outcome<List<ModrinthHit>, ModrinthError> {
+        require(limit in 1..MAX_HITS) { "limit must be 1 to $MAX_HITS" }
+        val refused =
+            when {
+                query.isBlank() || query.length > MAX_QUERY -> ModrinthError.InvalidQuery(query)
+                !SLUG.matches(gameVersion) -> ModrinthError.InvalidId(gameVersion)
+                else -> null
+            }
+        if (refused != null) return Outcome.Err(refused)
+        val facets = """[["categories:$FABRIC"],["versions:$gameVersion"],["project_type:mod"]]"""
+        val url = "${settings.apiUrl}/search?query=${encode(query.trim())}&limit=$limit&facets=${encode(facets)}"
+        return http
+            .text(url, settings.maxResponseBytes)
+            .mapError { classify(url, it) }
+            .flatMap { decode(it, SearchJson.serializer()) }
+            .flatMap { found ->
+                val invalid = found.hits.firstOrNull { !ID.matches(it.projectId) }
+                when {
+                    invalid != null -> Outcome.Err(ModrinthError.Malformed("a search hit has the project id ${invalid.projectId}"))
+                    found.hits.size > limit -> Outcome.Err(ModrinthError.Malformed("${found.hits.size} search hits for $limit asked"))
+                    else -> Outcome.Ok(found.hits.map { ModrinthHit(it.projectId, it.slug, it.title, it.author, it.downloads) })
+                }
+            }
+    }
+
     /** [projects] for Java callers: runs on the IO dispatcher and completes with the outcome. */
     public fun projectsAsync(ids: Collection<String>): CompletableFuture<Outcome<Map<String, ModrinthProject>, ModrinthError>> =
         CoroutineScope(Dispatchers.IO).future { projects(ids) }
@@ -168,22 +202,29 @@ public class Modrinth(
         return http.text(url, settings.maxResponseBytes).mapError { classify(url, it) }
     }
 
-    private companion object {
-        val ID = Regex("[A-Za-z0-9]{1,16}")
+    /** Bounds of a search. */
+    public companion object {
+        /** The longest query a search sends. */
+        public const val MAX_QUERY: Int = 100
+
+        /** The most hits a search asks for, Modrinth's own limit. */
+        public const val MAX_HITS: Int = 100
+
+        private val ID = Regex("[A-Za-z0-9]{1,16}")
 
         // Project slugs and game versions, kept to characters that need no care in a URL path.
-        val SLUG = Regex("[A-Za-z0-9_.+-]{1,64}")
-        const val FABRIC = "fabric"
-        const val NOT_FOUND = 404
+        private val SLUG = Regex("[A-Za-z0-9_.+-]{1,64}")
+        private const val FABRIC = "fabric"
+        private const val NOT_FOUND = 404
 
-        fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
+        private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
-        val JSON = Json { ignoreUnknownKeys = true }
-        val VERSIONS = Endpoint("versions", "version", ListSerializer(VersionJson.serializer())) { it.id }
-        val PROJECTS = Endpoint("projects", "project", ListSerializer(ProjectJson.serializer())) { it.id }
-        const val TOO_MANY_REQUESTS = 429
+        private val JSON = Json { ignoreUnknownKeys = true }
+        private val VERSIONS = Endpoint("versions", "version", ListSerializer(VersionJson.serializer())) { it.id }
+        private val PROJECTS = Endpoint("projects", "project", ListSerializer(ProjectJson.serializer())) { it.id }
+        private const val TOO_MANY_REQUESTS = 429
 
-        fun classify(
+        private fun classify(
             url: String,
             error: DownloadError,
         ): ModrinthError =
@@ -193,7 +234,7 @@ public class Modrinth(
                 ModrinthError.Download(error)
             }
 
-        fun <T> decode(
+        private fun <T> decode(
             text: String,
             serializer: KSerializer<T>,
         ): Outcome<T, ModrinthError> =
@@ -206,7 +247,7 @@ public class Modrinth(
             }
 
         // The bulk endpoints leave unknown ids out of their answer instead of refusing them.
-        fun <T> complete(
+        private fun <T> complete(
             ids: Collection<String>,
             found: Map<String, T>,
             unknown: (List<String>) -> ModrinthError,

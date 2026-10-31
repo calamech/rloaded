@@ -126,3 +126,17 @@ internal data class MemberJson(
 internal data class UserJson(
     val username: String,
 )
+
+@Serializable
+internal data class SearchJson(
+    val hits: List<HitJson>,
+)
+
+@Serializable
+internal data class HitJson(
+    @SerialName("project_id") val projectId: String,
+    val slug: String,
+    val title: String,
+    val author: String,
+    val downloads: Long,
+)

@@ -9,6 +9,11 @@ public sealed interface ModrinthError {
         val id: String,
     ) : ModrinthError
 
+    /** A search query is empty or too long; nothing was requested. */
+    public data class InvalidQuery(
+        val query: String,
+    ) : ModrinthError
+
     /** Modrinth refused the request because this address sent too many; it allows 300 a minute. */
     public data class RateLimited(
         val url: String,
