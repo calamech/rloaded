@@ -14,6 +14,8 @@ val joinClientMods = configurations.dependencyScope("joinClientMods")
 val joinClientModJars = configurations.resolvable("joinClientModJars") { extendsFrom(joinClientMods.get()) }
 val stagingRefusedMods = configurations.dependencyScope("stagingRefusedMods")
 val stagingRefusedModJars = configurations.resolvable("stagingRefusedModJars") { extendsFrom(stagingRefusedMods.get()) }
+val addServedMods = configurations.dependencyScope("addServedMods")
+val addServedModJars = configurations.resolvable("addServedModJars") { extendsFrom(addServedMods.get()) }
 val addClientMods = configurations.dependencyScope("addClientMods")
 val addClientModJars = configurations.resolvable("addClientModJars") { extendsFrom(addClientMods.get()) }
 val clientTestMods = configurations.dependencyScope("clientTestMods")
@@ -58,6 +60,12 @@ dependencies {
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-add-test") }
     }
     addClientMods(libs.fabric.client.gametest.api) { isTransitive = false }
+    for (mod in listOf("content-basic", "mixin-field-init")) {
+        addServedMods("io.github.calamech.rloaded:rloaded-runtime") {
+            isTransitive = false
+            capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }
+        }
+    }
 }
 
 // The entry point downloads and starts a real game test server; its logic is checked by running it.
@@ -258,7 +266,7 @@ tasks.register<JavaExec>("addTest") {
     val run = layout.buildDirectory.dir("add-test/run")
     val agentFile = files(agentJar)
     val runtimeFile = files(runtimeModJar)
-    val servedFiles = files(hotAddModJars)
+    val servedFiles = files(addServedModJars)
     val clientModFiles = files(addClientModJars)
     inputs.files(agentFile).withPropertyName("agent")
     inputs.files(runtimeFile).withPropertyName("runtimeMod")

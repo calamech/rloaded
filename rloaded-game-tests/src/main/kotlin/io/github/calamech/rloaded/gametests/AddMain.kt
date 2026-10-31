@@ -16,14 +16,15 @@ import kotlin.system.exitProcess
 /**
  * Adds mods while players are connected, end to end: a server in its own process, two clients that
  * already trust it and stay in the world, and `rloaded add` typed into the server console for
- * content-basic, then mixin-loaded-class, served by a fake Modrinth; in between, the console gives
- * each player content-basic's block. Fails unless both players got
- * each mod without leaving their connection, the server says every player got them each time, and
- * no log line is an error from the first add on. The project owner accepted the Minecraft EULA for the server directory
- * this check creates.
+ * content-basic, then mixin-field-init, served by a fake Modrinth. Before the adds the console
+ * summons an armor stand; between them it gives each player content-basic's block. Fails unless both
+ * players got each mod without leaving their connection, the server says every player got them each
+ * time, every entity of the server has mixin-field-init's field, and no log line is an error from
+ * the first add on. The project owner accepted the Minecraft EULA for the server directory this
+ * check creates.
  *
  * Arguments: client cache, server cache, run directory, agent jar, runtime mod jar, then the client
- * mod jars and the jars to serve as content-basic and mixin-loaded-class, each list joined with the
+ * mod jars and the jars to serve as content-basic and mixin-field-init, each list joined with the
  * path separator.
  */
 @OptIn(ExperimentalPathApi::class)
@@ -43,7 +44,7 @@ public fun main(arguments: Array<String>) {
     val mods =
         listOf(
             FakeMod("cbProject", "cbVersion", "Content basic", served.single { "contentBasic" in it.fileName.toString() }),
-            FakeMod("mlcProject", "mlcVersion", "Mixin on a loaded class", served.single { "mixinLoadedClass" in it.fileName.toString() }),
+            FakeMod("mfiProject", "mfiVersion", "Mixin field initializer", served.single { "mixinFieldInit" in it.fileName.toString() }),
         )
     // The check ends the process, which stops the fake Modrinth with it.
     val modrinth = FakeModrinth(mods)
@@ -65,30 +66,36 @@ public fun main(arguments: Array<String>) {
             player.name to startClient(launch, player.directory.resolve("game"), player.name, null, properties)
         }
     processes += clients.values
-    val steps =
-        listOf(
-            "in the world" to emptyList(),
-            "content-basic added" to listOf("rloaded add cbProject"),
-            // The server makes the new item for players: it needs the item's components.
-            "content-basic item received" to players.map { "give ${it.name} content-basic:basic_block" },
-            "mixin-loaded-class added" to listOf("rloaded add mlcProject"),
-        )
-    for ((step, commands) in steps) {
+    for ((step, commands) in steps(players)) {
         commands.forEach { console.write("$it\n") }
         console.flush()
         waitForStep(players, step, clients, serverProcess, deadline)
     }
+    console.write("fieldinit\n")
+    console.flush()
     done.writeText("done\n")
     waitForClients(clients, serverProcess, deadline) { true }
     stopServer(serverProcess)
 
     val serverLog = serverDirectory.resolve("logs").resolve("latest.log").readText()
     val rollouts = serverLog.lines().count { "Every player has the new mods" in it }
+    val fieldInit = serverLog.lines().lastOrNull { "field-init:" in it }.orEmpty()
     val errors = errorsFromFirstAdd(serverLog, players)
-    println("Add check: $rollouts rollouts; ${errors.size} error lines")
+    println("Add check: $rollouts rollouts; ${errors.size} error lines; ${fieldInit.substringAfter("field-init: ")}")
     errors.forEach { println("  $it") }
-    exitProcess(if (rollouts == mods.size && errors.isEmpty()) 0 else 1)
+    exitProcess(if (rollouts == mods.size && errors.isEmpty() && FIELD_INIT_PASSED.containsMatchIn(fieldInit)) 0 else 1)
 }
+
+// What each player reaches, and the console commands that lead there.
+private fun steps(players: List<AddPlayer>): List<Pair<String, List<String>>> =
+    listOf(
+        "in the world" to emptyList(),
+        // An entity from before the adds, which the server must rebuild for mixin-field-init.
+        "content-basic added" to listOf("summon minecraft:armor_stand 0 -60 0", "rloaded add cbProject"),
+        // The server makes the new item for players: it needs the item's components.
+        "content-basic item received" to players.map { "give ${it.name} content-basic:basic_block" },
+        "mixin-field-init added" to listOf("rloaded add mfiProject"),
+    )
 
 // Errors before the first add come from starting the games offline, not from adds.
 private fun errorsFromFirstAdd(
@@ -156,6 +163,8 @@ private class AddPlayer(
         )
 }
 
+// The players and the armor stand at least, every one with the field.
+private val FIELD_INIT_PASSED = Regex("""field-init: ([3-9]|\d{2,}) entities, 0 without the field""")
 private const val MODRINTH_PROPERTY = "rloaded.test.modrinth"
 private const val ERROR = "/ERROR]"
 private const val POLL_MILLIS = 500L

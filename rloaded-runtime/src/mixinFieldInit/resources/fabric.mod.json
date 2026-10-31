@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "mixin-field-init",
+  "version": "${version}",
+  "name": "Mixin field initializer (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "mixins": ["mixin-field-init.mixins.json"],
+  "entrypoints": {
+    "main": ["io.github.calamech.rloaded.testmods.mixinfieldinit.MixinFieldInit"]
+  },
+  "depends": {
+    "minecraft": "26.3",
+    "fabric-api": "*"
+  }
+}
