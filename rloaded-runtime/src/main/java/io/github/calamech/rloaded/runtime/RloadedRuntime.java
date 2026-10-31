@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.runtime;
 
 import io.github.calamech.rloaded.runtime.admin.AdminCommands;
+import io.github.calamech.rloaded.runtime.engine.DataReload;
 import io.github.calamech.rloaded.runtime.join.JoinPayloads;
 import io.github.calamech.rloaded.runtime.join.JoinServer;
 import io.github.calamech.rloaded.runtime.staging.StagingDryRun;
@@ -18,6 +19,7 @@ public final class RloadedRuntime implements ModInitializer {
   public void onInitialize() {
     JoinPayloads.register();
     if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
+      DataReload.register();
       JoinServer.register();
       AdminCommands.register();
       StagingDryRun.registerIfActive();

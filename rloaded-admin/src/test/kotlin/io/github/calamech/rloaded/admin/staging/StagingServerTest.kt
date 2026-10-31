@@ -59,6 +59,15 @@ class StagingServerTest {
     }
 
     @Test
+    fun `starts with the mods the server started with and those installed since, each once`() {
+        val installed = listOf(root.resolve("mods/./fabric-api.jar"), root.resolve("mods/added-since.jar"))
+
+        val report = ok(staging("mods").run(candidates, installed))
+
+        assertEquals(listOf("fabric-api.jar", "added-since.jar"), report.mods)
+    }
+
+    @Test
     fun `refuses the mods the staging server reports failures for, naming the log`() {
         val failure = err(staging("fail").run(candidates))
 

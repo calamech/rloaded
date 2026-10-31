@@ -18,13 +18,19 @@ import kotlin.io.path.exists
 
 /** Tries mod jars before an add accepts them. */
 public fun interface Staging {
-    /** Runs [jars] with the server's mods somewhere nobody plays, and says why they failed, if they did. */
-    public suspend fun tryOut(jars: List<Path>): Outcome<Unit, StagingFailure>
+    /**
+     * Runs [jars] somewhere nobody plays, with the server's mods: those it started with and the
+     * [installed] ones its lockfile lists now. Says why they failed, if they did.
+     */
+    public suspend fun tryOut(
+        installed: List<Path>,
+        jars: List<Path>,
+    ): Outcome<Unit, StagingFailure>
 
     /** Staging for a server whose admin turned it off. */
     public companion object {
         /** Tries nothing: every jar passes. */
-        public val OFF: Staging = Staging { Outcome.Ok(Unit) }
+        public val OFF: Staging = Staging { _, _ -> Outcome.Ok(Unit) }
     }
 }
 
@@ -88,11 +94,19 @@ public class StagingServer(
     /** The game log of the last run. */
     public val log: Path get() = directory.resolve("logs").resolve("latest.log")
 
-    override suspend fun tryOut(jars: List<Path>): Outcome<Unit, StagingFailure> = runInterruptible(Dispatchers.IO) { run(jars) }.map { }
+    override suspend fun tryOut(
+        installed: List<Path>,
+        jars: List<Path>,
+    ): Outcome<Unit, StagingFailure> = runInterruptible(Dispatchers.IO) { run(jars, installed) }.map { }
 
-    /** Runs [jars] on a staging server and returns its report when they passed. Blocks until the run ends. */
-    public fun run(jars: List<Path>): Outcome<StagingReport, StagingFailure> =
-        prepare().flatMap { start(jars) }.flatMap { process -> judge(process) }
+    /**
+     * Runs [jars] on a staging server started with the launch's mods and [installed], and returns
+     * its report when they passed. Blocks until the run ends.
+     */
+    public fun run(
+        jars: List<Path>,
+        installed: List<Path> = emptyList(),
+    ): Outcome<StagingReport, StagingFailure> = prepare().flatMap { start(jars, installed) }.flatMap { process -> judge(process) }
 
     @OptIn(ExperimentalPathApi::class)
     private fun prepare(): Outcome<Unit, StagingFailure> =
@@ -106,7 +120,10 @@ public class StagingServer(
             Outcome.Err(StagingFailure.NotStarted("cannot prepare $directory: ${e.message}"))
         }
 
-    private fun start(jars: List<Path>): Outcome<Process, StagingFailure> {
+    private fun start(
+        jars: List<Path>,
+        installed: List<Path>,
+    ): Outcome<Process, StagingFailure> {
         val properties =
             launch.properties - ServerLaunch.PROPERTY +
                 mapOf(
@@ -116,7 +133,7 @@ public class StagingServer(
                 )
         return try {
             val process =
-                ProcessBuilder(launch.copy(properties = properties).command())
+                ProcessBuilder(launch.copy(mods = withInstalled(installed), properties = properties).command())
                     .directory(directory.toFile())
                     .redirectErrorStream(true)
                     .redirectOutput(directory.resolve(CONSOLE_FILE).toFile())
@@ -146,6 +163,12 @@ public class StagingServer(
             }
         }
     }
+
+    // The mods the server started with stay first; a mod installed since then is added once.
+    private fun withInstalled(installed: List<Path>): List<String> =
+        (launch.mods.map { absolute(Path.of(it)) } + installed.map { absolute(it) }).distinct()
+
+    private fun absolute(path: Path): String = path.toAbsolutePath().normalize().toString()
 
     // Returns the ids of the processes still running after a forced kill and a short wait.
     private fun kill(process: Process): List<Long> {

@@ -14,6 +14,8 @@ val joinClientMods = configurations.dependencyScope("joinClientMods")
 val joinClientModJars = configurations.resolvable("joinClientModJars") { extendsFrom(joinClientMods.get()) }
 val stagingRefusedMods = configurations.dependencyScope("stagingRefusedMods")
 val stagingRefusedModJars = configurations.resolvable("stagingRefusedModJars") { extendsFrom(stagingRefusedMods.get()) }
+val addClientMods = configurations.dependencyScope("addClientMods")
+val addClientModJars = configurations.resolvable("addClientModJars") { extendsFrom(addClientMods.get()) }
 val clientTestMods = configurations.dependencyScope("clientTestMods")
 val clientTestModJars = configurations.resolvable("clientTestModJars") { extendsFrom(clientTestMods.get()) }
 
@@ -51,6 +53,11 @@ dependencies {
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-join-test") }
     }
     joinClientMods(libs.fabric.client.gametest.api) { isTransitive = false }
+    addClientMods("io.github.calamech.rloaded:rloaded-runtime") {
+        isTransitive = false
+        capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-add-test") }
+    }
+    addClientMods(libs.fabric.client.gametest.api) { isTransitive = false }
 }
 
 // The entry point downloads and starts a real game test server; its logic is checked by running it.
@@ -68,6 +75,8 @@ kover {
                     "io.github.calamech.rloaded.gametests.ClientLaunch",
                     "io.github.calamech.rloaded.gametests.SeparateProcessesKt*",
                     "io.github.calamech.rloaded.gametests.JoinMainKt*",
+                    "io.github.calamech.rloaded.gametests.AddMainKt*",
+                    "io.github.calamech.rloaded.gametests.AddPlayer",
                     "io.github.calamech.rloaded.gametests.JoinPlayer",
                     "io.github.calamech.rloaded.gametests.FakeModrinth*",
                     "io.github.calamech.rloaded.gametests.FakeMod",
@@ -229,6 +238,38 @@ tasks.register<JavaExec>("joinTest") {
             run.get().asFile.absolutePath,
             agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+            servedFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+        )
+    }
+}
+
+// Adds mods while two players are connected: a server in its own process, two clients that stay in
+// the world, and `rloaded add` typed into the server console. Needs a display, like clientGameTest,
+// and runs in the same CI job.
+tasks.register<JavaExec>("addTest") {
+    description = "Checks that mods added from the console reach connected players."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.AddMainKt"
+    val clientCache = layout.buildDirectory.dir("client-game-test/cache")
+    val serverCache = layout.buildDirectory.dir("registry-sync-test/server-cache")
+    val run = layout.buildDirectory.dir("add-test/run")
+    val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
+    val servedFiles = files(hotAddModJars)
+    val clientModFiles = files(addClientModJars)
+    inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
+    inputs.files(servedFiles).withPropertyName("servedMods")
+    inputs.files(clientModFiles).withPropertyName("clientMods")
+    argumentProviders.add {
+        listOf(
+            clientCache.get().asFile.absolutePath,
+            serverCache.get().asFile.absolutePath,
+            run.get().asFile.absolutePath,
+            agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
             clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
             servedFiles.files.joinToString(File.pathSeparator) { it.absolutePath },

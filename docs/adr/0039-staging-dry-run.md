@@ -40,3 +40,5 @@ Checked on 2026-10-31. `stagingTest` (CI job `game-test`) tries content-basic an
 ## Enforcement
 
 `ServerLaunchTest`, `StagingServerTest` (a real child process for the report, the missing report and the timeout), `StagingSettingsTest`, `StagingReportTest`, `AdmissionServiceTest`, `ServerConfigTest`, `BootstrapTest`; `stagingTest` and `AdminAddGameTest` in the `game-test` CI job.
+
+Amended 2026-10-31: the staging server now also starts with the server mods the lockfile lists, since adds take effect while the game runs (ADR 0041).
