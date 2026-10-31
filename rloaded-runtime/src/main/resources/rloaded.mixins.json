@@ -9,6 +9,8 @@
     "HolderReferenceAccess",
     "MappedRegistryAccess",
     "PersistentEntitySectionManagerAccess",
+    "PlayerListMixin",
+    "ServerGamePacketListenerImplMixin",
     "ServerLevelAccess"
   ],
   "client": [
