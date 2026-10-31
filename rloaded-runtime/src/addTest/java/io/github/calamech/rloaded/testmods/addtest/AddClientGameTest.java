@@ -11,6 +11,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.loader.api.FabricLoader;
@@ -46,10 +47,13 @@ public final class AddClientGameTest implements FabricClientGameTest {
       Identifier.fromNamespaceAndPath("content-basic", "basic_block");
   private static final int STEP_TICKS = 20 * 60 * 5;
   private static final int MIN_ENTITIES = 3;
+  private static final Identifier LATE_ITEM =
+      Identifier.fromNamespaceAndPath("late-item", "late_item");
   private static final Identifier KEYBIND_AND_TAB =
       Identifier.fromNamespaceAndPath("keybind-and-tab", "tab");
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded add test");
   private static final String CODE_OF_CONDUCT = "the code of conduct";
+  private static final String REJOIN = "rejoin";
   private static final String RESOURCE_PACK = "the resource pack";
 
   /** The log line after which the add check counts errors: what came before is not about adds. */
@@ -61,21 +65,16 @@ public final class AddClientGameTest implements FabricClientGameTest {
     Path report = Path.of(required("rloaded.add-test.report"));
     Path done = Path.of(required("rloaded.add-test.done"));
 
-    context.runOnClient(
-        client ->
-            ConnectScreen.startConnecting(
-                client.gui.screen(),
-                client,
-                ServerAddress.parseString(address),
-                new ServerData("Add test", address, ServerData.Type.OTHER),
-                false,
-                null));
+    connect(context, address);
     String answered = answerAtJoin(context);
-    Object connection = context.computeOnClient(client -> client.getConnection().getConnection());
+    Object connection = connection(context);
     LOGGER.info(IN_WORLD_MARK);
     append(report, answered.isEmpty() ? "in the world" : "in the world; answered " + answered);
 
     for (String step : required("rloaded.add-test.steps").split(",", -1)) {
+      if (step.equals(REJOIN)) {
+        rejoin(context, address);
+      }
       String details = step(context, step);
       sameConnection(context, connection);
       append(report, details.isEmpty() ? step : step + "; " + details);
@@ -113,6 +112,43 @@ public final class AddClientGameTest implements FabricClientGameTest {
         context.waitFor(client -> inWorld(client) && everyEntityInitialized(client), STEP_TICKS);
         yield "";
       }
+      case "late-item" -> {
+        context.waitFor(
+            client -> inWorld(client) && BuiltInRegistries.ITEM.getOptional(LATE_ITEM).isPresent(),
+            STEP_TICKS);
+        yield "";
+      }
+      // A game started again after the rejoin: both items came back with the inventory.
+      case "rejoined" -> {
+        context.waitFor(
+            client ->
+                inWorld(client)
+                    && Stream.of(BASIC_BLOCK, LATE_ITEM)
+                        .allMatch(
+                            id ->
+                                BuiltInRegistries.ITEM
+                                    .getOptional(id)
+                                    .filter(
+                                        item ->
+                                            client
+                                                .player
+                                                .getInventory()
+                                                .contains(new ItemStack(item)))
+                                    .isPresent()),
+            STEP_TICKS);
+        yield "";
+      }
+      case "late-item-given" -> {
+        context.waitFor(
+            client ->
+                inWorld(client)
+                    && BuiltInRegistries.ITEM
+                        .getOptional(LATE_ITEM)
+                        .filter(item -> client.player.getInventory().contains(new ItemStack(item)))
+                        .isPresent(),
+            STEP_TICKS);
+        yield "";
+      }
       case "keybind-and-tab" -> {
         context.waitFor(
             client -> inWorld(client) && hasKeyMapping(client) && hasTab(client), STEP_TICKS);
@@ -125,6 +161,35 @@ public final class AddClientGameTest implements FabricClientGameTest {
         yield "";
       }
     };
+  }
+
+  private static void connect(ClientGameTestContext context, String address) {
+    context.runOnClient(
+        client ->
+            ConnectScreen.startConnecting(
+                client.gui.screen(),
+                client,
+                ServerAddress.parseString(address),
+                new ServerData("Add test", address, ServerData.Type.OTHER),
+                false,
+                null));
+  }
+
+  private static Object connection(ClientGameTestContext context) {
+    return context.computeOnClient(client -> client.getConnection().getConnection());
+  }
+
+  // Leaves the server for the title screen and joins it again in the same game, which loaded mods
+  // while it played there: the game must restart instead, and the check starts it again.
+  private static void rejoin(ClientGameTestContext context, String address) {
+    context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
+    context.waitFor(client -> client.level == null && client.gui.screen() instanceof TitleScreen);
+    boolean registered =
+        context.computeOnClient(
+            client -> BuiltInRegistries.ITEM.getOptional(LATE_ITEM).isPresent());
+    LOGGER.info("Left the server; late-item registered: {}", registered);
+    connect(context, address);
+    context.waitFor(client -> false, STEP_TICKS);
   }
 
   // Accepts the server's code of conduct and resource pack if it has them, and says which it did.

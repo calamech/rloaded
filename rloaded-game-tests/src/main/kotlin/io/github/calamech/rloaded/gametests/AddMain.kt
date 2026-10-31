@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.gametests
 
 import io.github.calamech.rloaded.launcher.ClientDirectories
+import io.github.calamech.rloaded.launcher.Relaunch
 import java.io.BufferedWriter
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -23,7 +24,9 @@ import kotlin.system.exitProcess
  * Adds mods while players are connected, end to end: a server in its own process, two clients that
  * already trust it and stay in the world, and `rloaded add` typed into the server console for
  * content-basic, mixin-field-init, then keybind-and-tab, served by a fake Modrinth. Before the adds the console
- * summons an armor stand; between them it gives each player content-basic's block. Fails unless both
+ * summons an armor stand; between them it gives each player content-basic's block. Then late-item
+ * comes, the players leave, and join again from the same game, which must restart first; the fresh
+ * game joins with both items in the player's inventory. Fails unless both
  * players got each mod without leaving their connection, the server says every player got them each
  * time, every entity of the server has mixin-field-init's field, and no log line is an error from
  * the first add on. The project owner accepted the Minecraft EULA for the server directory this
@@ -45,6 +48,7 @@ public fun main(arguments: Array<String>) {
                 "Key mapping and creative tab",
                 served.single { "keybindAndTab" in it.fileName.toString() },
             ),
+            FakeMod("liProject", "liVersion", "Late item", served.single { "lateItem" in it.fileName.toString() }),
         )
     val passed =
         runAddCheck(
@@ -115,32 +119,43 @@ internal fun runAddCheck(
     val console = serverProcess.outputWriter()
 
     val steps = plan.steps(players)
-    val clients =
+    // The clients of the steps from [first] on, the first one already reached.
+    val start = { first: Int ->
         players.associate { player ->
             val launch = ClientLaunch(client, directories, player.launcherData, agent, runtime, clientMods)
-            val properties = player.properties(port, done, steps.drop(1).map { it.first }) + (MODRINTH_PROPERTY to modrinth.url)
+            val remaining = steps.drop(first + 1).map { it.first }
+            val properties = player.properties(port, done, remaining) + (MODRINTH_PROPERTY to modrinth.url)
             player.name to startClient(launch, player.directory.resolve("game"), player.name, null, properties)
         }
+    }
+    var clients = start(0)
     processes += clients.values
-    for ((step, commands) in steps) {
-        type(console, commands)
-        waitForStep(players, step, clients, serverProcess, deadline)
+    for ((index, entry) in steps.withIndex()) {
+        type(console, entry.second)
+        if (entry.first == REJOIN) {
+            clients = startedAgain(clients, serverProcess, deadline) { start(index) }
+            processes += clients.values
+        } else {
+            waitForStep(players, entry.first, clients, serverProcess, deadline)
+        }
     }
     type(console, plan.finally)
     done.writeText("done\n")
     waitForClients(clients, serverProcess, deadline) { true }
     stopServer(serverProcess)
-    return passed(plan, players, serverDirectory.resolve("logs").resolve("latest.log").readText())
+    val joins = 1 + steps.count { (step, _) -> step == REJOIN }
+    return passed(plan, players, joins, serverDirectory.resolve("logs").resolve("latest.log").readText())
 }
 
 private fun passed(
     plan: AddPlan,
     players: List<AddPlayer>,
+    joins: Int,
     serverLog: String,
 ): Boolean {
     val rollouts = serverLog.lines().count { "Every player has the new mods" in it }
     val errors = errorsFromFirstAdd(serverLog, players)
-    // An add is no reason to tell the chat that players left and joined: each did once, for real.
+    // An add is no reason to tell the chat that players left and joined: each did so only for real.
     val announced =
         players.associate { player ->
             player.name to listOf("joined", "left").map { what -> serverLog.lines().count { "${player.name} $what the game" in it } }
@@ -156,7 +171,7 @@ private fun passed(
                 .first() == IN_WORLD + (if (plan.askedAtJoin) ANSWERED else "")
         }
     println("Add check: players answered what the server asks at join, and only then: $answered")
-    return rollouts == plan.mods.size && errors.isEmpty() && announced.values.all { it == listOf(1, 1) } && answered &&
+    return rollouts == plan.mods.size && errors.isEmpty() && announced.values.all { it == listOf(joins, joins) } && answered &&
         plan.serverChecks(serverLog)
 }
 
@@ -206,6 +221,12 @@ private fun steps(players: List<AddPlayer>): List<Pair<String, List<String>>> =
         "content-basic-item" to players.map { "give ${it.name} content-basic:basic_block" },
         "mixin-field-init" to listOf("rloaded add mfiProject"),
         "keybind-and-tab" to listOf("rloaded add kbtProject"),
+        // An item added once the players' games have synchronized their items with the server.
+        "late-item" to listOf("rloaded add liProject"),
+        "late-item-given" to players.map { "give ${it.name} late-item:late_item" },
+        // The players leave and join again in the same game, which loaded the mods while it played.
+        REJOIN to emptyList(),
+        "rejoined" to emptyList(),
     )
 
 // Errors before the first add come from starting the games offline, not from adds.
@@ -220,6 +241,23 @@ private fun errorsFromFirstAdd(
         if (from < 0) failCheck("a log does not say \"$mark\"")
         lines.drop(from).filter { ERROR in it }
     }
+}
+
+// A game that loaded mods while it played must restart rather than join again: each must exit
+// asking for it, and the check then starts them again, as the launcher does.
+private fun startedAgain(
+    clients: Map<String, Process>,
+    server: Process,
+    deadline: Long,
+    start: () -> Map<String, Process>,
+): Map<String, Process> {
+    clients.forEach { (name, process) ->
+        val exited = process.waitFor(maxOf(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)
+        if (!exited || !Relaunch.wanted(process.exitValue(), 0)) failCheck("$name did not ask to be started again before joining again")
+    }
+    if (!server.isAlive) failCheck("the server exited with code ${server.exitValue()} while the players restarted")
+    println("Add check: every player restarted before joining again")
+    return start()
 }
 
 // Every player reaches [step], or the check fails: a client that exits, a server that stops, or time.
@@ -279,6 +317,7 @@ internal class AddPlayer(
 // The players and the armor stand at least, every one with the field.
 private val FIELD_INIT_PASSED = Regex("""field-init: ([3-9]|\d{2,}) entities, 0 without the field""")
 private const val IN_WORLD = "in the world"
+private const val REJOIN = "rejoin"
 private const val ANSWERED = "; answered the code of conduct and the resource pack"
 private const val PACK = "add-check-pack.zip"
 private const val MODRINTH_PROPERTY = "rloaded.test.modrinth"

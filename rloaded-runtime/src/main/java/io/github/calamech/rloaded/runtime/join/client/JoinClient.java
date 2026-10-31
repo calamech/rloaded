@@ -77,6 +77,10 @@ public final class JoinClient {
   private static volatile boolean ended;
   // Set when an install failed in a game that already had the server's world or mods.
   private static volatile boolean relaunch;
+  // Set once this game loaded mods while it was in a world. When the game leaves the server, Fabric
+  // API resets the synchronized registries to how they were at the connection's first
+  // synchronization, which drops what those mods registered after it: a fresh game must join next.
+  private static volatile boolean addedInSession;
   private static Connection connection;
 
   private JoinClient() {}
@@ -94,7 +98,15 @@ public final class JoinClient {
             GameRelaunch.request(client);
           }
         });
-    ClientLoginConnectionEvents.INIT.register((listener, client) -> inSession = false);
+    ClientLoginConnectionEvents.INIT.register(
+        (listener, client) -> {
+          inSession = false;
+          if (addedInSession) {
+            LOGGER.info(
+                "Mods were added while this game played: it restarts before it joins a server again");
+            GameRelaunch.request(client);
+          }
+        });
     ClientConfigurationConnectionEvents.COMPLETE.register((listener, client) -> inSession = true);
     ClientConfigurationNetworking.registerGlobalReceiver(
         JoinPayloads.Hello.TYPE,
@@ -274,6 +286,9 @@ public final class JoinClient {
       LateKeyMappings.close(client);
     }
     mods.forEach(mod -> LOADED.put(mod.getEntry().getProjectId(), mod.getEntry().getVersionId()));
+    if (inSession) {
+      addedInSession = true;
+    }
     shown.stage(InstallStage.RELOAD);
     progress(sender, InstallStage.RELOAD, 0);
     onClientThread(
