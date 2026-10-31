@@ -29,3 +29,4 @@ The test catches a stalled or dropped connection: with a server mod that keeps a
 `ReconfigurationStabilityClientGameTest`, run by the `client-game-test` CI job.
 
 Amended 2026-10-31: the server drops play packets sent to a player in the configuration phase (ADR 0040).
+Amended 2026-10-31: the stability test now ends each round with `startConfiguration`, the path an add takes (ADR 0024), and checks that Fabric configured the player once per round.
