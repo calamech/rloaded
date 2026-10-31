@@ -22,6 +22,8 @@ val recoveryServedMods = configurations.dependencyScope("recoveryServedMods")
 val recoveryServedModJars = configurations.resolvable("recoveryServedModJars") { extendsFrom(recoveryServedMods.get()) }
 val restartServedMods = configurations.dependencyScope("restartServedMods")
 val restartServedModJars = configurations.resolvable("restartServedModJars") { extendsFrom(restartServedMods.get()) }
+val singleplayerTestMods = configurations.dependencyScope("singleplayerTestMods")
+val singleplayerTestModJars = configurations.resolvable("singleplayerTestModJars") { extendsFrom(singleplayerTestMods.get()) }
 val clientTestMods = configurations.dependencyScope("clientTestMods")
 val clientTestModJars = configurations.resolvable("clientTestModJars") { extendsFrom(clientTestMods.get()) }
 
@@ -52,6 +54,11 @@ dependencies {
         isTransitive = false
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-gametest") }
     }
+    singleplayerTestMods("io.github.calamech.rloaded:rloaded-runtime") {
+        isTransitive = false
+        capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-singleplayer-test") }
+    }
+    singleplayerTestMods(libs.fabric.client.gametest.api) { isTransitive = false }
     clientTestMods(libs.fabric.gametest.api) { isTransitive = false }
     clientTestMods(libs.fabric.client.gametest.api) { isTransitive = false }
     joinClientMods("io.github.calamech.rloaded:rloaded-runtime") {
@@ -102,6 +109,7 @@ kover {
                     "io.github.calamech.rloaded.gametests.AddMainKt*",
                     "io.github.calamech.rloaded.gametests.SoakMainKt*",
                     "io.github.calamech.rloaded.gametests.RecoveryMainKt*",
+                    "io.github.calamech.rloaded.gametests.SingleplayerMainKt*",
                     "io.github.calamech.rloaded.gametests.Until",
                     "io.github.calamech.rloaded.gametests.AddPlayer",
                     "io.github.calamech.rloaded.gametests.JoinPlayer",
@@ -383,6 +391,35 @@ tasks.register<JavaExec>("recoveryTest") {
             agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
             servedFile.singleFile.absolutePath,
+        )
+    }
+}
+
+// Adds mods to an open singleplayer world, asked for through the launcher's link. Needs a display,
+// like clientGameTest.
+tasks.register<JavaExec>("singleplayerTest") {
+    description = "Checks that mods the launcher asks for are added to an open singleplayer world."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.SingleplayerMainKt"
+    val cache = layout.buildDirectory.dir("client-game-test/cache")
+    val run = layout.buildDirectory.dir("singleplayer-test/run")
+    val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
+    val modFiles = files(singleplayerTestModJars)
+    val servedFiles = files(addServedModJars)
+    inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
+    inputs.files(modFiles).withPropertyName("testMods")
+    inputs.files(servedFiles).withPropertyName("servedMods")
+    argumentProviders.add {
+        listOf(
+            cache.get().asFile.absolutePath,
+            run.get().asFile.absolutePath,
+            agentFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            modFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+            servedFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         )
     }
 }

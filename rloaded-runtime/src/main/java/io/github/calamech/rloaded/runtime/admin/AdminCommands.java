@@ -6,39 +6,24 @@ import io.github.calamech.rloaded.admin.AddRefusal;
 import io.github.calamech.rloaded.admin.AddTarget;
 import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
-import io.github.calamech.rloaded.admin.CompatDatabase;
-import io.github.calamech.rloaded.admin.JarRules;
+import io.github.calamech.rloaded.admin.LiveGame;
 import io.github.calamech.rloaded.admin.LocalCompat;
-import io.github.calamech.rloaded.admin.RecordChecks;
 import io.github.calamech.rloaded.admin.ReputationRules;
-import io.github.calamech.rloaded.admin.Resolver;
 import io.github.calamech.rloaded.admin.staging.Staging;
 import io.github.calamech.rloaded.admin.staging.StagingServer;
 import io.github.calamech.rloaded.admin.staging.StagingSettings;
-import io.github.calamech.rloaded.core.download.ArtifactStore;
-import io.github.calamech.rloaded.core.download.RetryPolicy;
 import io.github.calamech.rloaded.core.lockfile.Lockfile;
 import io.github.calamech.rloaded.core.runtime.ServerLaunch;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.runtime.ModrinthAccess;
 import io.github.calamech.rloaded.runtime.ServerLockfile;
-import io.github.calamech.rloaded.runtime.engine.Admission;
-import io.github.calamech.rloaded.runtime.engine.HotAdd;
-import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
 import io.github.calamech.rloaded.runtime.join.JoinServer;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.SharedConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -80,9 +65,8 @@ public final class AdminCommands {
           compat = localCompat(server);
           JoinServer.recordFailuresIn(compat);
           staging = staging(server);
-          live = new LiveAdd(server);
+          live = new LiveAdd(server, new DedicatedServerHost(server));
         });
-    ServerTickEvents.END_SERVER_TICK.register(server -> live.tick());
     ServerRestart.register();
     CommandRegistrationCallback.EVENT.register(
         (dispatcher, context, selection) ->
@@ -164,7 +148,9 @@ public final class AdminCommands {
 
   private static void rollout(MinecraftServer server) {
     switch (Lockfile.Companion.read(ServerLockfile.of(server).getPath())) {
-      case Outcome.Ok<?> ok -> live.rollout((Lockfile) ok.getValue());
+      case Outcome.Ok<?> ok -> {
+        CompletableFuture<?> _ = live.rollout((Lockfile) ok.getValue());
+      }
       case Outcome.Err<?> err -> {
         LOGGER.error("The lockfile just written cannot be read: {}", err.getError());
         ServerRestart.request(server);
@@ -179,18 +165,15 @@ public final class AdminCommands {
 
   private static synchronized AdmissionService service(MinecraftServer server) {
     if (service == null) {
-      ModrinthAccess access = ModrinthAccess.open();
       Path cache = server.getServerDirectory().resolve("rloaded").resolve("cache").resolve("mods");
-      Clock clock = Clock.systemUTC();
       service =
-          new AdmissionService(
-              new Resolver(access.modrinth(), SharedConstants.getCurrentVersion().name()),
-              new RecordChecks(access.modrinth(), rules, () -> compat.current(), clock),
-              new ArtifactStore(
-                  cache, access.http(), new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES),
-              new JarRules(Admission.classifier(), AdminCommands::serverRefusal, staging),
-              new AddTarget(ServerLockfile.of(server), live),
-              clock);
+          Admissions.service(
+              ModrinthAccess.open(),
+              cache,
+              rules,
+              () -> compat.current(),
+              staging,
+              new AddTarget(ServerLockfile.of(server), live, LiveGame.DEDICATED_SERVER));
     }
     return service;
   }
@@ -229,36 +212,9 @@ public final class AdminCommands {
   // server, so the admin fixes or removes it.
   private static LocalCompat localCompat(MinecraftServer server) {
     Path file = server.getServerDirectory().resolve("rloaded").resolve("compat-local.json");
-    return switch (LocalCompat.Companion.open(file, bundledCompatDatabase())) {
+    return switch (LocalCompat.Companion.open(file, Admissions.bundledCompatDatabase())) {
       case Outcome.Ok<?> ok -> (LocalCompat) ok.getValue();
       case Outcome.Err<?> err -> throw new IllegalStateException(err.getError().toString());
     };
-  }
-
-  // The database ships in the mod jar; a broken one is a defect of the build.
-  private static CompatDatabase bundledCompatDatabase() {
-    try (InputStream input = AdminCommands.class.getResourceAsStream("compat.json")) {
-      if (input == null) {
-        throw new IllegalStateException("compat.json is missing from the runtime mod");
-      }
-      return switch (CompatDatabase.Companion.parse(
-          new String(input.readAllBytes(), StandardCharsets.UTF_8))) {
-        case Outcome.Ok<?> ok -> (CompatDatabase) ok.getValue();
-        case Outcome.Err<?> err ->
-            throw new IllegalStateException("compat.json cannot be read: " + err.getError());
-      };
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  // The rules the server applies to the mods it loads itself, without loading them.
-  private static String serverRefusal(List<? extends Path> jars) {
-    try {
-      HotAdd.check(List.copyOf(jars));
-      return null;
-    } catch (HotAddRefusal refusal) {
-      return refusal.getMessage();
-    }
   }
 }

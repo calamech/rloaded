@@ -58,6 +58,7 @@ class AdmissionServiceTest {
     private var applyFailure: String? = null
     private var whileApplying: () -> Unit = {}
     private var whileChecking: () -> Unit = {}
+    private var game = LiveGame.DEDICATED_SERVER
     private val lockfile get() = directory.resolve("rloaded/lockfile.json")
     private val base = BaseSetEntry("P7dR8mSH", "EQKgpeKu", sha("fabric api"))
     private val empty = Lockfile("26.3", "0.1.0", listOf(base), emptyList(), emptyList())
@@ -85,6 +86,20 @@ class AdmissionServiceTest {
         assertEquals(listOf(listOf("library")), serverChecks, "the server checks what it loads, not client-only mods")
         assertEquals(listOf(listOf("library")), staged, "the staging server tries what the server loads, not client-only mods")
         assertEquals(listOf(listOf("library")), applied, "the running server loads what it runs, not client-only mods")
+    }
+
+    @Test
+    fun `checks and loads mods for the client too in a singleplayer world, where the game is the client`() {
+        game = LiveGame.SINGLEPLAYER
+        publish("library", jar("library", environment = "*"))
+        publish("menu", jar("menu", environment = "client"), dependsOn = "library")
+
+        val added = ok(add("menu"))
+
+        assertEquals(listOf("library" to Side.BOTH, "menu" to Side.CLIENT), added.map { it.entry.projectId to it.entry.side })
+        assertEquals(listOf(listOf("library", "menu")), serverChecks)
+        assertEquals(listOf(listOf("library", "menu")), applied)
+        assertEquals(listOf("library", "menu"), ok(Lockfile.read(lockfile)).mods.map { it.entry.projectId })
     }
 
     @Test
@@ -280,11 +295,15 @@ class AdmissionServiceTest {
                     stagingFailure?.let { Outcome.Err(it) } ?: Outcome.Ok(Unit)
                 },
             ),
-            AddTarget(LockfileLocation(lockfile, empty)) { jars ->
-                applied += jars.map { jar -> projectOf(jar) }
-                whileApplying()
-                CompletableFuture.completedFuture(applyFailure?.let { Outcome.Err(it) } ?: Outcome.Ok(Unit))
-            },
+            AddTarget(
+                LockfileLocation(lockfile, empty),
+                { jars ->
+                    applied += jars.map { jar -> projectOf(jar) }
+                    whileApplying()
+                    CompletableFuture.completedFuture(applyFailure?.let { Outcome.Err(it) } ?: Outcome.Ok(Unit))
+                },
+                game,
+            ),
             clock,
         )
     }

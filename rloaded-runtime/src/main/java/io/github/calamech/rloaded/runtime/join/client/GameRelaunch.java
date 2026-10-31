@@ -10,13 +10,13 @@ import org.slf4j.LoggerFactory;
  * launcher then joins the same server. The game closes as when the player quits; the exit comes
  * once the game thread ended, after the game saved its options and released its window.
  */
-final class GameRelaunch {
+public final class GameRelaunch {
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
 
   private GameRelaunch() {}
 
   /** Stops {@code client} and has the launcher start it again. */
-  static void request(Minecraft client) {
+  public static void request(Minecraft client) {
     client.execute(
         () -> {
           Thread gameThread = Thread.currentThread();

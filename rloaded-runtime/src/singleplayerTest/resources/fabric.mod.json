@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "rloaded-singleplayer-test",
+  "version": "${version}",
+  "name": "Rloaded singleplayer add test",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": ["io.github.calamech.rloaded.testmods.singleplayertest.SingleplayerAddClientGameTest"]
+  },
+  "depends": {
+    "rloaded": "*",
+    "fabric-client-gametest-api-v1": "*"
+  }
+}

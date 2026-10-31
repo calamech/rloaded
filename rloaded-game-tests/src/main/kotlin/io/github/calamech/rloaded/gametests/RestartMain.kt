@@ -63,7 +63,7 @@ public fun main(arguments: Array<String>) {
     }
     if (!first.waitFor(STOP_MINUTES, TimeUnit.MINUTES)) failCheck("the server did not stop within $STOP_MINUTES minutes of the add")
     // The running server loads a mod only once the staging server accepted it.
-    val failedLive = log.readText().lines().any { "loading the mods failed; the server restarts without the new mods" in it }
+    val failedLive = log.readText().lines().any { "loading the mods failed; the game restarts without the new mods" in it }
     val listed = listed(directory.resolve("rloaded").resolve("lockfile.json"))
     println(
         "Restart check: the server exited with code ${first.exitValue()}; it failed loading the mod: $failedLive; lockfile lists $listed",

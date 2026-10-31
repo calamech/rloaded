@@ -35,3 +35,5 @@ Checked on 2026-10-31 with `addTest` (CI job `client-game-test`): after content-
 ## Enforcement
 
 `addTest` in the `client-game-test` CI job.
+
+Amended 2026-10-31: a game that loaded mods into an open singleplayer world restarts the same way before it opens a world or joins a server again (ADR 0049).

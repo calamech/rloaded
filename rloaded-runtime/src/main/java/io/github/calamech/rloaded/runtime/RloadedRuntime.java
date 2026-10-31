@@ -22,8 +22,10 @@ public final class RloadedRuntime implements ModInitializer {
     RegistryThaw.rememberIntrusiveRegistries();
     JoinPayloads.register();
     Reconfigurations.register();
+    // A dedicated server and the server of a singleplayer world both reload data packs after an
+    // add.
+    DataReload.register();
     if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
-      DataReload.register();
       JoinServer.register();
       AdminCommands.register();
       StagingDryRun.registerIfActive();

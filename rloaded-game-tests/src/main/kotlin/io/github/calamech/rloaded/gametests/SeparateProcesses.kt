@@ -147,7 +147,11 @@ internal fun startClient(
             is Outcome.Ok -> withTestMods(built.value, launch.mods, properties)
             is Outcome.Err -> failCheck("unknown launch placeholder ${built.error.name}")
         }
-    return ProcessBuilder(command).directory(directory.toFile()).inheritIO().start()
+    return ProcessBuilder(command)
+        .directory(directory.toFile())
+        .inheritIO()
+        .apply { environment().putAll(launch.environment) }
+        .start()
 }
 
 /** Waits for the clients to end; one that fails, or a server that stops first, fails the check at once. */
