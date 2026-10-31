@@ -2,16 +2,21 @@ package io.github.calamech.rloaded.admin.staging
 
 import io.github.calamech.rloaded.core.runtime.ServerLaunch
 import io.github.calamech.rloaded.protocol.Outcome
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.CleanupMode
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import java.util.jar.Attributes
 import java.util.jar.JarOutputStream
 import java.util.jar.Manifest
+import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -21,8 +26,25 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class StagingServerTest {
-    @TempDir
+    // Windows keeps the files of a killed process locked for a moment after it exits, so the
+    // directory is deleted here, with retries, instead of by JUnit.
+    @TempDir(cleanup = CleanupMode.NEVER)
     lateinit var root: Path
+
+    @OptIn(ExperimentalPathApi::class)
+    @AfterEach
+    fun deleteRoot() {
+        val deadline = System.nanoTime() + Duration.ofSeconds(DELETE_SECONDS).toNanos()
+        while (true) {
+            try {
+                root.deleteRecursively()
+                return
+            } catch (e: IOException) {
+                if (System.nanoTime() > deadline) throw AssertionError("$root is still in use", e)
+                Thread.sleep(DELETE_RETRY_MILLIS)
+            }
+        }
+    }
 
     private val directory get() = root.resolve("rloaded/staging")
     private val eula get() = root.resolve("eula.txt")
@@ -140,4 +162,9 @@ class StagingServerTest {
             is Outcome.Ok -> throw AssertionError("expected a failure, got ${outcome.value}")
             is Outcome.Err -> outcome.error
         }
+
+    private companion object {
+        const val DELETE_SECONDS = 10L
+        const val DELETE_RETRY_MILLIS = 200L
+    }
 }
