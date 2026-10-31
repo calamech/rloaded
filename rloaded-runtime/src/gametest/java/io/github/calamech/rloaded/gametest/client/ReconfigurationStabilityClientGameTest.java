@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.gametest.client;
 
 import io.github.calamech.rloaded.gametest.PingTraffic;
+import io.github.calamech.rloaded.runtime.engine.ConfigurationPackets;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
@@ -9,7 +10,8 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 
 /**
  * Checks that a player stays connected through many reconfigurations in a row while mods send
- * custom packets both ways every tick.
+ * custom packets both ways every tick, and one sends play packets to players in the configuration
+ * phase, which the server drops.
  */
 public final class ReconfigurationStabilityClientGameTest implements FabricClientGameTest {
   private static final int CYCLES = 100;
@@ -50,6 +52,9 @@ public final class ReconfigurationStabilityClientGameTest implements FabricClien
               client -> client.getConnection().getConnection() == listenerBefore.getConnection());
       if (!sameConnection) {
         throw new AssertionError("the client reconnected instead of staying on its connection");
+      }
+      if (ConfigurationPackets.dropped() == 0) {
+        throw new AssertionError("no play packet sent in the configuration phase was dropped");
       }
     }
     ClientTestReport.passed(CYCLES + " reconfigurations with custom packets both ways");
