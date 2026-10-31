@@ -82,14 +82,17 @@ public fun main(arguments: Array<String>) {
     val second = startClient(launch, game, PLAYER, ServerAddress(LOOPBACK, port), properties)
     processes += second
     until("$PLAYER joins again") { joins(serverLog) == 2 }
+    // The game left during the add's configuration phase, for real: the chat says so once.
+    val leaves = serverLog.readText().lines().count { "$PLAYER left the game" in it }
     second.destroy()
     stopServer(serverProcess)
 
     val log = serverLog.readText()
     val reported = log.lines().any { "$PLAYER's game could not load $PROJECT (version $VERSION)" in it && "/ERROR]" in it }
     val recorded = recorded(serverDirectory.resolve("rloaded").resolve("compat-local.json"))
-    println("Recovery check: failure in the server log: $reported; recorded as $recorded")
-    exitProcess(if (!marker.exists() && reported && recorded == CompatStatus.BROKEN) 0 else 1)
+    println("Recovery check: failure in the server log: $reported; recorded as $recorded; left the game $leaves times before joining again")
+    val passed = listOf(!marker.exists(), reported, recorded == CompatStatus.BROKEN, leaves == 1).all { it }
+    exitProcess(if (passed) 0 else 1)
 }
 
 private fun joins(serverLog: Path): Int =

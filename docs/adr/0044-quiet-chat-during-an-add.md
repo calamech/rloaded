@@ -13,7 +13,7 @@ An add sends every connected player through the configuration phase (ADR 0041). 
 - A player who disconnects during that configuration did leave: the server announces it then, with the game's own message. A player who disconnects before its configuration starts loses the mark and is announced by the game as usual.
 - Every other join and leave is announced as before.
 
-Checked on 2026-10-31 with `addTest` and `soakTest` (CI job `client-game-test`), which now require each player's join and leave to be announced exactly once: three adds and twenty adds, one join and one leave per player. With the messages not skipped, `soakTest` counted 21 of each per player and failed.
+Checked on 2026-10-31 with `addTest` and `soakTest` (CI job `client-game-test`), which now require each player's join and leave to be announced exactly once: three adds and twenty adds, one join and one leave per player. With the messages not skipped, `soakTest` counted 21 of each per player and failed. `recoveryTest` checks that a player whose install fails during an add, and who is disconnected, is announced as leaving once; without that announcement it counted none and failed.
 
 ## Alternatives
 
@@ -27,4 +27,4 @@ Checked on 2026-10-31 with `addTest` and `soakTest` (CI job `client-game-test`),
 
 ## Enforcement
 
-`addTest` and `soakTest` in the `client-game-test` CI job count the announcements in the server log.
+`addTest`, `soakTest` and `recoveryTest` in the `client-game-test` CI job count the announcements in the server log.
