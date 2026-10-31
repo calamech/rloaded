@@ -11,6 +11,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -189,7 +190,22 @@ public final class AddClientGameTest implements FabricClientGameTest {
             client -> BuiltInRegistries.ITEM.getOptional(LATE_ITEM).isPresent());
     LOGGER.info("Left the server; late-item registered: {}", registered);
     connect(context, address);
-    context.waitFor(client -> false, STEP_TICKS);
+    try {
+      context.waitFor(client -> false, STEP_TICKS);
+    } catch (IllegalStateException stopped) {
+      // Fabric's test runner refuses to reach a game that stopped, and fails the run if the test
+      // goes on: this thread waits for the process to end with the game's own exit code.
+      LOGGER.info("The game stopped to start again");
+      waitForTheEnd();
+    }
+  }
+
+  private static void waitForTheEnd() {
+    try {
+      new CountDownLatch(1).await();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   // Accepts the server's code of conduct and resource pack if it has them, and says which it did.
