@@ -10,8 +10,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 
 /**
- * Sends the only player back to the configuration phase and into the world again, the way the
- * game's debug {@code config} and {@code unconfig} commands do, and as an add will.
+ * Sends the only player back to the configuration phase and into the world again, the way an add
+ * does: the configuration starts over, so Fabric's tasks and registry sync run again and the data
+ * pack registries are sent again.
  */
 final class Reconfiguration {
   private Reconfiguration() {}
@@ -23,7 +24,7 @@ final class Reconfiguration {
     ClientLevel levelBefore = context.computeOnClient(client -> client.level);
     server.runOnServer(running -> onlyPlayer(running).connection.switchToConfig());
     server.waitFor(running -> configuringPlayer(running).isPresent());
-    server.runOnServer(running -> configuringPlayer(running).orElseThrow().returnToWorld());
+    server.runOnServer(running -> configuringPlayer(running).orElseThrow().startConfiguration());
     context.waitFor(
         client -> client.level != null && client.level != levelBefore && client.player != null);
   }

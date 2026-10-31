@@ -9,9 +9,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerCon
 import net.minecraft.client.multiplayer.ClientPacketListener;
 
 /**
- * Checks that a player stays connected through many reconfigurations in a row while mods send
- * custom packets both ways every tick, and one sends play packets to players in the configuration
- * phase, which the server drops.
+ * Checks that a player stays connected through many reconfigurations in a row, each one running the
+ * configuration again as an add does, while mods send custom packets both ways every tick, and one
+ * sends play packets to players in the configuration phase, which the server drops.
  */
 public final class ReconfigurationStabilityClientGameTest implements FabricClientGameTest {
   private static final int CYCLES = 100;
@@ -26,6 +26,7 @@ public final class ReconfigurationStabilityClientGameTest implements FabricClien
               PingTraffic.RECEIVED_BY_CLIENT.get() > 0 && PingTraffic.RECEIVED_BY_SERVER.get() > 0);
       ClientPacketListener listenerBefore =
           context.computeOnClient(client -> client.getConnection());
+      long configurationsBefore = PingTraffic.CONFIGURATIONS.get();
 
       for (int cycle = 1; cycle <= CYCLES; cycle++) {
         Reconfiguration.cycle(context, server);
@@ -52,6 +53,11 @@ public final class ReconfigurationStabilityClientGameTest implements FabricClien
               client -> client.getConnection().getConnection() == listenerBefore.getConnection());
       if (!sameConnection) {
         throw new AssertionError("the client reconnected instead of staying on its connection");
+      }
+      long configurations = PingTraffic.CONFIGURATIONS.get() - configurationsBefore;
+      if (configurations != CYCLES) {
+        throw new AssertionError(
+            "Fabric configured the player " + configurations + " times in " + CYCLES + " rounds");
       }
       if (ConfigurationPackets.dropped() == 0) {
         throw new AssertionError("no play packet sent in the configuration phase was dropped");

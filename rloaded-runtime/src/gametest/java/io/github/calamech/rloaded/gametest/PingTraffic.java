@@ -6,6 +6,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -27,6 +28,9 @@ public final class PingTraffic {
 
   /** Packets the client received from the server. */
   public static final AtomicLong RECEIVED_BY_CLIENT = new AtomicLong();
+
+  /** Times the server ran Fabric's configuration of a player, joins and reconfigurations alike. */
+  public static final AtomicLong CONFIGURATIONS = new AtomicLong();
 
   // Players the careless mod holds on to; the server thread is the only one to touch it.
   private static final Set<ServerPlayer> REMEMBERED =
@@ -55,6 +59,8 @@ public final class PingTraffic {
     PayloadTypeRegistry.serverboundPlay().register(Ping.TYPE, Ping.CODEC);
     ServerPlayNetworking.registerGlobalReceiver(
         Ping.TYPE, (ping, context) -> RECEIVED_BY_SERVER.incrementAndGet());
+    ServerConfigurationConnectionEvents.CONFIGURE.register(
+        (listener, server) -> CONFIGURATIONS.incrementAndGet());
     ServerTickEvents.END_SERVER_TICK.register(
         server -> {
           for (ServerPlayer player : server.getPlayerList().getPlayers()) {
