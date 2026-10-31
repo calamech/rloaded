@@ -84,6 +84,7 @@ kover {
                     "io.github.calamech.rloaded.gametests.SeparateProcessesKt*",
                     "io.github.calamech.rloaded.gametests.JoinMainKt*",
                     "io.github.calamech.rloaded.gametests.AddMainKt*",
+                    "io.github.calamech.rloaded.gametests.SoakMainKt*",
                     "io.github.calamech.rloaded.gametests.AddPlayer",
                     "io.github.calamech.rloaded.gametests.JoinPlayer",
                     "io.github.calamech.rloaded.gametests.FakeModrinth*",
@@ -281,6 +282,34 @@ tasks.register<JavaExec>("addTest") {
             runtimeFile.singleFile.absolutePath,
             clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
             servedFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+        )
+    }
+}
+
+// Adds 20 generated mods in a row while two players are connected, with the add check's code.
+// Needs a display, like clientGameTest, and runs in the same CI job.
+tasks.register<JavaExec>("soakTest") {
+    description = "Checks that 20 adds in a row reach connected players without an error."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.SoakMainKt"
+    val clientCache = layout.buildDirectory.dir("client-game-test/cache")
+    val serverCache = layout.buildDirectory.dir("registry-sync-test/server-cache")
+    val run = layout.buildDirectory.dir("soak-test/run")
+    val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
+    val clientModFiles = files(addClientModJars)
+    inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
+    inputs.files(clientModFiles).withPropertyName("clientMods")
+    argumentProviders.add {
+        listOf(
+            clientCache.get().asFile.absolutePath,
+            serverCache.get().asFile.absolutePath,
+            run.get().asFile.absolutePath,
+            agentFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         )
     }
 }

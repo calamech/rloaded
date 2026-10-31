@@ -11,6 +11,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ConnectScreen;
@@ -29,11 +30,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Joins a server running in another process, which this player already trusts, and stays in the
- * world while the server's admin adds content-basic, mixin-field-init, then keybind-and-tab. After
- * each add, it checks that it is back in the world on the same connection, that the mod works, and
- * that a toast named the new mod; after the first, it waits for the new item the server gives; it
- * reports each step in {@code rloaded.add-test.report} and leaves once the file {@code
- * rloaded.add-test.done} exists.
+ * world while the server's admin adds mods. {@code rloaded.add-test.steps} lists what to wait for,
+ * in order: content-basic (with a toast naming it), its item given by the server, mixin-field-init,
+ * keybind-and-tab, or the id of a generated mod. After each step it checks that it is still on the
+ * same connection and reports the step in {@code rloaded.add-test.report}; it leaves once the file
+ * {@code rloaded.add-test.done} exists.
  */
 public final class AddClientGameTest implements FabricClientGameTest {
   private static final Identifier BASIC_BLOCK =
@@ -67,34 +68,56 @@ public final class AddClientGameTest implements FabricClientGameTest {
     LOGGER.info(IN_WORLD_MARK);
     append(report, "in the world");
 
-    context.waitFor(
-        client -> inWorld(client) && BuiltInRegistries.BLOCK.getOptional(BASIC_BLOCK).isPresent(),
-        STEP_TICKS);
-    Item item = BuiltInRegistries.ITEM.getOptional(BASIC_BLOCK).orElseThrow();
-    String stack =
-        context.computeOnClient(client -> new ItemStack(item).getHoverName().getString());
-    context.waitFor(client -> toastShown(client), STEP_TICKS);
-    context.takeScreenshot("rloaded-in-session-add");
-    sameConnection(context, connection);
-    append(report, "content-basic added; its item is " + stack);
-
-    // The server gives the item once every player has the mod.
-    context.waitFor(
-        client -> client.player.getInventory().contains(new ItemStack(item)), STEP_TICKS);
-    append(report, "content-basic item received");
-
-    context.waitFor(client -> inWorld(client) && everyEntityInitialized(client), STEP_TICKS);
-    sameConnection(context, connection);
-    append(report, "mixin-field-init added");
-
-    context.waitFor(
-        client -> inWorld(client) && hasKeyMapping(client) && hasTab(client), STEP_TICKS);
-    sameConnection(context, connection);
-    append(report, "keybind-and-tab added");
+    for (String step : required("rloaded.add-test.steps").split(",", -1)) {
+      String details = step(context, step);
+      sameConnection(context, connection);
+      append(report, details.isEmpty() ? step : step + "; " + details);
+    }
 
     context.waitFor(client -> Files.exists(done), STEP_TICKS);
     context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
     context.waitFor(client -> client.level == null && client.gui.screen() instanceof TitleScreen);
+  }
+
+  // Waits until the step is done, and says what it saw.
+  private static String step(ClientGameTestContext context, String step) {
+    return switch (step) {
+      case "content-basic" -> {
+        context.waitFor(
+            client ->
+                inWorld(client) && BuiltInRegistries.BLOCK.getOptional(BASIC_BLOCK).isPresent(),
+            STEP_TICKS);
+        Item item = BuiltInRegistries.ITEM.getOptional(BASIC_BLOCK).orElseThrow();
+        String stack =
+            context.computeOnClient(client -> new ItemStack(item).getHoverName().getString());
+        context.waitFor(client -> toastShown(client), STEP_TICKS);
+        context.takeScreenshot("rloaded-in-session-add");
+        yield "its item is " + stack;
+      }
+      // The server gives the item once every player has the mod.
+      case "content-basic-item" -> {
+        Item item = BuiltInRegistries.ITEM.getOptional(BASIC_BLOCK).orElseThrow();
+        context.waitFor(
+            client -> inWorld(client) && client.player.getInventory().contains(new ItemStack(item)),
+            STEP_TICKS);
+        yield "";
+      }
+      case "mixin-field-init" -> {
+        context.waitFor(client -> inWorld(client) && everyEntityInitialized(client), STEP_TICKS);
+        yield "";
+      }
+      case "keybind-and-tab" -> {
+        context.waitFor(
+            client -> inWorld(client) && hasKeyMapping(client) && hasTab(client), STEP_TICKS);
+        yield "";
+      }
+      // A generated mod without code: the loader lists it once it is added.
+      default -> {
+        context.waitFor(
+            client -> inWorld(client) && FabricLoader.getInstance().isModLoaded(step), STEP_TICKS);
+        yield "";
+      }
+    };
   }
 
   private static boolean inWorld(Minecraft client) {
