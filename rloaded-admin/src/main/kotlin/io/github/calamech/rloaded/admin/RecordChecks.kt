@@ -62,52 +62,97 @@ public data class ReputationRules(
     }
 }
 
-/** A version or project an add refuses because it is not proven enough. */
-public sealed interface ReputationFailure {
-    /** What is missing, in words for the admin. */
+/** A version or project an add refuses for what Modrinth's records say about it. */
+public sealed interface RecordFailure {
+    /** What is wrong, in words for the admin. */
     public val reason: String
 
-    /** The version is newer than the rules allow. */
+    /** The version is newer than the reputation rules allow. */
     public data class TooRecent(
         val projectId: String,
         val versionNumber: String,
         val publishedAt: Instant,
         val minAge: Duration,
-    ) : ReputationFailure {
+    ) : RecordFailure {
         override val reason: String get() =
             "$projectId $versionNumber was published on $publishedAt, less than ${minAge.toHours()} hours ago"
     }
 
-    /** The project has fewer downloads than the rules ask for. */
+    /** The project has fewer downloads than the reputation rules ask for. */
     public data class TooFewDownloads(
         val projectId: String,
         val downloads: Long,
         val minDownloads: Long,
-    ) : ReputationFailure {
+    ) : RecordFailure {
         override val reason: String get() = "$projectId has $downloads downloads, fewer than $minDownloads"
+    }
+
+    /** The project is in a category the compatibility database refuses. */
+    public data class DeniedCategory(
+        val projectId: String,
+        val category: String,
+        val why: String,
+    ) : RecordFailure {
+        override val reason: String get() = "$projectId is in the $category category: $why"
+    }
+
+    /** The compatibility database refuses the project. */
+    public data class DeniedProject(
+        val projectId: String,
+        val why: String,
+    ) : RecordFailure {
+        override val reason: String get() = "$projectId cannot be added: $why"
+    }
+
+    /** The version was tested with Rloaded and failed. */
+    public data class KnownBroken(
+        val versionId: String,
+        val rloaded: String,
+        val note: String,
+    ) : RecordFailure {
+        override val reason: String get() = "version $versionId failed with Rloaded $rloaded: $note"
     }
 }
 
-/** Checks versions against [rules], with project download counts read from [modrinth]. */
-public class Reputation(
+/**
+ * Checks the versions an add would bring against what Modrinth records about them: the
+ * [reputation][rules] of each version and project, and the [compatibility database][compat]. Project
+ * records are read once, and only when a rule needs them.
+ */
+public class RecordChecks(
     private val modrinth: Modrinth,
     private val rules: ReputationRules,
+    private val compat: CompatDatabase,
     private val clock: Clock,
 ) {
-    /** Every failure of [versions], all of them; an empty list means they are proven enough. */
-    public suspend fun failures(versions: List<ModrinthVersion>): Outcome<List<ReputationFailure>, ModrinthError> {
+    /** Every failure of [versions], all of them; an empty list means none. */
+    public suspend fun failures(versions: List<ModrinthVersion>): Outcome<List<RecordFailure>, ModrinthError> {
         val now = clock.instant()
-        val tooRecent =
-            versions
-                .filter { Duration.between(it.publishedAt, now) < rules.minVersionAge }
-                .map { ReputationFailure.TooRecent(it.projectId, it.versionNumber, it.publishedAt, rules.minVersionAge) }
-        if (rules.minProjectDownloads == 0L) return Outcome.Ok(tooRecent)
+        val fromVersions =
+            versions.flatMap { version ->
+                listOfNotNull(
+                    compat.deniedProjects[version.projectId]?.let { RecordFailure.DeniedProject(version.projectId, it) },
+                    compat.versions[version.id]
+                        ?.takeIf { it.status == CompatStatus.BROKEN }
+                        ?.let { RecordFailure.KnownBroken(version.id, it.rloaded, it.note) },
+                    RecordFailure
+                        .TooRecent(version.projectId, version.versionNumber, version.publishedAt, rules.minVersionAge)
+                        .takeIf { Duration.between(version.publishedAt, now) < rules.minVersionAge },
+                )
+            }
+        if (rules.minProjectDownloads == 0L && compat.deniedCategories.isEmpty()) return Outcome.Ok(fromVersions)
         return modrinth.projects(versions.map { it.projectId }.distinct()).map { projects: Map<String, ModrinthProject> ->
-            tooRecent +
-                projects.values
-                    .filter { it.downloads < rules.minProjectDownloads }
-                    .sortedBy { it.id }
-                    .map { ReputationFailure.TooFewDownloads(it.id, it.downloads, rules.minProjectDownloads) }
+            fromVersions + projects.values.sortedBy { it.id }.flatMap { project -> projectFailures(project) }
         }
     }
+
+    private fun projectFailures(project: ModrinthProject): List<RecordFailure> =
+        project.categories.mapNotNull { category ->
+            compat.deniedCategories[category]?.let { RecordFailure.DeniedCategory(project.id, category, it) }
+        } +
+            listOfNotNull(
+                RecordFailure
+                    .TooFewDownloads(project.id, project.downloads, rules.minProjectDownloads)
+                    .takeIf { project.downloads < rules.minProjectDownloads },
+            )
 }

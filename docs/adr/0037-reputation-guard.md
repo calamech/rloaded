@@ -29,3 +29,5 @@ Checked on 2026-10-31 with `AdminAddGameTest`: a version published a moment ago 
 ## Enforcement
 
 `ReputationRulesTest`, `AdmissionServiceTest`, `ServerConfigTest`, `BootstrapTest`, and `AdminAddGameTest` in the `game-test` CI job.
+
+Amended 2026-10-31: the reputation checks moved into `RecordChecks`, which also applies the compatibility database (ADR 0038).

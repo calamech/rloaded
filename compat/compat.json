@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "deniedCategories": [
+    {
+      "category": "optimization",
+      "reason": "optimization mods replace systems the game builds when it starts"
+    }
+  ],
+  "deniedProjects": [
+    { "projectId": "AANobbMI", "slug": "sodium", "reason": "replaces the renderer, which the game builds when it starts" },
+    { "projectId": "YL57xq9U", "slug": "iris", "reason": "replaces the renderer, which the game builds when it starts" },
+    { "projectId": "gvQqBUqZ", "slug": "lithium", "reason": "replaces game logic that is set up when the game starts" },
+    { "projectId": "VSNURh3q", "slug": "c2me-fabric", "reason": "replaces chunk loading, which runs from the start" },
+    { "projectId": "nmDcB62a", "slug": "modernfix", "reason": "changes how the game starts and loads resources" },
+    { "projectId": "uXXizFIs", "slug": "ferrite-core", "reason": "replaces how block states are stored, which is set up at start" },
+    { "projectId": "5ZwdcRci", "slug": "immediatelyfast", "reason": "replaces parts of the renderer, which the game builds when it starts" },
+    { "projectId": "NNAgCjsB", "slug": "entityculling", "reason": "replaces entity rendering set up when the game starts" },
+    { "projectId": "Orvt0mRa", "slug": "indium", "reason": "plugs into the renderer, which the game builds when it starts" }
+  ],
+  "versions": []
+}

@@ -68,7 +68,8 @@ internal class FakeModrinth(
             """"game_versions": ["26.3"], "loaders": ["fabric"], "dependencies": []}"""
 
     private fun project(mod: FakeMod): String =
-        """{"id": "${mod.projectId}", "title": "${mod.title}", "downloads": 1234, "team": "team${mod.projectId}"}"""
+        """{"id": "${mod.projectId}", "title": "${mod.title}", "downloads": 1234, "team": "team${mod.projectId}", """ +
+            """"categories": ["utility"], "additional_categories": []}"""
 
     private fun wanted(
         exchange: HttpExchange,

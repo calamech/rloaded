@@ -93,7 +93,8 @@ class RecordedModrinth(
                 ).jsonArray
 
         /**
-         * The projects and teams recorded on 2026-10-30, trimmed to the fields Rloaded reads and a few
+         * The projects and teams recorded on 2026-10-30, with their categories read on 2026-10-31,
+         * trimmed to the fields Rloaded reads and a few
          * it ignores: the full answers carry each project's whole description page.
          */
         val PROJECTS_RECORDED: JsonArray = recording("projects-P7dR8mSH-mOgUt4GM-zzzzzzzz.json")
