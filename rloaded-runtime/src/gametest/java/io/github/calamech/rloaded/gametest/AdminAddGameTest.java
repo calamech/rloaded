@@ -151,7 +151,7 @@ public final class AdminAddGameTest {
                           m.startsWith(
                                   "throwsoninit was not added: it failed on the staging server: ")
                               && m.contains(
-                                  "loading the mods threw java.lang.IllegalStateException:"
+                                  "throws-on-init failed as it started: java.lang.IllegalStateException:"
                                       + " throws-on-init fails as it starts, on purpose")
                               && m.contains("latest.log")),
               "the mod that throws as it starts was not refused by the staging server: "

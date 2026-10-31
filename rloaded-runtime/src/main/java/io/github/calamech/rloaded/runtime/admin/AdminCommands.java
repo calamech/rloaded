@@ -8,6 +8,7 @@ import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
 import io.github.calamech.rloaded.admin.CompatDatabase;
 import io.github.calamech.rloaded.admin.JarRules;
+import io.github.calamech.rloaded.admin.LocalCompat;
 import io.github.calamech.rloaded.admin.RecordChecks;
 import io.github.calamech.rloaded.admin.ReputationRules;
 import io.github.calamech.rloaded.admin.Resolver;
@@ -24,6 +25,7 @@ import io.github.calamech.rloaded.runtime.ServerLockfile;
 import io.github.calamech.rloaded.runtime.engine.Admission;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
+import io.github.calamech.rloaded.runtime.join.JoinServer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -56,7 +58,7 @@ public final class AdminCommands {
   private static final String PROJECT = "project";
   private static final String VERSION = "version";
   private static volatile ReputationRules rules;
-  private static volatile CompatDatabase compat;
+  private static volatile LocalCompat compat;
   private static volatile Staging staging;
   private static volatile LiveAdd live;
   private static AdmissionService service;
@@ -75,7 +77,8 @@ public final class AdminCommands {
                 case Outcome.Err<?> err ->
                     throw new IllegalStateException(err.getError().toString());
               };
-          compat = bundledCompatDatabase();
+          compat = localCompat(server);
+          JoinServer.recordFailuresIn(compat);
           staging = staging(server);
           live = new LiveAdd(server);
         });
@@ -182,7 +185,7 @@ public final class AdminCommands {
       service =
           new AdmissionService(
               new Resolver(access.modrinth(), SharedConstants.getCurrentVersion().name()),
-              new RecordChecks(access.modrinth(), rules, compat, clock),
+              new RecordChecks(access.modrinth(), rules, () -> compat.current(), clock),
               new ArtifactStore(
                   cache, access.http(), new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES),
               new JarRules(Admission.classifier(), AdminCommands::serverRefusal, staging),
@@ -220,6 +223,16 @@ public final class AdminCommands {
         directory.resolve("rloaded").resolve("staging"),
         directory.resolve("eula.txt"),
         settings.getTimeout());
+  }
+
+  // What this server recorded goes on top of the shipped database; a file it cannot read stops the
+  // server, so the admin fixes or removes it.
+  private static LocalCompat localCompat(MinecraftServer server) {
+    Path file = server.getServerDirectory().resolve("rloaded").resolve("compat-local.json");
+    return switch (LocalCompat.Companion.open(file, bundledCompatDatabase())) {
+      case Outcome.Ok<?> ok -> (LocalCompat) ok.getValue();
+      case Outcome.Err<?> err -> throw new IllegalStateException(err.getError().toString());
+    };
   }
 
   // The database ships in the mod jar; a broken one is a defect of the build.

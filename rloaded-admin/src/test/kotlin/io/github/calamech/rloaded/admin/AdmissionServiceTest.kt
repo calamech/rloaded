@@ -215,6 +215,21 @@ class AdmissionServiceTest {
     }
 
     @Test
+    fun `refuses a version the server recorded as broken after it started`() {
+        publish("flaky", jar("flaky"))
+        publish("steady", jar("steady"))
+        assertIs<Outcome.Ok<*>>(add("steady"))
+
+        assertEquals(Outcome.Ok(true), local.recordBroken("vflaky", "0.2.0", "failed to load on a player's game"))
+
+        assertEquals(
+            "version vflaky failed with Rloaded 0.2.0: failed to load on a player's game",
+            (add("flaky") as Outcome.Err).error.reason,
+        )
+        assertEquals(0, server.hits("/cdn/flaky.jar"))
+    }
+
+    @Test
     fun `refuses a lockfile it cannot read`() {
         lockfile.parent.toFile().mkdirs()
         lockfile.writeText("{}")
@@ -250,7 +265,7 @@ class AdmissionServiceTest {
         val clock = Clock.fixed(now, ZoneOffset.UTC)
         AdmissionService(
             Resolver(modrinth, "26.3"),
-            RecordChecks(modrinth, ReputationRules(Duration.ofHours(72), 1_000), compat, clock),
+            RecordChecks(modrinth, ReputationRules(Duration.ofHours(72), 1_000), { local.current() }, clock),
             ArtifactStore(directory.resolve("store"), http, RetryPolicy(maxAttempts = 1)),
             JarRules(
                 JarClassifier(emptySet(), setOf("default")),
@@ -282,6 +297,7 @@ class AdmissionServiceTest {
             deniedProjects = mapOf("renderer" to "it replaces the renderer"),
             versions = mapOf("vcrashy" to TestedVersion(CompatStatus.BROKEN, "0.1.0", "crashes on join")),
         )
+    private val local by lazy { (LocalCompat.open(directory.resolve("compat-local.json"), compat) as Outcome.Ok).value }
 
     init {
         // Modrinth's project records, with the download counts set in [downloads], and no team members.

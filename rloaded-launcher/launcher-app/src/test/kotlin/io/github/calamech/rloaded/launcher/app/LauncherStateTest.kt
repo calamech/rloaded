@@ -7,6 +7,7 @@ import io.github.calamech.rloaded.core.runtime.InstallError
 import io.github.calamech.rloaded.launcher.InstallFailure
 import io.github.calamech.rloaded.launcher.LaunchFailure
 import io.github.calamech.rloaded.launcher.OfflineProfile
+import io.github.calamech.rloaded.launcher.Relaunch
 import io.github.calamech.rloaded.launcher.ServerAddress
 import io.github.calamech.rloaded.launcher.StartFailure
 import io.github.calamech.rloaded.launcher.UnknownPlaceholder
@@ -101,6 +102,40 @@ class LauncherStateTest {
             process.destroy()
             assertEquals(Status.Stopped(3), state.status.value)
             assertTrue(state.canPlay)
+        }
+
+    @Test
+    fun `starts the game again for the same server when it asks, then shows the exit`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val exits = ArrayDeque(listOf(75, 0))
+            val servers = mutableListOf<ServerAddress?>()
+            val state =
+                LauncherState({ _, server, _ ->
+                    servers += server
+                    Outcome.Ok(FakeProcess(exits.removeFirst()).also { it.destroy() })
+                }, backgroundScope) { logged += it }
+
+            state.play("Dev", "localhost:25566")
+
+            assertEquals(List<ServerAddress?>(2) { ServerAddress("localhost", 25566) }, servers)
+            assertEquals(Status.Stopped(0), state.status.value)
+            assertTrue(logged.single().contains("started again"))
+        }
+
+    @Test
+    fun `stops starting a game that keeps asking`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var launches = 0
+            val state =
+                LauncherState({ _, _, _ ->
+                    launches++
+                    Outcome.Ok(FakeProcess(75).also { it.destroy() })
+                }, backgroundScope) {}
+
+            state.play("Dev", "localhost:25566")
+
+            assertEquals(Relaunch.MAX_IN_A_ROW + 1, launches)
+            assertEquals(Status.Stopped(75), state.status.value)
         }
 
     @Test

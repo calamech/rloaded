@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.DedicatedServerModInitializer;
@@ -34,7 +35,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
  *
  * <p>Runs on the game thread. A refusal happens before anything of the mods is registered; any
  * failure after that leaves the game in a state only a restart cleans, and is thrown as an
- * unchecked exception.
+ * unchecked exception: a {@link HotAddFailure} naming the mod when one of its entrypoints fails.
  */
 public final class HotAdd {
   private HotAdd() {}
@@ -176,22 +177,25 @@ public final class HotAdd {
     BuiltInRegistries.REGISTRY.forEach(registries::add);
     registries.forEach(RegistryThaw::thaw);
     try {
-      for (ModInitializer main : entrypoints("main", ModInitializer.class, mods)) {
-        main.onInitialize();
-      }
+      run(mods, "main", ModInitializer.class, ModInitializer::onInitialize);
       if (LoaderBridge.environment() == EnvType.CLIENT) {
-        entrypoints("client", ClientModInitializer.class, mods)
-            .forEach(ClientModInitializer::onInitializeClient);
+        run(mods, "client", ClientModInitializer.class, ClientModInitializer::onInitializeClient);
       } else {
-        entrypoints("server", DedicatedServerModInitializer.class, mods)
-            .forEach(DedicatedServerModInitializer::onInitializeServer);
+        run(
+            mods,
+            "server",
+            DedicatedServerModInitializer.class,
+            DedicatedServerModInitializer::onInitializeServer);
       }
     } finally {
       registries.forEach(RegistryThaw::freeze);
     }
   }
 
-  private static <T> List<T> entrypoints(String key, Class<T> type, List<ModJar> mods) {
+  // The game checks its registries with assertions: a mod that breaks them fails like one that
+  // throws. Either names the mod.
+  private static <T> void run(
+      List<ModJar> mods, String key, Class<T> type, Consumer<T> initializer) {
     List<String> order = ids(mods);
     List<EntrypointContainer<T>> containers =
         FabricLoader.getInstance().getEntrypointContainers(key, type).stream()
@@ -200,7 +204,14 @@ public final class HotAdd {
                 Comparator.comparingInt(
                     container -> order.indexOf(container.getProvider().getMetadata().getId())))
             .toList();
-    return containers.stream().map(EntrypointContainer::getEntrypoint).toList();
+    for (EntrypointContainer<T> container : containers) {
+      try {
+        initializer.accept(container.getEntrypoint());
+      } catch (RuntimeException | AssertionError e) {
+        String id = container.getProvider().getMetadata().getId();
+        throw new HotAddFailure(mods.get(order.indexOf(id)).path(), id, e);
+      }
+    }
   }
 
   private static List<String> ids(List<ModJar> mods) {

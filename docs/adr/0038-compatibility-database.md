@@ -33,3 +33,5 @@ Checked on 2026-10-31 with `AdminAddGameTest`: a project in the `optimization` c
 ## Enforcement
 
 `CompatDatabaseTest` (reads the shipped file), `AdmissionServiceTest`, `ModrinthProjectsTest`, and `AdminAddGameTest` in the `game-test` CI job.
+
+Amended 2026-10-31: servers now keep the versions that failed on players' games in `rloaded/compat-local.json`, in the format of this file, and admission reads it on top of the shipped database (ADR 0043).

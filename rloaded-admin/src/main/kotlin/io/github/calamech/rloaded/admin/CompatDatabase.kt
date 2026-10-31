@@ -24,6 +24,23 @@ public data class CompatDatabase(
         public const val SCHEMA: Int = 1
 
         private val JSON = Json { ignoreUnknownKeys = false }
+        private val PRETTY =
+            Json {
+                prettyPrint = true
+                encodeDefaults = true
+            }
+
+        /** The text of a database that lists [versions] and refuses no category or project. */
+        internal fun versionsOnly(versions: Map<String, TestedVersion>): String =
+            PRETTY.encodeToString(
+                FileJson.serializer(),
+                FileJson(
+                    SCHEMA,
+                    emptyList(),
+                    emptyList(),
+                    versions.map { (id, tested) -> VersionJson(id, tested.status, tested.rloaded, tested.note) },
+                ),
+            ) + "\n"
 
         /** Reads [text]; an unknown field, a missing one or a project listed twice refuses the whole file. */
         public fun parse(text: String): Outcome<CompatDatabase, String> =

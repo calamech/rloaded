@@ -116,18 +116,19 @@ public sealed interface RecordFailure {
 
 /**
  * Checks the versions an add would bring against what Modrinth records about them: the
- * [reputation][rules] of each version and project, and the [compatibility database][compat]. Project
- * records are read once, and only when a rule needs them.
+ * [reputation][rules] of each version and project, and the compatibility database [compat] gives at
+ * the time of the check. Project records are read once, and only when a rule needs them.
  */
 public class RecordChecks(
     private val modrinth: Modrinth,
     private val rules: ReputationRules,
-    private val compat: CompatDatabase,
+    private val compat: () -> CompatDatabase,
     private val clock: Clock,
 ) {
     /** Every failure of [versions], all of them; an empty list means none. */
     public suspend fun failures(versions: List<ModrinthVersion>): Outcome<List<RecordFailure>, ModrinthError> {
         val now = clock.instant()
+        val compat = compat()
         val fromVersions =
             versions.flatMap { version ->
                 listOfNotNull(
@@ -142,11 +143,14 @@ public class RecordChecks(
             }
         if (rules.minProjectDownloads == 0L && compat.deniedCategories.isEmpty()) return Outcome.Ok(fromVersions)
         return modrinth.projects(versions.map { it.projectId }.distinct()).map { projects: Map<String, ModrinthProject> ->
-            fromVersions + projects.values.sortedBy { it.id }.flatMap { project -> projectFailures(project) }
+            fromVersions + projects.values.sortedBy { it.id }.flatMap { project -> projectFailures(compat, project) }
         }
     }
 
-    private fun projectFailures(project: ModrinthProject): List<RecordFailure> =
+    private fun projectFailures(
+        compat: CompatDatabase,
+        project: ModrinthProject,
+    ): List<RecordFailure> =
         project.categories.mapNotNull { category ->
             compat.deniedCategories[category]?.let { RecordFailure.DeniedCategory(project.id, category, it) }
         } +

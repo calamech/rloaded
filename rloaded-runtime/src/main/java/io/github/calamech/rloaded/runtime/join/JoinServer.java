@@ -1,12 +1,15 @@
 package io.github.calamech.rloaded.runtime.join;
 
+import io.github.calamech.rloaded.admin.LocalCompat;
 import io.github.calamech.rloaded.admin.LockfileLocation;
 import io.github.calamech.rloaded.core.join.JoinDeadlines;
 import io.github.calamech.rloaded.core.join.JoinRefusal;
 import io.github.calamech.rloaded.core.join.ServerJoin;
+import io.github.calamech.rloaded.core.lockfile.LockedMod;
 import io.github.calamech.rloaded.core.lockfile.Lockfile;
 import io.github.calamech.rloaded.core.trust.ServerIdentity;
 import io.github.calamech.rloaded.protocol.InstallResult;
+import io.github.calamech.rloaded.protocol.ModEntry;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.runtime.ServerLockfile;
 import java.nio.file.Files;
@@ -18,26 +21,38 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConfigurationTask;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The server's side of a join on a dedicated server: every joining player goes through the {@code
  * rloaded:install} configuration task, which sends the server's hello and its signed manifest and
  * waits for the client's result. It runs before Fabric's registry sync, so the client has loaded
  * the mods' content when raw ids are synced.
+ *
+ * <p>A player whose game fails to load a mod of the lockfile is disconnected with the reason; the
+ * server keeps the mod, records its version as broken in its local compatibility data so it cannot
+ * be added again, and tells the admin in its log.
  */
 public final class JoinServer {
+  private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
   private static final Identifier BEFORE_REGISTRY_SYNC =
       Identifier.fromNamespaceAndPath("rloaded", "install");
   private static final int MAX_SERVER_NAME = 64;
+  private static final int MAX_LOGGED_REPORT = 1000;
+  private static final int MAX_NOTE = 200;
   private static volatile ServerIdentity identity;
   private static volatile String name;
   private static volatile ServerJoin join;
+  private static volatile Lockfile lockfile;
+  private static volatile LocalCompat compat;
   private static volatile JoinDeadlines<ServerConfigurationPacketListenerImpl> deadlines;
 
   private JoinServer() {}
@@ -118,7 +133,13 @@ public final class JoinServer {
    * from now on.
    */
   public static void update(Lockfile lockfile) {
+    JoinServer.lockfile = lockfile;
     join = new ServerJoin(identity, lockfile, name);
+  }
+
+  /** Records in {@code compat} the versions that players' games fail to load. */
+  public static void recordFailuresIn(LocalCompat compat) {
+    JoinServer.compat = compat;
   }
 
   private static void configure(ServerConfigurationPacketListenerImpl listener) {
@@ -148,14 +169,67 @@ public final class JoinServer {
           listener.disconnect(
               Component.translatableWithFallback(
                   "rloaded.disconnect.declined", "You chose not to install this server's mods."));
-      case InstallResult.Failed failed ->
-          listener.disconnect(
-              Component.translatableWithFallback(
-                  "rloaded.disconnect.failed",
-                  "The mods could not be installed: %s",
-                  failed.getReport()));
+      case InstallResult.Failed failed -> {
+        record(listener.getOwner().name(), failed);
+        listener.disconnect(
+            Component.translatableWithFallback(
+                "rloaded.disconnect.failed",
+                "The mods could not be installed: %s",
+                failed.getReport()));
+      }
       default -> throw new IllegalStateException("unknown install result " + result);
     }
+  }
+
+  // The report comes from the player's game: it is kept to one line and bounded before it is logged
+  // or written.
+  private static void record(String player, InstallResult.Failed failed) {
+    String report = printable(failed.getReport(), MAX_LOGGED_REPORT);
+    ModEntry entry =
+        lockfile.getMods().stream()
+            .map(LockedMod::getEntry)
+            .filter(mod -> mod.getProjectId().equals(failed.getFailingMod()))
+            .findFirst()
+            .orElse(null);
+    if (entry == null) {
+      LOGGER.warn("{} could not install the server's mods: {}", player, report);
+      return;
+    }
+    String note = "failed to load on a player's game: " + printable(report, MAX_NOTE);
+    switch (compat.recordBroken(entry.getVersionId(), rloadedVersion(), note)) {
+      case Outcome.Ok<?> ok ->
+          LOGGER.error(
+              "{}'s game could not load {} (version {}): {}. The server keeps the mod; {} now"
+                  + " marks this version broken, so it cannot be added again.",
+              player,
+              entry.getProjectId(),
+              entry.getVersionId(),
+              report,
+              compat.getFile());
+      case Outcome.Err<?> err ->
+          LOGGER.error(
+              "{}'s game could not load {} (version {}): {}. The server keeps the mod, and"
+                  + " cannot record the failure: {}",
+              player,
+              entry.getProjectId(),
+              entry.getVersionId(),
+              report,
+              err.getError());
+    }
+  }
+
+  private static String printable(String text, int max) {
+    String line = text.replaceAll("\\p{Cntrl}", " ");
+    return line.length() > max ? line.substring(0, max) : line;
+  }
+
+  private static String rloadedVersion() {
+    return FabricLoader.getInstance()
+        .getModContainer("rloaded")
+        .orElseThrow()
+        .getMetadata()
+        .getVersion()
+        .getFriendlyString();
   }
 
   private static Component refusal(JoinRefusal refusal) {

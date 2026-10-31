@@ -31,6 +31,13 @@ class ClientTestCommandTest {
     }
 
     @Test
+    fun `keeps the launcher's mods as they are without test mods`() {
+        val command = listOf("java", "-Dfabric.addMods=base.jar", "Main")
+
+        assertEquals(listOf("java", "-Dx=y", "-Dfabric.addMods=base.jar", "Main"), withTestMods(command, emptyList(), mapOf("x" to "y")))
+    }
+
+    @Test
     fun `refuses a command that does not load mods`() {
         val refused = runCatching { withTestMods(listOf("java", "Main"), listOf(Path.of("a.jar")), emptyMap()) }.exceptionOrNull()
 
