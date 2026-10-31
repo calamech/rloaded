@@ -211,6 +211,7 @@ fun testMod(
 testMod("gametest", seesRuntime = true)
 testMod("contentBasic", seesRuntime = false)
 testMod("mixinLoadedClass", seesRuntime = false)
+testMod("mixinFieldInit", seesRuntime = false)
 testMod("joinTest", seesRuntime = false)
 testMod("throwsOnInit", seesRuntime = false)
 testMod("addTest", seesRuntime = true)

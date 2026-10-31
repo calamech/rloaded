@@ -3,6 +3,7 @@ package io.github.calamech.rloaded.testmods.addtest;
 import io.github.calamech.rloaded.runtime.join.client.JoinClient;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,15 +18,15 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Joins a server running in another process, which this player already trusts, and stays in the
- * world while the server's admin adds content-basic, then mixin-loaded-class. After each add, it
+ * world while the server's admin adds content-basic, then mixin-field-init. After each add, it
  * checks that it is back in the world on the same connection, that the mod works, and that a toast
  * named the new mod; after the first, it waits for the new item the server gives; it reports each
  * step in {@code rloaded.add-test.report} and leaves once the file {@code rloaded.add-test.done}
@@ -35,6 +36,7 @@ public final class AddClientGameTest implements FabricClientGameTest {
   private static final Identifier BASIC_BLOCK =
       Identifier.fromNamespaceAndPath("content-basic", "basic_block");
   private static final int STEP_TICKS = 20 * 60 * 5;
+  private static final int MIN_ENTITIES = 3;
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded add test");
 
   /** The log line after which the add check counts errors: what came before is not about adds. */
@@ -76,9 +78,9 @@ public final class AddClientGameTest implements FabricClientGameTest {
         client -> client.player.getInventory().contains(new ItemStack(item)), STEP_TICKS);
     append(report, "content-basic item received");
 
-    context.waitFor(client -> inWorld(client) && "hello #1".equals(greet(Items.STONE)), STEP_TICKS);
+    context.waitFor(client -> inWorld(client) && everyEntityInitialized(client), STEP_TICKS);
     sameConnection(context, connection);
-    append(report, "mixin-loaded-class added");
+    append(report, "mixin-field-init added");
 
     context.waitFor(client -> Files.exists(done), STEP_TICKS);
     context.runOnClient(client -> client.disconnect(new TitleScreen(), false));
@@ -127,18 +129,28 @@ public final class AddClientGameTest implements FabricClientGameTest {
     return value;
   }
 
-  // Before the add, the method is missing: that is the state waited out, not a linkage defect.
+  // The client's entities are new objects after the reconfiguration: each has the mixin's field.
+  // Before the add, the interface is missing: that is the state waited out, not a linkage defect.
   @SuppressWarnings("RethrowReflectiveOperationExceptionAsLinkageError")
-  private static Object greet(Item item) {
+  private static boolean everyEntityInitialized(Minecraft client) {
     try {
-      Class<?> greeting =
+      Class<?> marker =
           Class.forName(
-              "io.github.calamech.rloaded.testmods.mixinloadedclass.ItemGreeting",
+              "io.github.calamech.rloaded.testmods.mixinfieldinit.FieldInitMarker",
               true,
-              Item.class.getClassLoader());
-      return greeting.getMethod("mixinLoadedClass$greet").invoke(item);
+              Entity.class.getClassLoader());
+      Method read = marker.getMethod("mixinFieldInit$marker");
+      int entities = 0;
+      for (Entity entity : client.level.entitiesForRendering()) {
+        if (!"initialized".equals(read.invoke(entity))) {
+          return false;
+        }
+        entities++;
+      }
+      // The two players and the armor stand summoned before the adds.
+      return entities >= MIN_ENTITIES;
     } catch (ReflectiveOperationException e) {
-      return null;
+      return false;
     }
   }
 }
