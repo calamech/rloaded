@@ -10,8 +10,12 @@ import io.github.calamech.rloaded.admin.JarRules;
 import io.github.calamech.rloaded.admin.RecordChecks;
 import io.github.calamech.rloaded.admin.ReputationRules;
 import io.github.calamech.rloaded.admin.Resolver;
+import io.github.calamech.rloaded.admin.staging.Staging;
+import io.github.calamech.rloaded.admin.staging.StagingServer;
+import io.github.calamech.rloaded.admin.staging.StagingSettings;
 import io.github.calamech.rloaded.core.download.ArtifactStore;
 import io.github.calamech.rloaded.core.download.RetryPolicy;
+import io.github.calamech.rloaded.core.runtime.ServerLaunch;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.runtime.ModrinthAccess;
 import io.github.calamech.rloaded.runtime.ServerLockfile;
@@ -40,8 +44,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The console commands an admin manages the server's mods with. {@code rloaded add <project>
- * [version]} admits a mod from Modrinth and writes it, with its dependencies, to the lockfile: the
- * server loads it at its next start, and players install it when they next join.
+ * [version]} admits a mod from Modrinth, tries it on a staging server, and writes it, with its
+ * dependencies, to the lockfile: the server loads it at its next start, and players install it when
+ * they next join.
  */
 public final class AdminCommands {
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
@@ -49,6 +54,7 @@ public final class AdminCommands {
   private static final String VERSION = "version";
   private static volatile ReputationRules rules;
   private static volatile CompatDatabase compat;
+  private static volatile Staging staging;
   private static AdmissionService service;
 
   private AdminCommands() {}
@@ -66,6 +72,7 @@ public final class AdminCommands {
                     throw new IllegalStateException(err.getError().toString());
               };
           compat = bundledCompatDatabase();
+          staging = staging(server);
         });
     CommandRegistrationCallback.EVENT.register(
         (dispatcher, context, selection) ->
@@ -159,11 +166,41 @@ public final class AdminCommands {
               new RecordChecks(access.modrinth(), rules, compat, clock),
               new ArtifactStore(
                   cache, access.http(), new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES),
-              new JarRules(Admission.classifier(), AdminCommands::serverRefusal),
+              new JarRules(Admission.classifier(), AdminCommands::serverRefusal, staging),
               ServerLockfile.of(server),
               clock);
     }
     return service;
+  }
+
+  // A server that stages needs the launch the bootstrap describes; without it, it does not start.
+  private static Staging staging(MinecraftServer server) {
+    StagingSettings settings =
+        switch (StagingSettings.Companion.fromProperties(System::getProperty)) {
+          case Outcome.Ok<?> ok -> (StagingSettings) ok.getValue();
+          case Outcome.Err<?> err -> throw new IllegalStateException(err.getError().toString());
+        };
+    if (!settings.getEnabled()) {
+      LOGGER.warn(
+          "Staging is off in rloaded-server.toml: mods are added without being tried first");
+      return Staging.Companion.getOFF();
+    }
+    String described = System.getProperty(ServerLaunch.PROPERTY);
+    if (described == null) {
+      throw new IllegalStateException(
+          ServerLaunch.PROPERTY + " is not set; start the server with rloaded-server.jar");
+    }
+    ServerLaunch launch =
+        switch (ServerLaunch.Companion.read(Path.of(described))) {
+          case Outcome.Ok<?> ok -> (ServerLaunch) ok.getValue();
+          case Outcome.Err<?> err -> throw new IllegalStateException(err.getError().toString());
+        };
+    Path directory = server.getServerDirectory();
+    return new StagingServer(
+        launch,
+        directory.resolve("rloaded").resolve("staging"),
+        directory.resolve("eula.txt"),
+        settings.getTimeout());
   }
 
   // The database ships in the mod jar; a broken one is a defect of the build.

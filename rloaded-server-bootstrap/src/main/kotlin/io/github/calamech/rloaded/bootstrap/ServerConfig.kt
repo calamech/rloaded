@@ -2,6 +2,7 @@ package io.github.calamech.rloaded.bootstrap
 
 import com.akuleshov7.ktoml.Toml
 import io.github.calamech.rloaded.admin.ReputationRules
+import io.github.calamech.rloaded.admin.staging.StagingSettings
 import io.github.calamech.rloaded.core.join.JoinDeadlines
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.flatMap
@@ -14,6 +15,7 @@ public data class ServerConfig(
     val server: ServerSection = ServerSection(),
     val rollout: RolloutSection = RolloutSection(),
     val reputation: ReputationSection = ReputationSection(),
+    val staging: StagingSection = StagingSection(),
 ) {
     /** The settings the game reads, as the system properties the bootstrap starts it with. */
     public fun gameProperties(): Map<String, String> =
@@ -21,6 +23,8 @@ public data class ServerConfig(
             JoinDeadlines.TIMEOUT_PROPERTY to rollout.clientTimeoutSeconds.toString(),
             ReputationRules.VERSION_AGE_PROPERTY to reputation.minVersionAgeHours.toString(),
             ReputationRules.DOWNLOADS_PROPERTY to reputation.minProjectDownloads.toString(),
+            StagingSettings.ENABLED_PROPERTY to staging.enabled.toString(),
+            StagingSettings.TIMEOUT_PROPERTY to staging.timeoutSeconds.toString(),
         )
 
     /** Reading and writing `rloaded-server.toml`. */
@@ -47,6 +51,13 @@ public data class ServerConfig(
             # A mod is added only once its project has been downloaded this many times. 0 turns the rule off.
             minProjectDownloads = 1000
 
+            [staging]
+            # Before a mod is added, try it with the server's mods on a test server that nobody plays on,
+            # in a new flat world, and refuse it if it fails there.
+            enabled = true
+            # Seconds the test server may run before the mod is refused.
+            timeoutSeconds = 180
+
             """.trimIndent()
 
         private val MEMORY_RANGE = 512..65_536
@@ -70,6 +81,10 @@ public data class ServerConfig(
 
                     config.reputation.minProjectDownloads !in ReputationRules.PROJECT_DOWNLOADS -> {
                         Outcome.Err(outOfRange("reputation.minProjectDownloads", ReputationRules.PROJECT_DOWNLOADS))
+                    }
+
+                    config.staging.timeoutSeconds !in StagingSettings.TIMEOUT_SECONDS -> {
+                        Outcome.Err(outOfRange("staging.timeoutSeconds", StagingSettings.TIMEOUT_SECONDS))
                     }
 
                     else -> {
@@ -116,4 +131,11 @@ public data class RolloutSection(
 public data class ReputationSection(
     val minVersionAgeHours: Long = ReputationRules.DEFAULT_VERSION_AGE_HOURS,
     val minProjectDownloads: Long = ReputationRules.DEFAULT_PROJECT_DOWNLOADS,
+)
+
+/** The `[staging]` table. */
+@Serializable
+public data class StagingSection(
+    val enabled: Boolean = true,
+    val timeoutSeconds: Long = StagingSettings.DEFAULT_TIMEOUT_SECONDS,
 )

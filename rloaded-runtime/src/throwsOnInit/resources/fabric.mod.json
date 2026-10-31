@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "throws-on-init",
+  "version": "${version}",
+  "name": "Throws on init (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.calamech.rloaded.testmods.throwsoninit.ThrowsOnInit"]
+  },
+  "depends": {
+    "minecraft": "26.3"
+  }
+}

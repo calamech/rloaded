@@ -212,6 +212,7 @@ testMod("gametest", seesRuntime = true)
 testMod("contentBasic", seesRuntime = false)
 testMod("mixinLoadedClass", seesRuntime = false)
 testMod("joinTest", seesRuntime = false)
+testMod("throwsOnInit", seesRuntime = false)
 
 // After the test mods: they compile against Minecraft and Fabric only, while the game test mod
 // calls the libraries the runtime mod nests.

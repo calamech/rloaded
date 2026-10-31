@@ -12,16 +12,18 @@ val hotAddMods = configurations.dependencyScope("hotAddMods")
 val hotAddModJars = configurations.resolvable("hotAddModJars") { extendsFrom(hotAddMods.get()) }
 val joinClientMods = configurations.dependencyScope("joinClientMods")
 val joinClientModJars = configurations.resolvable("joinClientModJars") { extendsFrom(joinClientMods.get()) }
+val stagingRefusedMods = configurations.dependencyScope("stagingRefusedMods")
+val stagingRefusedModJars = configurations.resolvable("stagingRefusedModJars") { extendsFrom(stagingRefusedMods.get()) }
 val clientTestMods = configurations.dependencyScope("clientTestMods")
 val clientTestModJars = configurations.resolvable("clientTestModJars") { extendsFrom(clientTestMods.get()) }
 
 dependencies {
+    implementation(project(":rloaded-admin"))
     implementation(project(":rloaded-core"))
     implementation(project(":rloaded-server-bootstrap"))
     implementation(project(":rloaded-launcher:launcher-core"))
     implementation(project(":rloaded-modrinth"))
     agent(project(":rloaded-agent"))
-    testMods("io.github.calamech.rloaded:rloaded-runtime") { isTransitive = false }
     testMods("io.github.calamech.rloaded:rloaded-runtime") {
         isTransitive = false
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-gametest") }
@@ -32,6 +34,10 @@ dependencies {
             isTransitive = false
             capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }
         }
+    }
+    stagingRefusedMods("io.github.calamech.rloaded:rloaded-runtime") {
+        isTransitive = false
+        capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-throws-on-init") }
     }
     runtimeMod("io.github.calamech.rloaded:rloaded-runtime") { isTransitive = false }
     clientTestMods("io.github.calamech.rloaded:rloaded-runtime") {
@@ -52,7 +58,7 @@ kover {
     reports {
         filters {
             excludes {
-                classes("io.github.calamech.rloaded.gametests.MainKt*")
+                classes("io.github.calamech.rloaded.gametests.MainKt*", "io.github.calamech.rloaded.gametests.StagingMainKt*")
                 // Like Main, but starts a client; the command it builds is unit tested in ClientTestCommand.
                 classes("io.github.calamech.rloaded.gametests.ClientMainKt*")
                 // These start servers and clients in processes of their own; the logic they check is tested
@@ -82,11 +88,15 @@ tasks.register<JavaExec>("gameTest") {
     val run = layout.buildDirectory.dir("game-test/run")
     val report = layout.buildDirectory.file("game-test/report.xml")
     val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
     val modFiles = files(testModJars)
     val hotAddFiles = files(hotAddModJars)
+    val refusedFile = files(stagingRefusedModJars)
     inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
     inputs.files(modFiles).withPropertyName("testMods")
     inputs.files(hotAddFiles).withPropertyName("hotAddMods")
+    inputs.files(refusedFile).withPropertyName("stagingRefusedMod")
     outputs.file(report)
     argumentProviders.add {
         listOf(
@@ -94,8 +104,37 @@ tasks.register<JavaExec>("gameTest") {
             run.get().asFile.absolutePath,
             report.get().asFile.absolutePath,
             agentFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            refusedFile.singleFile.absolutePath,
             hotAddFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         ) + modFiles.files.map { it.absolutePath }
+    }
+}
+
+// Tries content-basic and mixin-loaded-class on a staging server started the way a real server
+// starts one, while the game port is taken. Not part of check: it downloads the server and runs it,
+// so CI runs it in the game test job.
+tasks.register<JavaExec>("stagingTest") {
+    description = "Tries mods on a staging server like an add does."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.StagingMainKt"
+    val cache = layout.buildDirectory.dir("game-test/cache")
+    val run = layout.buildDirectory.dir("staging-test/run")
+    val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
+    val candidateFiles = files(hotAddModJars)
+    inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
+    inputs.files(candidateFiles).withPropertyName("candidates")
+    argumentProviders.add {
+        listOf(
+            cache.get().asFile.absolutePath,
+            run.get().asFile.absolutePath,
+            agentFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            candidateFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+        )
     }
 }
 

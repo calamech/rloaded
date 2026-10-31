@@ -1,5 +1,7 @@
 package io.github.calamech.rloaded.admin
 
+import io.github.calamech.rloaded.admin.staging.Staging
+import io.github.calamech.rloaded.admin.staging.StagingFailure
 import io.github.calamech.rloaded.core.admission.JarClassifier
 import io.github.calamech.rloaded.core.admission.JarProblem
 import io.github.calamech.rloaded.core.admission.JarReport
@@ -37,10 +39,14 @@ public fun interface ServerJarCheck {
     public fun refusal(jars: List<Path>): String?
 }
 
-/** The rules a mod's jar must pass: the static classifier, then the server's own check of what it would load. */
+/**
+ * The rules a mod's jar must pass: the static classifier, the server's own check of what it would
+ * load, then a run on a staging server.
+ */
 public data class JarRules(
     val classifier: JarClassifier,
     val serverCheck: ServerJarCheck,
+    val staging: Staging,
 )
 
 /** Where the server's lockfile is, and what a server without one starts from. */
@@ -135,12 +141,20 @@ public sealed interface AddRefusal {
     public data class ServerRefused(
         override val reason: String,
     ) : AddRefusal
+
+    /** The mods failed on the staging server, or it could not judge them. */
+    public data class StagingRefused(
+        val failure: StagingFailure,
+    ) : AddRefusal {
+        override val reason: String get() = failure.reason
+    }
 }
 
 /**
  * Adds a mod from Modrinth to the server's lockfile, with what it needs: resolves it, refuses
- * versions Modrinth's records rule out (reputation, compatibility database), downloads the files into [store], refuses any jar the rules or
- * the server refuse, then writes every entry to the lockfile in one step. The only writer of the
+ * versions Modrinth's records rule out (reputation, compatibility database), downloads the files
+ * into [store], refuses any jar the rules or the server refuse, tries the jars the server would
+ * load on a staging server, then writes every entry to the lockfile in one step. The only writer of the
  * lockfile; one add runs at a time.
  */
 public class AdmissionService(
@@ -171,6 +185,7 @@ public class AdmissionService(
                     .flatMap { versions -> proven(versions) }
                     .flatMap { versions -> download(versions) }
                     .flatMap { downloaded -> admit(downloaded) }
+                    .flatMap { admitted -> stage(admitted) }
                     .flatMap { admitted -> write(current, admitted, addedBy) }
             }
         } finally {
@@ -216,7 +231,12 @@ public class AdmissionService(
                     .map { jars -> files.indices.map { Downloaded(files[it].first, files[it].second, jars[it]) } }
             }
 
-    private fun admit(downloaded: List<Downloaded>): Outcome<List<AddedMod>, AddRefusal> =
+    private class Admitted(
+        val jar: Path,
+        val mod: AddedMod,
+    )
+
+    private fun admit(downloaded: List<Downloaded>): Outcome<List<Admitted>, AddRefusal> =
         downloaded
             .traverse { mod ->
                 jarRules.classifier
@@ -224,16 +244,27 @@ public class AdmissionService(
                     .mapError<JarReport, JarProblem, AddRefusal> { AddRefusal.Unreadable(it) }
                     .flatMap { report ->
                         if (report.refusals.isEmpty()) {
-                            entry(mod, report.side).map { mod.jar to it }
+                            entry(mod, report.side).map { Admitted(mod.jar, it) }
                         } else {
                             Outcome.Err(AddRefusal.Refused(report.refusals))
                         }
                     }
             }.flatMap { admitted ->
-                // The server checks what it loads itself; mods for the client only are the players' to load.
-                val refusal = jarRules.serverCheck.refusal(admitted.filter { it.second.entry.side != Side.CLIENT }.map { it.first })
-                if (refusal == null) Outcome.Ok(admitted.map { it.second }) else Outcome.Err(AddRefusal.ServerRefused(refusal))
+                val refusal = jarRules.serverCheck.refusal(serverJars(admitted))
+                if (refusal == null) Outcome.Ok(admitted) else Outcome.Err(AddRefusal.ServerRefused(refusal))
             }
+
+    private suspend fun stage(admitted: List<Admitted>): Outcome<List<AddedMod>, AddRefusal> {
+        val jars = serverJars(admitted)
+        if (jars.isEmpty()) return Outcome.Ok(admitted.map { it.mod })
+        return jarRules.staging
+            .tryOut(jars)
+            .mapError<Unit, StagingFailure, AddRefusal> { AddRefusal.StagingRefused(it) }
+            .map { admitted.map { it.mod } }
+    }
+
+    // The server checks and tries what it loads itself; mods for the client only are the players' to load.
+    private fun serverJars(admitted: List<Admitted>): List<Path> = admitted.filter { it.mod.entry.side != Side.CLIENT }.map { it.jar }
 
     private fun entry(
         mod: Downloaded,

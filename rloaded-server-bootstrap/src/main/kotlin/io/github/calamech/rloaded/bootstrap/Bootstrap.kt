@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.bootstrap
 
+import io.github.calamech.rloaded.core.runtime.ServerLaunch
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.flatMap
 import io.github.calamech.rloaded.protocol.map
@@ -67,7 +68,7 @@ public class Bootstrap(
     }
 
     private suspend fun start(dev: Boolean): Int {
-        val command =
+        val launch =
             ServerConfig
                 .parse(folder.readConfig())
                 .mapError { "rloaded-server.toml is invalid: $it" }
@@ -88,7 +89,7 @@ public class Bootstrap(
                         writeBundled("agent", "rloaded-agent.jar").flatMap { agent ->
                             writeBundled("runtime", "rloaded-runtime.jar").map { runtime ->
                                 { mods: List<Path> ->
-                                    ServerCommand.build(
+                                    ServerCommand.launch(
                                         installed,
                                         agent,
                                         listOf(runtime) + mods,
@@ -100,16 +101,16 @@ public class Bootstrap(
                         }
                     }
                 }
-        return when (command) {
-            is Outcome.Ok -> runUntilStopped(command.value)
-            is Outcome.Err -> fail(command.error)
+        return when (launch) {
+            is Outcome.Ok -> runUntilStopped(launch.value)
+            is Outcome.Err -> fail(launch.error)
         }
     }
 
-    private suspend fun runUntilStopped(command: (List<Path>) -> List<String>): Int {
+    private suspend fun runUntilStopped(launch: (List<Path>) -> ServerLaunch): Int {
         var restarts = 0
         while (true) {
-            val exit = runOnce(command)
+            val exit = runOnce(launch)
             if (exit != ExitCode.RESTART) return exit
             if (restarts == maxRestarts) return fail("The server asked for $maxRestarts restarts in a row; stopping.")
             restarts++
@@ -117,12 +118,16 @@ public class Bootstrap(
         }
     }
 
-    // The lockfile is read again at each start: a restart is how mods leave it.
-    private suspend fun runOnce(command: (List<Path>) -> List<String>): Int =
-        when (val mods = lockfileMods.obtain(folder.lockfile)) {
-            is Outcome.Ok -> process.run(command(mods.value), folder.root)
-            is Outcome.Err -> fail(mods.error)
+    // The lockfile is read again at each start: a restart is how mods leave it. The launch is written
+    // down each time, so the server can start a staging server with the mods it runs.
+    private suspend fun runOnce(launch: (List<Path>) -> ServerLaunch): Int =
+        when (val started = lockfileMods.obtain(folder.lockfile).map(launch).flatMap { describe(it) }) {
+            is Outcome.Ok -> process.run(started.value.command(), folder.root)
+            is Outcome.Err -> fail(started.error)
         }
+
+    private fun describe(launch: ServerLaunch): Outcome<ServerLaunch, String> =
+        launch.write(folder.serverLaunch).map { launch.describedBy(folder.serverLaunch) }
 
     // The agent and the runtime mod ship inside the bootstrap, so they always match its version.
     private fun writeBundled(

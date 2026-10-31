@@ -56,6 +56,8 @@ jobs:
           key: game-test-${{ hashFiles('rloaded-core/src/main/resources/io/github/calamech/rloaded/core/runtime/runtime-pins.json') }}
       - name: Game tests
         run: ./gradlew :rloaded-game-tests:gameTest --stacktrace
+      - name: Staging dry run
+        run: ./gradlew :rloaded-game-tests:stagingTest --stacktrace
 
   client-game-test:
     name: client-game-test

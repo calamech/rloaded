@@ -1,5 +1,7 @@
 package io.github.calamech.rloaded.admin
 
+import io.github.calamech.rloaded.admin.staging.StagingFailure
+import io.github.calamech.rloaded.admin.staging.StagingReport
 import io.github.calamech.rloaded.core.admission.JarClassifier
 import io.github.calamech.rloaded.core.admission.Refusal
 import io.github.calamech.rloaded.core.download.ArtifactStore
@@ -48,6 +50,8 @@ class AdmissionServiceTest {
     private val now = Instant.parse("2026-10-31T10:00:00Z")
     private val serverChecks = mutableListOf<List<String>>()
     private var serverRefusal: String? = null
+    private val staged = mutableListOf<List<String>>()
+    private var stagingFailure: StagingFailure? = null
     private var whileChecking: () -> Unit = {}
     private val lockfile get() = directory.resolve("rloaded/lockfile.json")
     private val base = BaseSetEntry("P7dR8mSH", "EQKgpeKu", sha("fabric api"))
@@ -74,6 +78,31 @@ class AdmissionServiceTest {
         assertEquals(listOf(now, now), written.mods.map { it.addedAt })
         assertEquals(listOf("console", "console"), written.mods.map { it.addedBy })
         assertEquals(listOf(listOf("library")), serverChecks, "the server checks what it loads, not client-only mods")
+        assertEquals(listOf(listOf("library")), staged, "the staging server tries what the server loads, not client-only mods")
+    }
+
+    @Test
+    fun `writes nothing when the mods fail on the staging server, and says why`() {
+        publish("crashing", jar("crashing"))
+        val log = directory.resolve("staging/logs/latest.log")
+        stagingFailure =
+            StagingFailure.Failed(StagingReport.of(listOf("crashing")).failing("loading the mods threw: boom"), log)
+
+        val refusal = (add("crashing") as Outcome.Err).error
+
+        assertEquals(AddRefusal.StagingRefused(stagingFailure as StagingFailure), refusal)
+        assertEquals("it failed on the staging server: loading the mods threw: boom; see $log", refusal.reason)
+        assertEquals(listOf(listOf("crashing")), staged)
+        assertFalse(lockfile.exists())
+    }
+
+    @Test
+    fun `does not start a staging server for mods only players load`() {
+        publish("menu", jar("menu", environment = "client"))
+        stagingFailure = StagingFailure.NotStarted("it must not start")
+
+        assertEquals(listOf("menu"), ok(add("menu")).map { it.entry.projectId })
+        assertEquals(emptyList(), staged)
     }
 
     @Test
@@ -97,6 +126,7 @@ class AdmissionServiceTest {
         serverRefusal = "needy.jar is refused: it depends on missing-mod"
         assertEquals(Outcome.Err(AddRefusal.ServerRefused("needy.jar is refused: it depends on missing-mod")), add("needy"))
         serverRefusal = null
+        assertEquals(emptyList(), staged, "refused jars never reach the staging server")
 
         publish("gone", jar("gone"))
         server.serve("/cdn/gone.jar", ByteArray(0), status = 404)
@@ -193,11 +223,18 @@ class AdmissionServiceTest {
             Resolver(modrinth, "26.3"),
             RecordChecks(modrinth, ReputationRules(Duration.ofHours(72), 1_000), compat, clock),
             ArtifactStore(directory.resolve("store"), http, RetryPolicy(maxAttempts = 1)),
-            JarRules(JarClassifier(emptySet(), setOf("default"))) { jars ->
-                serverChecks += jars.map { jar -> projectOf(jar) }
-                whileChecking()
-                serverRefusal
-            },
+            JarRules(
+                JarClassifier(emptySet(), setOf("default")),
+                { jars ->
+                    serverChecks += jars.map { jar -> projectOf(jar) }
+                    whileChecking()
+                    serverRefusal
+                },
+                { jars ->
+                    staged += jars.map { jar -> projectOf(jar) }
+                    stagingFailure?.let { Outcome.Err(it) } ?: Outcome.Ok(Unit)
+                },
+            ),
             LockfileLocation(lockfile, empty),
             clock,
         )

@@ -9,6 +9,8 @@ import io.github.calamech.rloaded.core.mojang.OperatingSystem
 import io.github.calamech.rloaded.core.mojang.Platform
 import io.github.calamech.rloaded.core.runtime.FakeDistribution
 import io.github.calamech.rloaded.core.runtime.RuntimePins
+import io.github.calamech.rloaded.core.runtime.ServerLaunch
+import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -122,6 +124,10 @@ class BootstrapTest {
             assertEquals(listOf("-Xmx4096M", "-XX:+AllowEnhancedClassRedefinition"), command.subList(1, 3))
             assertTrue("-Drloaded.client-timeout-seconds=120" in command)
             assertTrue("-Drloaded.reputation.min-version-age-hours=72" in command)
+            assertTrue("-Drloaded.staging.enabled=true" in command)
+            assertTrue("-Drloaded.server-launch=${folder.serverLaunch}" in command)
+            val described = (ServerLaunch.read(folder.serverLaunch) as Outcome.Ok).value
+            assertEquals(command, described.describedBy(folder.serverLaunch).command(), "the description is how the server was started")
             assertEquals(
                 "io.github.calamech.rloaded.agent.RloadedAgent",
                 JarFile(agent.toFile()).use {
@@ -190,6 +196,11 @@ class BootstrapTest {
             assertEquals(
                 listOf(listOf("rloaded-runtime.jar", first.fileName), listOf("rloaded-runtime.jar", second.fileName)),
                 process.commands.map { extraMods(it) },
+            )
+            assertEquals(
+                listOf("rloaded-runtime.jar", second.fileName),
+                extraMods((ServerLaunch.read(folder.serverLaunch) as Outcome.Ok).value.command()),
+                "the description follows the lockfile",
             )
         }
 
