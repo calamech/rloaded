@@ -47,3 +47,5 @@ Amended 2026-10-31: `soakTest` (CI job `client-game-test`) adds 20 generated mod
 Amended 2026-10-31: a player whose game fails to install the mods of an add is now started again by the launcher and joins again, and the server records the failing version as broken (ADR 0043).
 
 Amended 2026-10-31: an add no longer announces players leaving and joining (ADR 0044).
+
+Amended 2026-10-31: the restart after a failure past the point of no return is now checked by `restartTest` (CI job `game-test`): fails-in-running-server, which fails as it starts only in the running server's folder, passes the staging server; the running server then stops with exit code 75, its lockfile does not list the mod, and started again it runs without it. With the restart left out, the server kept running and the check failed.

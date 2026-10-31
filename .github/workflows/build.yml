@@ -58,6 +58,8 @@ jobs:
         run: ./gradlew :rloaded-game-tests:gameTest --stacktrace
       - name: Staging dry run
         run: ./gradlew :rloaded-game-tests:stagingTest --stacktrace
+      - name: Restart after a failed live add
+        run: ./gradlew :rloaded-game-tests:restartTest --stacktrace
 
   client-game-test:
     name: client-game-test

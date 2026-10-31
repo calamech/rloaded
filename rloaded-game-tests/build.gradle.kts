@@ -20,6 +20,8 @@ val addClientMods = configurations.dependencyScope("addClientMods")
 val addClientModJars = configurations.resolvable("addClientModJars") { extendsFrom(addClientMods.get()) }
 val recoveryServedMods = configurations.dependencyScope("recoveryServedMods")
 val recoveryServedModJars = configurations.resolvable("recoveryServedModJars") { extendsFrom(recoveryServedMods.get()) }
+val restartServedMods = configurations.dependencyScope("restartServedMods")
+val restartServedModJars = configurations.resolvable("restartServedModJars") { extendsFrom(restartServedMods.get()) }
 val clientTestMods = configurations.dependencyScope("clientTestMods")
 val clientTestModJars = configurations.resolvable("clientTestModJars") { extendsFrom(clientTestMods.get()) }
 
@@ -62,6 +64,10 @@ dependencies {
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-add-test") }
     }
     addClientMods(libs.fabric.client.gametest.api) { isTransitive = false }
+    restartServedMods("io.github.calamech.rloaded:rloaded-runtime") {
+        isTransitive = false
+        capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-fails-in-running-server") }
+    }
     recoveryServedMods("io.github.calamech.rloaded:rloaded-runtime") {
         isTransitive = false
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-fails-on-client-once") }
@@ -79,7 +85,11 @@ kover {
     reports {
         filters {
             excludes {
-                classes("io.github.calamech.rloaded.gametests.MainKt*", "io.github.calamech.rloaded.gametests.StagingMainKt*")
+                classes(
+                    "io.github.calamech.rloaded.gametests.MainKt*",
+                    "io.github.calamech.rloaded.gametests.StagingMainKt*",
+                    "io.github.calamech.rloaded.gametests.RestartMainKt*",
+                )
                 // Like Main, but starts a client; the command it builds is unit tested in ClientTestCommand.
                 classes("io.github.calamech.rloaded.gametests.ClientMainKt*")
                 // These start servers and clients in processes of their own; the logic they check is tested
@@ -258,6 +268,33 @@ tasks.register<JavaExec>("joinTest") {
             runtimeFile.singleFile.absolutePath,
             clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
             servedFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+        )
+    }
+}
+
+// A mod that the staging server accepts fails as the running server loads it: the server must stop
+// with the restart exit code, without the mod in its lockfile, and start again without it. Not part
+// of check: it downloads the server and runs it, so CI runs it in the game test job.
+tasks.register<JavaExec>("restartTest") {
+    description = "Checks that a server restarts without a mod that failed as it loaded it."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.RestartMainKt"
+    val cache = layout.buildDirectory.dir("game-test/cache")
+    val run = layout.buildDirectory.dir("restart-test/run")
+    val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
+    val servedFile = files(restartServedModJars)
+    inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
+    inputs.files(servedFile).withPropertyName("servedMod")
+    argumentProviders.add {
+        listOf(
+            cache.get().asFile.absolutePath,
+            run.get().asFile.absolutePath,
+            agentFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            servedFile.singleFile.absolutePath,
         )
     }
 }

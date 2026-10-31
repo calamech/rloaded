@@ -28,6 +28,7 @@ You need a JDK 17 or newer to start Gradle. Gradle then downloads the JetBrains 
 ./gradlew check                                  # build and unit tests
 ./gradlew :rloaded-game-tests:gameTest           # game tests, downloads the pinned server
 ./gradlew :rloaded-game-tests:stagingTest        # test mods pass a staging server
+./gradlew :rloaded-game-tests:restartTest        # a server restarts without a mod that failed as it loaded it
 ./gradlew :rloaded-game-tests:registrySyncTest   # a server and two clients agree on raw ids after an add
 ./gradlew :rloaded-game-tests:joinTest           # a client joins a server and installs its mods
 ./gradlew :rloaded-game-tests:addTest            # mods added from the console reach two connected players
