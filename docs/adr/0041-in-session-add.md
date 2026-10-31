@@ -43,3 +43,5 @@ Amended 2026-10-31: `addTest` now adds content-basic, then mixin-field-init, who
 Amended 2026-10-31: `addTest` now adds content-basic, mixin-field-init, then keybind-and-tab to two connected players, with no crash and no error line (ADR 0042).
 
 Amended 2026-10-31: `soakTest` (CI job `client-game-test`) adds 20 generated mods in a row, without code and with staging off, while two players are connected: 20 rollouts, no error line, about a minute in local.
+
+Amended 2026-10-31: a player whose game fails to install the mods of an add is now started again by the launcher and joins again, and the server records the failing version as broken (ADR 0043).

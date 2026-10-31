@@ -3,6 +3,7 @@ package io.github.calamech.rloaded.launcher.app
 import io.github.calamech.rloaded.launcher.InstallFailure
 import io.github.calamech.rloaded.launcher.LaunchFailure
 import io.github.calamech.rloaded.launcher.OfflineProfile
+import io.github.calamech.rloaded.launcher.Relaunch
 import io.github.calamech.rloaded.launcher.ServerAddress
 import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.CoroutineScope
@@ -105,24 +106,37 @@ public class LauncherState(
                 is Outcome.Err -> return fail(FailureReason.SERVER_ADDRESS)
             }
         mutableStatus.value = Status.Installing(0, 0)
-        scope.launch {
-            when (val result = action.play(profile, server) { done, total -> mutableStatus.value = Status.Installing(done, total) }) {
-                is Outcome.Ok -> {
-                    watch(result.value)
-                }
-
-                is Outcome.Err -> {
-                    log("Launch failed: ${result.error}")
-                    fail(reasonOf(result.error))
-                }
-            }
-        }
+        scope.launch { run(profile, server) }
     }
 
-    private suspend fun watch(process: Process) {
-        mutableStatus.value = Status.Playing
-        val exited = process.onExit().await()
-        mutableStatus.value = Status.Stopped(exited.exitValue())
+    // A game that asks for it is started again with the same server, so the player joins it again.
+    private suspend fun run(
+        profile: OfflineProfile,
+        server: ServerAddress?,
+    ) {
+        var relaunches = 0
+        while (true) {
+            val process =
+                when (val result = action.play(profile, server) { done, total -> mutableStatus.value = Status.Installing(done, total) }) {
+                    is Outcome.Ok -> {
+                        result.value
+                    }
+
+                    is Outcome.Err -> {
+                        log("Launch failed: ${result.error}")
+                        return fail(reasonOf(result.error))
+                    }
+                }
+            mutableStatus.value = Status.Playing
+            val exitCode = process.onExit().await().exitValue()
+            if (!Relaunch.wanted(exitCode, relaunches)) {
+                mutableStatus.value = Status.Stopped(exitCode)
+                return
+            }
+            relaunches++
+            log("The game asked to be started again after an add failed; starting it again ($relaunches in a row)")
+            mutableStatus.value = Status.Installing(0, 0)
+        }
     }
 
     private fun fail(reason: FailureReason) {

@@ -97,3 +97,5 @@ jobs:
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:addTest --stacktrace
       - name: Twenty adds in a row
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:soakTest --stacktrace
+      - name: Restart and rejoin after a failed install
+        run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:recoveryTest --stacktrace

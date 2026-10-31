@@ -9,12 +9,17 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.PosixFilePermissions
 
-// Writes go to a temporary file next to the target, flushed to disk, then renamed over it, so a crash
-// leaves the old file or the new one, never half of one. The files hold keys and trust decisions:
-// they are readable by their owner only on file systems with POSIX permissions. Files.createTempFile
-// already defaults to that; it is stated here so it does not depend on the default.
-internal object AtomicFiles {
-    fun write(
+// The files hold keys and trust decisions: they are readable by their owner only on file systems
+// with POSIX permissions. Files.createTempFile already defaults to that; it is stated here so it does
+// not depend on the default.
+
+/**
+ * Replaces files in one step: the bytes go to a temporary file next to the target, flushed to disk,
+ * then renamed over it, so a crash leaves the old file or the new one, never half of one.
+ */
+public object AtomicFiles {
+    /** Replaces [target] with [bytes], creating its directory; throws the [IOException] that stopped it. */
+    public fun write(
         target: Path,
         bytes: ByteArray,
     ) {

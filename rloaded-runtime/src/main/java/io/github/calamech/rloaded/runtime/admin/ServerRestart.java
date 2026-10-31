@@ -1,17 +1,15 @@
 package io.github.calamech.rloaded.runtime.admin;
 
+import io.github.calamech.rloaded.core.runtime.GameExit;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * Stops the server and asks the bootstrap to start it again, with exit code 75. The game saves and
- * stops as with {@code /stop}; the exit comes once the server thread ended, because the game's own
- * shutdown hook waits for that thread.
+ * Stops the server and asks the bootstrap to start it again, with {@link GameExit#RESTART}. The
+ * game saves and stops as with {@code /stop}; the exit comes once the server thread ended, because
+ * the game's own shutdown hook waits for that thread.
  */
 final class ServerRestart {
-  /** The exit code the bootstrap reads as a request to start the server again. */
-  static final int EXIT_CODE = 75;
-
   private static volatile boolean requested;
 
   private ServerRestart() {}
@@ -31,7 +29,7 @@ final class ServerRestart {
                       } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                       }
-                      System.exit(EXIT_CODE);
+                      System.exit(GameExit.RESTART);
                     });
           }
         });

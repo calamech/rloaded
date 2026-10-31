@@ -22,6 +22,7 @@ import io.github.calamech.rloaded.protocol.Side;
 import io.github.calamech.rloaded.runtime.AgentBridge;
 import io.github.calamech.rloaded.runtime.ModrinthAccess;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
+import io.github.calamech.rloaded.runtime.engine.HotAddFailure;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
 import io.github.calamech.rloaded.runtime.engine.LateKeyMappings;
 import io.github.calamech.rloaded.runtime.join.JoinPayloads;
@@ -49,6 +50,11 @@ import org.slf4j.LoggerFactory;
  * trust the server the first time, then downloads the mods from Modrinth, loads them with {@link
  * HotAdd} before the world exists, reloads resources and tells the server. Every failure is sent to
  * the server as a failed install, which ends the join with the reason.
+ *
+ * <p>When the install fails in a game that already played on the server or loaded its mods, a fresh
+ * game may succeed where this one failed: once disconnected, the game stops and asks the launcher
+ * to start it again, which joins the server again. A fresh game that fails never asks, so this does
+ * not loop.
  */
 public final class JoinClient {
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
@@ -69,6 +75,8 @@ public final class JoinClient {
   private static volatile boolean inSession;
   // Set when the player leaves or the server ends the join: what is still in flight is dropped.
   private static volatile boolean ended;
+  // Set when an install failed in a game that already had the server's world or mods.
+  private static volatile boolean relaunch;
   private static Connection connection;
 
   private JoinClient() {}
@@ -79,7 +87,13 @@ public final class JoinClient {
 
   /** Registers the join on the client side. */
   public static void register() {
-    ClientConfigurationConnectionEvents.DISCONNECT.register((listener, client) -> ended = true);
+    ClientConfigurationConnectionEvents.DISCONNECT.register(
+        (listener, client) -> {
+          ended = true;
+          if (relaunch) {
+            GameRelaunch.request(client);
+          }
+        });
     ClientLoginConnectionEvents.INIT.register((listener, client) -> inSession = false);
     ClientConfigurationConnectionEvents.COMPLETE.register((listener, client) -> inSession = true);
     ClientConfigurationNetworking.registerGlobalReceiver(
@@ -103,6 +117,7 @@ public final class JoinClient {
       return;
     }
     ended = false;
+    relaunch = false;
     current = new ClientJoin(store, Map.copyOf(LOADED), rloadedVersion());
     switch (current.serverHello(payload.bytes())) {
       case Outcome.Ok<?> ok -> sender.sendPacket(new JoinPayloads.Hello((byte[]) ok.getValue()));
@@ -245,13 +260,15 @@ public final class JoinClient {
           mods.stream().map(InstalledMod::getJar).toList(),
           AgentBridge.instrumentation().orElseThrow());
     } catch (HotAddRefusal refusal) {
-      String failing =
-          mods.stream()
-              .filter(mod -> mod.getJar().equals(refusal.jar()))
-              .map(mod -> mod.getEntry().getProjectId())
-              .findFirst()
-              .orElse(null);
-      fail(sender, failing, refusal.getMessage());
+      fail(sender, projectOf(mods, refusal.jar()), refusal.getMessage());
+      return;
+    } catch (HotAddFailure failure) {
+      LOGGER.error("A mod failed as it started", failure);
+      fail(sender, projectOf(mods, failure.jar()), failure.getMessage());
+      return;
+    } catch (RuntimeException | AssertionError e) {
+      LOGGER.error("Loading the mods failed", e);
+      fail(sender, null, "loading the mods failed: " + e);
       return;
     } finally {
       LateKeyMappings.close(client);
@@ -271,6 +288,14 @@ public final class JoinClient {
             announce(client, mods);
           }
         });
+  }
+
+  private static String projectOf(List<InstalledMod> mods, Path jar) {
+    return mods.stream()
+        .filter(mod -> mod.getJar().equals(jar))
+        .map(mod -> mod.getEntry().getProjectId())
+        .findFirst()
+        .orElse(null);
   }
 
   // Players accepted the server's future mods when they trusted it: a toast tells them what came.
@@ -339,6 +364,7 @@ public final class JoinClient {
   }
 
   private static void sendFailure(PacketSender sender, String failingMod, String report) {
+    relaunch = inSession || !LOADED.isEmpty();
     String bounded = report.length() > MAX_REPORT ? report.substring(0, MAX_REPORT) : report;
     sender.sendPacket(
         new JoinPayloads.Result(

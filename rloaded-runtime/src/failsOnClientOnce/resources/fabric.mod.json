@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "fails-on-client-once",
+  "version": "${version}",
+  "name": "Fails on client once (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "client": ["io.github.calamech.rloaded.testmods.failsonclientonce.FailsOnClientOnce"]
+  },
+  "depends": {
+    "minecraft": "26.3"
+  }
+}

@@ -10,9 +10,10 @@ internal fun withTestMods(
     testMods: List<Path>,
     properties: Map<String, String>,
 ): List<String> {
+    require(command.any { it.startsWith(ADD_MODS) }) { "the launch command has no $ADD_MODS argument" }
     val extraMods = testMods.joinToString(File.pathSeparator)
-    val withMods = command.map { if (it.startsWith(ADD_MODS)) "$it${File.pathSeparator}$extraMods" else it }
-    require(withMods != command) { "the launch command has no $ADD_MODS argument" }
+    val withMods =
+        if (testMods.isEmpty()) command else command.map { if (it.startsWith(ADD_MODS)) "$it${File.pathSeparator}$extraMods" else it }
     return listOf(withMods.first()) + properties.map { (name, value) -> "-D$name=$value" } + withMods.drop(1)
 }
 

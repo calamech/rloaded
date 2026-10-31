@@ -18,6 +18,8 @@ val addServedMods = configurations.dependencyScope("addServedMods")
 val addServedModJars = configurations.resolvable("addServedModJars") { extendsFrom(addServedMods.get()) }
 val addClientMods = configurations.dependencyScope("addClientMods")
 val addClientModJars = configurations.resolvable("addClientModJars") { extendsFrom(addClientMods.get()) }
+val recoveryServedMods = configurations.dependencyScope("recoveryServedMods")
+val recoveryServedModJars = configurations.resolvable("recoveryServedModJars") { extendsFrom(recoveryServedMods.get()) }
 val clientTestMods = configurations.dependencyScope("clientTestMods")
 val clientTestModJars = configurations.resolvable("clientTestModJars") { extendsFrom(clientTestMods.get()) }
 
@@ -60,6 +62,10 @@ dependencies {
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-add-test") }
     }
     addClientMods(libs.fabric.client.gametest.api) { isTransitive = false }
+    recoveryServedMods("io.github.calamech.rloaded:rloaded-runtime") {
+        isTransitive = false
+        capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-fails-on-client-once") }
+    }
     for (mod in listOf("content-basic", "mixin-field-init", "keybind-and-tab")) {
         addServedMods("io.github.calamech.rloaded:rloaded-runtime") {
             isTransitive = false
@@ -85,6 +91,8 @@ kover {
                     "io.github.calamech.rloaded.gametests.JoinMainKt*",
                     "io.github.calamech.rloaded.gametests.AddMainKt*",
                     "io.github.calamech.rloaded.gametests.SoakMainKt*",
+                    "io.github.calamech.rloaded.gametests.RecoveryMainKt*",
+                    "io.github.calamech.rloaded.gametests.Until",
                     "io.github.calamech.rloaded.gametests.AddPlayer",
                     "io.github.calamech.rloaded.gametests.JoinPlayer",
                     "io.github.calamech.rloaded.gametests.FakeModrinth*",
@@ -310,6 +318,34 @@ tasks.register<JavaExec>("soakTest") {
             agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
             clientModFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
+        )
+    }
+}
+
+// A player's game fails to load a mod added while it plays: it must ask to be started again, and the
+// fresh game must join with the mod. Needs a display, like clientGameTest, and runs in the same CI job.
+tasks.register<JavaExec>("recoveryTest") {
+    description = "Checks that a game that fails to load an added mod starts again and joins the server."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.RecoveryMainKt"
+    val clientCache = layout.buildDirectory.dir("client-game-test/cache")
+    val serverCache = layout.buildDirectory.dir("registry-sync-test/server-cache")
+    val run = layout.buildDirectory.dir("recovery-test/run")
+    val agentFile = files(agentJar)
+    val runtimeFile = files(runtimeModJar)
+    val servedFile = files(recoveryServedModJars)
+    inputs.files(agentFile).withPropertyName("agent")
+    inputs.files(runtimeFile).withPropertyName("runtimeMod")
+    inputs.files(servedFile).withPropertyName("servedMod")
+    argumentProviders.add {
+        listOf(
+            clientCache.get().asFile.absolutePath,
+            serverCache.get().asFile.absolutePath,
+            run.get().asFile.absolutePath,
+            agentFile.singleFile.absolutePath,
+            runtimeFile.singleFile.absolutePath,
+            servedFile.singleFile.absolutePath,
         )
     }
 }

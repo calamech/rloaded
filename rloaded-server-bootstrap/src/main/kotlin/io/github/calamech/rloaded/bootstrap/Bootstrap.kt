@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.bootstrap
 
+import io.github.calamech.rloaded.core.runtime.GameExit
 import io.github.calamech.rloaded.core.runtime.ServerLaunch
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.flatMap
@@ -24,7 +25,7 @@ public object ExitCode {
     public const val USAGE: Int = 2
 
     /** Asked by the runtime mod: start the server again. */
-    public const val RESTART: Int = 75
+    public const val RESTART: Int = GameExit.RESTART
 }
 
 /** Starts the server process and returns its exit code. */
