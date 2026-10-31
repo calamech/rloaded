@@ -27,3 +27,5 @@ The test catches a stalled or dropped connection: with a server mod that keeps a
 ## Enforcement
 
 `ReconfigurationStabilityClientGameTest`, run by the `client-game-test` CI job.
+
+Amended 2026-10-31: the server drops play packets sent to a player in the configuration phase (ADR 0040).
