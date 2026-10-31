@@ -34,10 +34,12 @@ You need a JDK 17 or newer to start Gradle. Gradle then downloads the JetBrains 
 ./gradlew :rloaded-game-tests:addTest            # mods added from the console reach two connected players
 ./gradlew :rloaded-game-tests:soakTest           # twenty adds in a row with two connected players
 ./gradlew :rloaded-game-tests:recoveryTest       # a game that fails to load an added mod starts again and rejoins
-./gradlew :rloaded-game-tests:singleplayerTest   # mods asked for by the launcher join an open singleplayer world
+./gradlew :rloaded-game-tests:singleplayerTest   # mods installed from the game's Mods screen join an open singleplayer world
 ./gradlew :rloaded-launcher:launcher-app:run     # the launcher window
 ./gradlew :rloaded-server-bootstrap:serverJar    # rloaded-server-bootstrap/build/libs/rloaded-server.jar
 ```
+
+In a singleplayer world started from the launcher, the pause menu has a Mods button: it searches Modrinth and installs a mod in the open world while you play. Each world lists its mods in `<world>/rloaded/lockfile.json`.
 
 The launcher keeps its data in `~/Library/Application Support/Rloaded` on macOS, `%APPDATA%\Rloaded` on Windows and `$XDG_DATA_HOME/rloaded` on Linux.
 

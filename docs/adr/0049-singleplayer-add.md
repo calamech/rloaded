@@ -42,3 +42,5 @@ Checked on 2026-10-31 with `singleplayerTest` (CI job `client-game-test`), green
 ## Enforcement
 
 `singleplayerTest` in the `client-game-test` CI job; `HandoffTest`, `AdmissionServiceTest` (singleplayer world) and `AddProblemsTest` in `check`; `addTest`, `soakTest` and `restartTest` for dedicated servers.
+
+Amended 2026-10-31: requests now come from the game's Mods screen, sent by the world's owner over `rloaded:admin` (ADR 0050); the launcher link is gone (ADR 0051). Anyone but the owner is refused with `NOT_ALLOWED`, which replaces `NO_WORLD`; the lockfile records `addedBy: owner`.

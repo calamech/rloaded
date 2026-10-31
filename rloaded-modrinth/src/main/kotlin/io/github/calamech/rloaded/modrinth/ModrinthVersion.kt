@@ -75,3 +75,12 @@ public data class ModrinthProject(
     /** Its categories, featured and additional, such as `optimization`. */
     val categories: List<String>,
 )
+
+/** A mod a search found: what players see of it in a list. */
+public data class ModrinthHit(
+    val projectId: String,
+    val slug: String,
+    val title: String,
+    val author: String,
+    val downloads: Long,
+)

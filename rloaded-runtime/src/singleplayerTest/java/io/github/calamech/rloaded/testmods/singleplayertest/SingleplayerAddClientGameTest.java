@@ -1,17 +1,30 @@
 package io.github.calamech.rloaded.testmods.singleplayertest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.function.Predicate;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.events.ContainerEventHandler;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.block.BlockStateModelSet;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
@@ -24,23 +37,24 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.storage.LevelResource;
 
 /**
- * The game's side of the singleplayer check, which a harness drives as the launcher: once told,
- * creates a world and opens it to the local network; once told again, closes it to the network and
- * pauses the game, as when the player switches to the launcher; once the mods are added, places
- * content-basic's block and checks that the client shows it with its model, that the client's
- * entities have mixin-field-init's field, and that the world's lockfile lists both mods. Each step
- * reached is a line in the report; the harness writes the steps it allows to the control file.
+ * Installs mods in an open singleplayer world from the game's Mods screen, the way a player does:
+ * opens the pause menu, clicks "Mods", types into the search field and clicks Install. Refused
+ * while the world is open to the local network, and for a mod a search still lists but Modrinth
+ * removed; then content-basic, and after a second search mixin-field-init, are installed with the
+ * game paused. Then places content-basic's block and checks that the client shows it with its
+ * model, that the client's entities have mixin-field-init's field, and that the world's lockfile
+ * lists both mods.
  */
 public final class SingleplayerAddClientGameTest implements FabricClientGameTest {
   private static final Identifier BASIC_BLOCK =
       Identifier.fromNamespaceAndPath("content-basic", "basic_block");
-  private static final int STEP_TICKS = 20 * 60 * 5;
+  private static final int STEP_TICKS = 20 * 60 * 3;
+  private static final String CONTENT_BASIC = "Content basic";
+  private static final String MIXIN_FIELD_INIT = "Mixin field initializer";
+  private static final String REMOVED = "removedProject";
 
   @Override
   public void runTest(ClientGameTestContext context) {
-    Path report = Path.of(System.getProperty("rloaded.singleplayer-test.report"));
-    Path control = Path.of(System.getProperty("rloaded.singleplayer-test.control"));
-    awaitStep(context, control, "open");
     try (TestSingleplayerContext world = context.worldBuilder().create()) {
       world.getConnection().waitForChunksRender();
       IntegratedServer server = context.computeOnClient(Minecraft::getSingleplayerServer);
@@ -52,23 +66,21 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
       if (!published) {
         throw new AssertionError("the world could not be opened to the local network");
       }
-      write(report, "shared");
-      awaitStep(context, control, "unshare");
-      context.runOnClient(
-          client -> {
-            server.unpublishServer();
-            client.pauseGame(false);
-          });
-      context.waitFor(Minecraft::isPaused);
-      write(report, "paused");
-      awaitStep(context, control, "added");
-      // Back in the world, the player closes the pause menu if it is still open.
+      openModsScreen(context);
+      search(context, "content");
+      install(context, CONTENT_BASIC, "Close the world to LAN players first.");
+      context.runOnClient(client -> server.unpublishServer());
+      install(context, REMOVED, "Modrinth no longer has this mod.");
+      install(context, CONTENT_BASIC, "Installed");
+      search(context, "mixin");
+      install(context, MIXIN_FIELD_INIT, "Installed");
+      // The search result, and the mods the world has.
       context.waitFor(
           client ->
-              client.level != null
-                  && client.player != null
-                  && (client.gui.screen() == null || client.gui.screen() instanceof PauseScreen),
+              titled(client.gui.screen(), MIXIN_FIELD_INIT) == 2
+                  && titled(client.gui.screen(), CONTENT_BASIC) == 1,
           STEP_TICKS);
+      context.takeScreenshot("rloaded-mods-screen");
       context.runOnClient(client -> client.gui.setScreen(null));
       world.getConnection().waitForChunksRender();
       checkBlock(context, world);
@@ -76,10 +88,124 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
       checkLockfile(server);
       context.takeScreenshot("rloaded-singleplayer-add");
     }
-    write(report, "passed");
     write(
         Path.of(System.getProperty("rloaded.client-game-test.report")),
-        "mods asked for by the launcher are added to an open singleplayer world");
+        "mods installed from the Mods screen join an open singleplayer world");
+  }
+
+  private static void openModsScreen(ClientGameTestContext context) {
+    context.runOnClient(client -> client.pauseGame(false));
+    context.waitFor(client -> client.gui.screen() instanceof PauseScreen);
+    AbstractWidget mods =
+        context
+            .computeOnClient(
+                client ->
+                    find(
+                        client.gui.screen(),
+                        widget -> widget instanceof Button && "Mods".equals(text(widget))))
+            .orElseThrow(() -> new AssertionError("the pause menu has no Mods button"));
+    click(context, mods);
+    context.waitFor(client -> isModsScreen(client.gui.screen()));
+  }
+
+  private static void search(ClientGameTestContext context, String query) {
+    AbstractWidget field =
+        context
+            .computeOnClient(client -> find(client.gui.screen(), EditBox.class::isInstance))
+            .orElseThrow(() -> new AssertionError("the Mods screen has no search field"));
+    click(context, field);
+    context.runOnClient(client -> ((EditBox) field).setValue(""));
+    context.getInput().typeChars(query);
+    context.waitFor(
+        client ->
+            widgets(client.gui.screen()).stream()
+                .anyMatch(
+                    widget ->
+                        widget instanceof StringWidget
+                            && text(widget).toLowerCase(Locale.ROOT).startsWith(query)),
+        STEP_TICKS);
+  }
+
+  // Clicks Install on the row of [title], then waits until the row shows [outcome]. An add sends
+  // the player through the configuration phase; the game opens the Mods screen again after it.
+  private static void install(ClientGameTestContext context, String title, String outcome) {
+    AbstractWidget button =
+        context
+            .computeOnClient(client -> rowWidget(client.gui.screen(), title, Button.class))
+            .orElseThrow(() -> new AssertionError("no Install button for " + title));
+    click(context, button);
+    context.waitFor(
+        client ->
+            isModsScreen(client.gui.screen())
+                && rowWidget(client.gui.screen(), title, StringWidget.class)
+                    .filter(widget -> outcome.equals(text(widget)))
+                    .isPresent(),
+        STEP_TICKS);
+  }
+
+  // The test mod cannot see the runtime's screen class, which is not public.
+  private static boolean isModsScreen(Screen screen) {
+    return screen != null && screen.getClass().getSimpleName().equals("ModsScreen");
+  }
+
+  // The nearest widget of [type] to the right of the first row whose text starts with [title].
+  private static Optional<AbstractWidget> rowWidget(
+      Screen screen, String title, Class<? extends AbstractWidget> type) {
+    return find(screen, widget -> widget instanceof StringWidget && text(widget).startsWith(title))
+        .flatMap(
+            name ->
+                widgets(screen).stream()
+                    .filter(widget -> widget.getY() == name.getY() && widget.getX() > name.getX())
+                    .filter(type::isInstance)
+                    .min(Comparator.comparingInt(AbstractWidget::getX)));
+  }
+
+  private static long titled(Screen screen, String title) {
+    return widgets(screen).stream()
+        .filter(widget -> widget instanceof StringWidget && text(widget).startsWith(title))
+        .count();
+  }
+
+  // Moves the cursor to the middle of [widget], in window coordinates, and clicks.
+  private static void click(ClientGameTestContext context, AbstractWidget widget) {
+    double scale =
+        context.computeOnClient(
+            client ->
+                client.getWindow().getScreenWidth()
+                    / (double) client.getWindow().getGuiScaledWidth());
+    context
+        .getInput()
+        .setCursorPos(
+            (widget.getX() + widget.getWidth() / 2.0) * scale,
+            (widget.getY() + widget.getHeight() / 2.0) * scale);
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+  }
+
+  private static Optional<AbstractWidget> find(Screen screen, Predicate<AbstractWidget> wanted) {
+    return widgets(screen).stream().filter(wanted).findFirst();
+  }
+
+  private static List<AbstractWidget> widgets(Screen screen) {
+    List<AbstractWidget> found = new ArrayList<>();
+    if (screen != null) {
+      collect(screen, found);
+    }
+    return found;
+  }
+
+  private static void collect(ContainerEventHandler container, List<AbstractWidget> found) {
+    for (GuiEventListener child : container.children()) {
+      if (child instanceof AbstractWidget widget) {
+        found.add(widget);
+      }
+      if (child instanceof ContainerEventHandler nested) {
+        collect(nested, found);
+      }
+    }
+  }
+
+  private static String text(AbstractWidget widget) {
+    return widget.getMessage().getString();
   }
 
   private static void checkBlock(ClientGameTestContext context, TestSingleplayerContext world) {
@@ -142,18 +268,6 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
     }
     if (!text.contains("cbProject") || !text.contains("mfiProject")) {
       throw new AssertionError("the world's lockfile lacks the added mods: " + text);
-    }
-  }
-
-  private static void awaitStep(ClientGameTestContext context, Path control, String step) {
-    context.waitFor(client -> lines(control).contains(step), STEP_TICKS);
-  }
-
-  private static List<String> lines(Path file) {
-    try {
-      return Files.exists(file) ? Files.readAllLines(file, StandardCharsets.UTF_8) : List.of();
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
     }
   }
 
