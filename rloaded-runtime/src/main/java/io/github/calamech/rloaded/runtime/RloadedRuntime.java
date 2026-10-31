@@ -2,6 +2,7 @@ package io.github.calamech.rloaded.runtime;
 
 import io.github.calamech.rloaded.runtime.admin.AdminCommands;
 import io.github.calamech.rloaded.runtime.engine.DataReload;
+import io.github.calamech.rloaded.runtime.engine.Reconfigurations;
 import io.github.calamech.rloaded.runtime.engine.RegistryThaw;
 import io.github.calamech.rloaded.runtime.join.JoinPayloads;
 import io.github.calamech.rloaded.runtime.join.JoinServer;
@@ -20,6 +21,7 @@ public final class RloadedRuntime implements ModInitializer {
   public void onInitialize() {
     RegistryThaw.rememberIntrusiveRegistries();
     JoinPayloads.register();
+    Reconfigurations.register();
     if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
       DataReload.register();
       JoinServer.register();

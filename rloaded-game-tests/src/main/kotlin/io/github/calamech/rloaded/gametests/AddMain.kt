@@ -70,7 +70,8 @@ internal class AddPlan(
  * Runs an add check: installs the games, starts the server and the fake Modrinth, two trusted
  * clients, then for each step types its console commands and waits for both players to report it.
  * Returns whether the server completed one rollout per mod, no log has an error line from the first
- * add on, and the plan's checks accept the server's log.
+ * add on, the server announced each player's join and leave once, and the plan's checks accept the
+ * server's log.
  */
 @OptIn(ExperimentalPathApi::class)
 internal fun runAddCheck(
@@ -123,9 +124,14 @@ internal fun runAddCheck(
     val serverLog = serverDirectory.resolve("logs").resolve("latest.log").readText()
     val rollouts = serverLog.lines().count { "Every player has the new mods" in it }
     val errors = errorsFromFirstAdd(serverLog, players)
-    println("Add check: $rollouts rollouts; ${errors.size} error lines")
+    // An add is no reason to tell the chat that players left and joined: each did once, for real.
+    val announced =
+        players.associate { player ->
+            player.name to listOf("joined", "left").map { what -> serverLog.lines().count { "${player.name} $what the game" in it } }
+        }
+    println("Add check: $rollouts rollouts; ${errors.size} error lines; joins and leaves announced: $announced")
     errors.forEach { println("  $it") }
-    return rollouts == plan.mods.size && errors.isEmpty() && plan.serverChecks(serverLog)
+    return rollouts == plan.mods.size && errors.isEmpty() && announced.values.all { it == listOf(1, 1) } && plan.serverChecks(serverLog)
 }
 
 private fun type(
