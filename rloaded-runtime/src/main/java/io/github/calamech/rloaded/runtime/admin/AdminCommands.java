@@ -3,6 +3,7 @@ package io.github.calamech.rloaded.runtime.admin;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import io.github.calamech.rloaded.admin.AddRefusal;
+import io.github.calamech.rloaded.admin.AddTarget;
 import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
 import io.github.calamech.rloaded.admin.CompatDatabase;
@@ -15,6 +16,7 @@ import io.github.calamech.rloaded.admin.staging.StagingServer;
 import io.github.calamech.rloaded.admin.staging.StagingSettings;
 import io.github.calamech.rloaded.core.download.ArtifactStore;
 import io.github.calamech.rloaded.core.download.RetryPolicy;
+import io.github.calamech.rloaded.core.lockfile.Lockfile;
 import io.github.calamech.rloaded.core.runtime.ServerLaunch;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.runtime.ModrinthAccess;
@@ -33,6 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.SharedConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -44,9 +47,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The console commands an admin manages the server's mods with. {@code rloaded add <project>
- * [version]} admits a mod from Modrinth, tries it on a staging server, and writes it, with its
- * dependencies, to the lockfile: the server loads it at its next start, and players install it when
- * they next join.
+ * [version]} admits a mod from Modrinth, tries it on a staging server, loads it into the running
+ * server, writes it with its dependencies to the lockfile, and has every connected player install
+ * it without leaving.
  */
 public final class AdminCommands {
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
@@ -55,6 +58,7 @@ public final class AdminCommands {
   private static volatile ReputationRules rules;
   private static volatile CompatDatabase compat;
   private static volatile Staging staging;
+  private static volatile LiveAdd live;
   private static AdmissionService service;
 
   private AdminCommands() {}
@@ -73,7 +77,10 @@ public final class AdminCommands {
               };
           compat = bundledCompatDatabase();
           staging = staging(server);
+          live = new LiveAdd(server);
         });
+    ServerTickEvents.END_SERVER_TICK.register(server -> live.tick());
+    ServerRestart.register();
     CommandRegistrationCallback.EVENT.register(
         (dispatcher, context, selection) ->
             dispatcher.register(
@@ -132,20 +139,32 @@ public final class AdminCommands {
                 .stream()
                     .map(added -> ((AddedMod) added).getEntry().getFileName())
                     .collect(Collectors.joining(", "));
-        LOGGER.info("Added {} to the lockfile: {}", project, files);
+        LOGGER.info("Added {}: {}", project, files);
         source.sendSuccess(
             () ->
                 Component.translatableWithFallback(
-                    "rloaded.admin.added",
-                    "Added %s. Restart the server to load them; players get them when they next"
-                        + " join.",
-                    files),
+                    "rloaded.admin.added", "Added %s. Players install them now.", files),
             false);
+        rollout(source.getServer());
       }
       case Outcome.Err<?> err -> {
-        String reason = ((AddRefusal) err.getError()).getReason();
-        LOGGER.warn("Did not add {}: {}", project, reason);
-        source.sendFailure(refused(project, reason));
+        AddRefusal refusal = (AddRefusal) err.getError();
+        LOGGER.warn("Did not add {}: {}", project, refusal.getReason());
+        source.sendFailure(refused(project, refusal.getReason()));
+        // The server runs mods its lockfile does not list: only a restart makes them agree.
+        if (refusal instanceof AddRefusal.NotRecorded) {
+          ServerRestart.request(source.getServer());
+        }
+      }
+    }
+  }
+
+  private static void rollout(MinecraftServer server) {
+    switch (Lockfile.Companion.read(ServerLockfile.of(server).getPath())) {
+      case Outcome.Ok<?> ok -> live.rollout((Lockfile) ok.getValue());
+      case Outcome.Err<?> err -> {
+        LOGGER.error("The lockfile just written cannot be read: {}", err.getError());
+        ServerRestart.request(server);
       }
     }
   }
@@ -167,7 +186,7 @@ public final class AdminCommands {
               new ArtifactStore(
                   cache, access.http(), new RetryPolicy(), ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES),
               new JarRules(Admission.classifier(), AdminCommands::serverRefusal, staging),
-              ServerLockfile.of(server),
+              new AddTarget(ServerLockfile.of(server), live),
               clock);
     }
     return service;

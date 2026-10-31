@@ -35,6 +35,8 @@ public final class JoinServer {
   private static final Identifier BEFORE_REGISTRY_SYNC =
       Identifier.fromNamespaceAndPath("rloaded", "install");
   private static final int MAX_SERVER_NAME = 64;
+  private static volatile ServerIdentity identity;
+  private static volatile String name;
   private static volatile ServerJoin join;
   private static volatile JoinDeadlines<ServerConfigurationPacketListenerImpl> deadlines;
 
@@ -90,7 +92,7 @@ public final class JoinServer {
         };
     deadlines = new JoinDeadlines<>(timeout, System::nanoTime);
     Path directory = server.getServerDirectory().resolve("rloaded");
-    ServerIdentity identity =
+    identity =
         switch (ServerIdentity.Companion.loadOrCreate(directory.resolve("identity.key"))) {
           case Outcome.Ok<?> ok -> (ServerIdentity) ok.getValue();
           case Outcome.Err<?> err ->
@@ -107,7 +109,16 @@ public final class JoinServer {
                   throw new IllegalStateException(
                       "cannot use " + lockfilePath + ": " + err.getError());
             };
-    join = new ServerJoin(identity, lockfile, serverName(server));
+    name = serverName(server);
+    update(lockfile);
+  }
+
+  /**
+   * Sends the mods of {@code lockfile} to the players who join, or go through configuration again,
+   * from now on.
+   */
+  public static void update(Lockfile lockfile) {
+    join = new ServerJoin(identity, lockfile, name);
   }
 
   private static void configure(ServerConfigurationPacketListenerImpl listener) {

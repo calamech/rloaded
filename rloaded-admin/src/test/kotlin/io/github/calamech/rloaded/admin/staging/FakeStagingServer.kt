@@ -25,6 +25,11 @@ object FakeStagingServer {
                 write(report, unexpected(arguments).fold(started.exercised(1, 0, 1, 400)) { report, failure -> report.failing(failure) })
             }
 
+            "mods" -> {
+                val loaded = System.getProperty("fabric.addMods").split(File.pathSeparator).map { Path.of(it).fileName.toString() }
+                write(report, StagingReport.of(loaded))
+            }
+
             "fail" -> {
                 write(report, started.failing("loading the mods threw java.lang.IllegalStateException: boom"))
             }

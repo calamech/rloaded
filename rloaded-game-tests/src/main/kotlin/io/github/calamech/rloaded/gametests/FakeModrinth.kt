@@ -26,7 +26,7 @@ internal data class FakeMod(
 
 /**
  * Stands in for Modrinth on the loopback interface, for mods that are not on Modrinth: the versions,
- * projects and teams endpoints Rloaded reads, answering the way Modrinth does (unknown ids left out),
+ * project versions, projects and teams endpoints Rloaded reads, answering the way Modrinth does (unknown ids left out),
  * and the files.
  */
 internal class FakeModrinth(
@@ -42,6 +42,20 @@ internal class FakeModrinth(
 
     init {
         server.createContext("/v2/versions") { exchange -> json(exchange, wanted(exchange).joinToString(",", "[", "]") { version(it) }) }
+        // A project's versions, the way an add resolves it.
+        server.createContext("/v2/project/") { exchange ->
+            val project =
+                exchange.requestURI.path
+                    .removePrefix("/v2/project/")
+                    .removeSuffix("/version")
+            val listed = mods.filter { it.projectId == project }
+            if (listed.isEmpty()) {
+                exchange.sendResponseHeaders(NOT_FOUND, -1)
+                exchange.close()
+            } else {
+                json(exchange, listed.joinToString(",", "[", "]") { version(it) })
+            }
+        }
         server.createContext("/v2/projects") { exchange ->
             json(exchange, wanted(exchange, FakeMod::projectId).joinToString(",", "[", "]") { project(it) })
         }

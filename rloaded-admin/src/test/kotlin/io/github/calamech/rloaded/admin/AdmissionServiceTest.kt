@@ -30,6 +30,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
@@ -51,7 +52,11 @@ class AdmissionServiceTest {
     private val serverChecks = mutableListOf<List<String>>()
     private var serverRefusal: String? = null
     private val staged = mutableListOf<List<String>>()
+    private val stagedWith = mutableListOf<List<String>>()
     private var stagingFailure: StagingFailure? = null
+    private val applied = mutableListOf<List<String>>()
+    private var applyFailure: String? = null
+    private var whileApplying: () -> Unit = {}
     private var whileChecking: () -> Unit = {}
     private val lockfile get() = directory.resolve("rloaded/lockfile.json")
     private val base = BaseSetEntry("P7dR8mSH", "EQKgpeKu", sha("fabric api"))
@@ -79,6 +84,27 @@ class AdmissionServiceTest {
         assertEquals(listOf("console", "console"), written.mods.map { it.addedBy })
         assertEquals(listOf(listOf("library")), serverChecks, "the server checks what it loads, not client-only mods")
         assertEquals(listOf(listOf("library")), staged, "the staging server tries what the server loads, not client-only mods")
+        assertEquals(listOf(listOf("library")), applied, "the running server loads what it runs, not client-only mods")
+    }
+
+    @Test
+    fun `writes nothing when the running server cannot load the mods`() {
+        publish("unloadable", jar("unloadable"))
+        applyFailure = "a mod with id unloadable is already loaded"
+
+        assertEquals(Outcome.Err(AddRefusal.NotApplied("a mod with id unloadable is already loaded")), add("unloadable"))
+        assertFalse(lockfile.exists())
+    }
+
+    @Test
+    fun `says the mods run but are not recorded when the lockfile cannot be written after they loaded`() {
+        publish("loaded", jar("loaded"))
+        whileApplying = { lockfile.toFile().mkdirs() }
+
+        val refusal = (add("loaded") as Outcome.Err).error
+
+        assertIs<AddRefusal.NotRecorded>(refusal)
+        assertEquals(listOf(listOf("loaded")), applied)
     }
 
     @Test
@@ -93,6 +119,7 @@ class AdmissionServiceTest {
         assertEquals(AddRefusal.StagingRefused(stagingFailure as StagingFailure), refusal)
         assertEquals("it failed on the staging server: loading the mods threw: boom; see $log", refusal.reason)
         assertEquals(listOf(listOf("crashing")), staged)
+        assertEquals(emptyList(), applied, "the running server never loads what failed on the staging server")
         assertFalse(lockfile.exists())
     }
 
@@ -103,6 +130,7 @@ class AdmissionServiceTest {
 
         assertEquals(listOf("menu"), ok(add("menu")).map { it.entry.projectId })
         assertEquals(emptyList(), staged)
+        assertEquals(listOf(emptyList()), applied, "players load it; the server loads nothing")
     }
 
     @Test
@@ -115,6 +143,7 @@ class AdmissionServiceTest {
 
         assertEquals(listOf("menu"), added.map { it.entry.projectId })
         assertEquals(listOf("library", "menu"), ok(Lockfile.read(lockfile)).mods.map { it.entry.projectId })
+        assertEquals(listOf(emptyList(), listOf("library")), stagedWith, "the staging server runs the mods added before")
     }
 
     @Test
@@ -230,12 +259,17 @@ class AdmissionServiceTest {
                     whileChecking()
                     serverRefusal
                 },
-                { jars ->
+                { installed, jars ->
+                    stagedWith += listOf(installed.map { jar -> projectOf(jar) })
                     staged += jars.map { jar -> projectOf(jar) }
                     stagingFailure?.let { Outcome.Err(it) } ?: Outcome.Ok(Unit)
                 },
             ),
-            LockfileLocation(lockfile, empty),
+            AddTarget(LockfileLocation(lockfile, empty)) { jars ->
+                applied += jars.map { jar -> projectOf(jar) }
+                whileApplying()
+                CompletableFuture.completedFuture(applyFailure?.let { Outcome.Err(it) } ?: Outcome.Ok(Unit))
+            },
             clock,
         )
     }

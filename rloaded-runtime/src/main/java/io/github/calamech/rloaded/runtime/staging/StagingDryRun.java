@@ -4,6 +4,7 @@ import io.github.calamech.rloaded.admin.staging.StagingReport;
 import io.github.calamech.rloaded.admin.staging.StagingServer;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.runtime.AgentBridge;
+import io.github.calamech.rloaded.runtime.engine.DataReload;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
 import java.io.File;
@@ -97,8 +98,6 @@ public final class StagingDryRun {
     ServerLifecycleEvents.SERVER_STARTED.register(run::start);
     ServerTickEvents.START_SERVER_TICK.register(server -> run.tickStart = System.nanoTime());
     ServerTickEvents.END_SERVER_TICK.register(run::tick);
-    ServerLifecycleEvents.END_DATA_PACK_RELOAD.register(
-        (server, resources, success) -> run.reloaded(success));
   }
 
   private static void haltWhenGone(ProcessHandle parent) {
@@ -165,10 +164,8 @@ public final class StagingDryRun {
     }
   }
 
-  private static void reload(MinecraftServer server) {
-    server
-        .getCommands()
-        .performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "reload");
+  private void reload(MinecraftServer server) {
+    CompletableFuture<?> _ = DataReload.run(server).thenAccept(this::reloaded);
   }
 
   private void reloaded(boolean success) {

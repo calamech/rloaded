@@ -26,6 +26,7 @@ import io.github.calamech.rloaded.protocol.mapError
 import io.github.calamech.rloaded.protocol.traverse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.sync.Mutex
 import java.nio.file.Files
@@ -53,6 +54,30 @@ public data class JarRules(
 public data class LockfileLocation(
     val path: Path,
     val whenMissing: Lockfile,
+)
+
+/** Loads admitted jars into the running server. The game implements it. */
+public fun interface LiveApply {
+    /**
+     * Loads [jars] into the running server, which may take several ticks, and completes with the
+     * reason when it could not. Empty when only players load the mods of the add.
+     */
+    public fun apply(jars: List<Path>): CompletableFuture<Outcome<Unit, String>>
+
+    /** Outcomes of an apply, typed for Java implementations. */
+    public companion object {
+        /** The mods were loaded. */
+        public val LOADED: Outcome<Unit, String> = Outcome.Ok(Unit)
+
+        /** The mods were not loaded, for [reason]. */
+        public fun notLoaded(reason: String): Outcome<Unit, String> = Outcome.Err(reason)
+    }
+}
+
+/** Where an admitted add lands: the running server first, then its lockfile. */
+public data class AddTarget(
+    val lockfile: LockfileLocation,
+    val live: LiveApply,
 )
 
 /** A mod an add wrote to the lockfile. */
@@ -142,6 +167,20 @@ public sealed interface AddRefusal {
         override val reason: String,
     ) : AddRefusal
 
+    /** The running server could not load the mods. */
+    public data class NotApplied(
+        val problem: String,
+    ) : AddRefusal {
+        override val reason: String get() = "the server could not load them: $problem"
+    }
+
+    /** The running server loaded the mods, but the lockfile could not record them. */
+    public data class NotRecorded(
+        val error: LockfileError,
+    ) : AddRefusal {
+        override val reason: String get() = "the server loaded them but rloaded/lockfile.json cannot record them: $error"
+    }
+
     /** The mods failed on the staging server, or it could not judge them. */
     public data class StagingRefused(
         val failure: StagingFailure,
@@ -154,15 +193,15 @@ public sealed interface AddRefusal {
  * Adds a mod from Modrinth to the server's lockfile, with what it needs: resolves it, refuses
  * versions Modrinth's records rule out (reputation, compatibility database), downloads the files
  * into [store], refuses any jar the rules or the server refuse, tries the jars the server would
- * load on a staging server, then writes every entry to the lockfile in one step. The only writer of the
- * lockfile; one add runs at a time.
+ * load on a staging server, loads them into the running server, then writes every entry to the
+ * lockfile in one step. The only writer of the lockfile; one add runs at a time.
  */
 public class AdmissionService(
     private val resolver: Resolver,
     private val recordChecks: RecordChecks,
     private val store: ArtifactStore,
     private val jarRules: JarRules,
-    private val lockfile: LockfileLocation,
+    private val target: AddTarget,
     private val clock: Clock,
 ) {
     private val running = Mutex()
@@ -185,8 +224,9 @@ public class AdmissionService(
                     .flatMap { versions -> proven(versions) }
                     .flatMap { versions -> download(versions) }
                     .flatMap { downloaded -> admit(downloaded) }
-                    .flatMap { admitted -> stage(admitted) }
-                    .flatMap { admitted -> write(current, admitted, addedBy) }
+                    .flatMap { admitted -> stage(current, admitted) }
+                    .flatMap { admitted -> apply(admitted) }
+                    .flatMap { added -> write(current, added, addedBy) }
             }
         } finally {
             running.unlock()
@@ -201,10 +241,10 @@ public class AdmissionService(
     ): CompletableFuture<Outcome<List<AddedMod>, AddRefusal>> = CoroutineScope(Dispatchers.IO).future { add(project, version, addedBy) }
 
     private fun lockfile(): Outcome<Lockfile, AddRefusal> =
-        if (Files.exists(lockfile.path)) {
-            Lockfile.read(lockfile.path).mapError { AddRefusal.LockfileProblem(it) }
+        if (Files.exists(target.lockfile.path)) {
+            Lockfile.read(target.lockfile.path).mapError { AddRefusal.LockfileProblem(it) }
         } else {
-            Outcome.Ok(lockfile.whenMissing)
+            Outcome.Ok(target.lockfile.whenMissing)
         }
 
     private suspend fun proven(versions: List<ModrinthVersion>): Outcome<List<ModrinthVersion>, AddRefusal> =
@@ -231,11 +271,6 @@ public class AdmissionService(
                     .map { jars -> files.indices.map { Downloaded(files[it].first, files[it].second, jars[it]) } }
             }
 
-    private class Admitted(
-        val jar: Path,
-        val mod: AddedMod,
-    )
-
     private fun admit(downloaded: List<Downloaded>): Outcome<List<Admitted>, AddRefusal> =
         downloaded
             .traverse { mod ->
@@ -254,17 +289,30 @@ public class AdmissionService(
                 if (refusal == null) Outcome.Ok(admitted) else Outcome.Err(AddRefusal.ServerRefused(refusal))
             }
 
-    private suspend fun stage(admitted: List<Admitted>): Outcome<List<AddedMod>, AddRefusal> {
+    // The staging server runs the lockfile's mods too: the server may have added some since it started.
+    private suspend fun stage(
+        current: Lockfile,
+        admitted: List<Admitted>,
+    ): Outcome<List<Admitted>, AddRefusal> {
         val jars = serverJars(admitted)
-        if (jars.isEmpty()) return Outcome.Ok(admitted.map { it.mod })
+        if (jars.isEmpty()) return Outcome.Ok(admitted)
+        val installed =
+            current.mods
+                .map { it.entry }
+                .filter { it.side != Side.CLIENT }
+                .map { store.pathOf(it.sha512, JAR) }
         return jarRules.staging
-            .tryOut(jars)
+            .tryOut(installed, jars)
             .mapError<Unit, StagingFailure, AddRefusal> { AddRefusal.StagingRefused(it) }
-            .map { admitted.map { it.mod } }
+            .map { admitted }
     }
 
-    // The server checks and tries what it loads itself; mods for the client only are the players' to load.
-    private fun serverJars(admitted: List<Admitted>): List<Path> = admitted.filter { it.mod.entry.side != Side.CLIENT }.map { it.jar }
+    private suspend fun apply(admitted: List<Admitted>): Outcome<List<AddedMod>, AddRefusal> =
+        target.live
+            .apply(serverJars(admitted))
+            .await()
+            .mapError<Unit, String, AddRefusal> { AddRefusal.NotApplied(it) }
+            .map { admitted.map { it.mod } }
 
     private fun entry(
         mod: Downloaded,
@@ -285,7 +333,7 @@ public class AdmissionService(
     ): Outcome<List<AddedMod>, AddRefusal> {
         val now = clock.instant()
         val updated = current.copy(mods = current.mods + added.map { LockedMod(it.entry, now, addedBy) })
-        return updated.write(lockfile.path).mapError<Unit, LockfileError, AddRefusal> { AddRefusal.LockfileProblem(it) }.map { added }
+        return updated.write(target.lockfile.path).mapError<Unit, LockfileError, AddRefusal> { AddRefusal.NotRecorded(it) }.map { added }
     }
 
     private companion object {
@@ -293,3 +341,11 @@ public class AdmissionService(
         const val PARALLELISM = 4
     }
 }
+
+private class Admitted(
+    val jar: Path,
+    val mod: AddedMod,
+)
+
+// The server checks, tries and loads what it runs itself; mods for the client only are the players' to load.
+private fun serverJars(admitted: List<Admitted>): List<Path> = admitted.filter { it.mod.entry.side != Side.CLIENT }.map { it.jar }

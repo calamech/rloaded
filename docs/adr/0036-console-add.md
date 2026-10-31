@@ -37,3 +37,4 @@ Checked on 2026-10-31 with `AdminAddGameTest` on the game test server: against a
 `ModrinthProjectVersionsTest` (recorded answers of 2026-10-31), `ResolverTest`, `AdmissionServiceTest`, `JarClassifierTest`, `LockfileTest`, and `AdminAddGameTest` in the `game-test` CI job.
 
 Amended 2026-10-31: the staging dry-run is described in ADR 0039; the reputation guard and the compatibility database in ADR 0037 and ADR 0038.
+Amended 2026-10-31: an added mod is now loaded into the running server and installed by connected players at once (ADR 0041).

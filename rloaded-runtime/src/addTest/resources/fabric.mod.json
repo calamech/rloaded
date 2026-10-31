@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "rloaded-add-test",
+  "version": "${version}",
+  "name": "Rloaded in-session add test",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": ["io.github.calamech.rloaded.testmods.addtest.AddClientGameTest"]
+  },
+  "depends": {
+    "rloaded": "*",
+    "fabric-client-gametest-api-v1": "*"
+  }
+}

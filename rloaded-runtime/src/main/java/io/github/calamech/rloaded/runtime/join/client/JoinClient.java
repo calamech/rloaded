@@ -33,10 +33,13 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
+import net.fabricmc.fabric.api.client.networking.v1.ClientLoginConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,10 +56,16 @@ public final class JoinClient {
   private static final int MAX_REPORT = 1000;
   private static final int PERCENT = 100;
 
+  /** The toast that names the mods an add brought while the player was in the world. */
+  public static final SystemToast.SystemToastId ADDED_TOAST = new SystemToast.SystemToastId();
+
   /** Project ids this game loaded during the session, with their version ids. */
   private static final Map<String, String> LOADED = new ConcurrentHashMap<>();
 
   private static ClientJoin current;
+  // Whether the player was in the world on this connection before: the configuration is then an
+  // add.
+  private static volatile boolean inSession;
   // Set when the player leaves or the server ends the join: what is still in flight is dropped.
   private static volatile boolean ended;
   private static Connection connection;
@@ -70,6 +79,8 @@ public final class JoinClient {
   /** Registers the join on the client side. */
   public static void register() {
     ClientConfigurationConnectionEvents.DISCONNECT.register((listener, client) -> ended = true);
+    ClientLoginConnectionEvents.INIT.register((listener, client) -> inSession = false);
+    ClientConfigurationConnectionEvents.COMPLETE.register((listener, client) -> inSession = true);
     ClientConfigurationNetworking.registerGlobalReceiver(
         JoinPayloads.Hello.TYPE,
         (payload, context) ->
@@ -252,7 +263,43 @@ public final class JoinClient {
           client.gui.setScreen(previous);
           sender.sendPacket(
               new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE)));
+          if (inSession) {
+            announce(client, mods);
+          }
         });
+  }
+
+  // Players accepted the server's future mods when they trusted it: a toast tells them what came.
+  private static void announce(Minecraft client, List<InstalledMod> mods) {
+    List<String> ids = mods.stream().map(mod -> mod.getEntry().getProjectId()).toList();
+    CompletableFuture<?> _ =
+        connection()
+            .modrinth()
+            .projectsAsync(ids)
+            .whenComplete(
+                (projects, error) ->
+                    client.execute(() -> showAddedToast(client, ids, projects, error)));
+  }
+
+  private static void showAddedToast(
+      Minecraft client,
+      List<String> ids,
+      Outcome<Map<String, ModrinthProject>, ModrinthError> projects,
+      Throwable error) {
+    @SuppressWarnings("unchecked")
+    Map<String, ModrinthProject> details =
+        error == null && projects instanceof Outcome.Ok<?> ok
+            ? (Map<String, ModrinthProject>) ok.getValue()
+            : Map.of();
+    String names =
+        ids.stream()
+            .map(id -> details.containsKey(id) ? details.get(id).getTitle() : id)
+            .collect(Collectors.joining(", "));
+    SystemToast.add(
+        client.gui.toastManager(),
+        ADDED_TOAST,
+        Component.translatableWithFallback("rloaded.toast.added", "New mods on this server"),
+        Component.literal(names));
   }
 
   /**

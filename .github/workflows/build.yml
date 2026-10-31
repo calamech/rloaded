@@ -89,3 +89,5 @@ jobs:
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:registrySyncTest --stacktrace
       - name: First join with mods from a separate server
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:joinTest --stacktrace
+      - name: In-session add
+        run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:addTest --stacktrace

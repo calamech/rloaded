@@ -36,6 +36,8 @@ internal fun serverProperties(port: Int): String =
         "enforce-secure-profile=false",
         "level-type=minecraft\\:flat",
         "generate-structures=false",
+        // Players of a check stand still: on a flat world, slimes would kill them.
+        "difficulty=peaceful",
         "view-distance=2",
         "simulation-distance=2",
         "spawn-protection=0",
