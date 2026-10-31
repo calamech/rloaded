@@ -5,6 +5,7 @@
   "name": "Rloaded in-session add test",
   "license": "MIT",
   "environment": "client",
+  "mixins": ["rloaded-add-test.mixins.json"],
   "entrypoints": {
     "fabric-client-gametest": ["io.github.calamech.rloaded.testmods.addtest.AddClientGameTest"]
   },

@@ -11,7 +11,8 @@
     "PersistentEntitySectionManagerAccess",
     "PlayerListMixin",
     "ServerGamePacketListenerImplMixin",
-    "ServerLevelAccess"
+    "ServerLevelAccess",
+    "UnconfiguredOutboundMixin"
   ],
   "client": [
     "KeyMappingRegistryMixin"
