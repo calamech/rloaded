@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "fails-in-running-server",
+  "version": "${version}",
+  "name": "Fails in running server (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.calamech.rloaded.testmods.failsinrunningserver.FailsInRunningServer"]
+  },
+  "depends": {
+    "minecraft": "26.3"
+  }
+}

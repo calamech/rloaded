@@ -216,6 +216,7 @@ testMod("keybindAndTab", seesRuntime = false)
 testMod("joinTest", seesRuntime = false)
 testMod("throwsOnInit", seesRuntime = false)
 testMod("failsOnClientOnce", seesRuntime = false)
+testMod("failsInRunningServer", seesRuntime = false)
 testMod("addTest", seesRuntime = true)
 
 // After the test mods: they compile against Minecraft and Fabric only, while the game test mod
