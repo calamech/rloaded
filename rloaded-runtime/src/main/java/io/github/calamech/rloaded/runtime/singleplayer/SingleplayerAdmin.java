@@ -10,11 +10,16 @@ import io.github.calamech.rloaded.admin.LiveGame;
 import io.github.calamech.rloaded.admin.LockfileLocation;
 import io.github.calamech.rloaded.admin.ReputationRules;
 import io.github.calamech.rloaded.admin.staging.Staging;
+import io.github.calamech.rloaded.core.download.ArtifactStore;
+import io.github.calamech.rloaded.core.download.RetryPolicy;
 import io.github.calamech.rloaded.core.lockfile.Lockfile;
+import io.github.calamech.rloaded.modrinth.ModInstaller;
 import io.github.calamech.rloaded.protocol.AddProblem;
 import io.github.calamech.rloaded.protocol.AdminEvent;
 import io.github.calamech.rloaded.protocol.AdminRequest;
+import io.github.calamech.rloaded.protocol.ModEntry;
 import io.github.calamech.rloaded.protocol.Outcome;
+import io.github.calamech.rloaded.runtime.LoadedMods;
 import io.github.calamech.rloaded.runtime.ModrinthAccess;
 import io.github.calamech.rloaded.runtime.ServerLockfile;
 import io.github.calamech.rloaded.runtime.admin.AdminPayloads;
@@ -67,6 +72,15 @@ public final class SingleplayerAdmin {
     ModrinthAccess access = ModrinthAccess.open();
     CompatDatabase compat = Admissions.bundledCompatDatabase();
     IntegratedServerHost.register();
+    WorldGate.register(
+        new ModInstaller(
+            access.modrinth(),
+            new ArtifactStore(
+                Path.of(modStore),
+                access.http(),
+                new RetryPolicy(),
+                ArtifactStore.DEFAULT_MAX_UNSIZED_BYTES),
+            ModInstaller.DEFAULT_PARALLELISM));
     ServerLifecycleEvents.SERVER_STARTED.register(
         server -> {
           if (server instanceof IntegratedServer integrated) {
@@ -174,7 +188,15 @@ public final class SingleplayerAdmin {
       return;
     }
     switch (outcome) {
-      case Outcome.Ok<?> ok -> rollout(open, player, add, files((List<?>) ok.getValue()));
+      case Outcome.Ok<?> ok -> {
+        List<?> added = (List<?>) ok.getValue();
+        added.forEach(
+            mod -> {
+              ModEntry entry = ((AddedMod) mod).getEntry();
+              LoadedMods.record(entry.getProjectId(), entry.getVersionId());
+            });
+        rollout(open, player, add, files(added));
+      }
       case Outcome.Err<?> err -> {
         AddRefusal refusal = (AddRefusal) err.getError();
         LOGGER.warn("Did not add {}: {}", add.getProjectId(), refusal.getReason());
