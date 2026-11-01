@@ -92,8 +92,8 @@ public final class ModsClient {
           allowed = access.getAllowed();
           return;
         }
+        boolean answer = browser().answers(event);
         browser().onEvent(event);
-        boolean answer = event instanceof AdminEvent.Added || event instanceof AdminEvent.Refused;
         if (answer && !(client.gui.screen() instanceof ModsScreen)) {
           reopen = true;
         }

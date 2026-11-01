@@ -6,6 +6,7 @@ import io.github.calamech.rloaded.admin.AddRefusal;
 import io.github.calamech.rloaded.admin.AddTarget;
 import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
+import io.github.calamech.rloaded.admin.InGameAdmin;
 import io.github.calamech.rloaded.admin.LiveGame;
 import io.github.calamech.rloaded.admin.LocalCompat;
 import io.github.calamech.rloaded.admin.ReputationRules;
@@ -36,7 +37,8 @@ import org.slf4j.LoggerFactory;
  * The console commands an admin manages the server's mods with. {@code rloaded add <project>
  * [version]} admits a mod from Modrinth, tries it on a staging server, loads it into the running
  * server, writes it with its dependencies to the lockfile, and has every connected player install
- * it without leaving.
+ * it without leaving. Operators add the same way from the game's Mods screen ({@link
+ * DedicatedAdmin}).
  */
 public final class AdminCommands {
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
@@ -66,7 +68,18 @@ public final class AdminCommands {
           JoinServer.recordFailuresIn(compat);
           staging = staging(server);
           live = new LiveAdd(server, new DedicatedServerHost(server));
+          boolean inGame =
+              switch (InGameAdmin.Companion.fromProperties(System::getProperty)) {
+                case Outcome.Ok<?> ok -> ((InGameAdmin) ok.getValue()).getEnabled();
+                case Outcome.Err<?> err ->
+                    throw new IllegalStateException(err.getError().toString());
+              };
+          if (!inGame) {
+            LOGGER.info("Adding mods from the game is off in rloaded-server.toml");
+          }
+          ModsChannel.serve(new DedicatedAdmin(server, () -> service(server), live, inGame));
         });
+    ServerLifecycleEvents.SERVER_STOPPING.register(ModsChannel::stop);
     ServerRestart.register();
     CommandRegistrationCallback.EVENT.register(
         (dispatcher, context, selection) ->

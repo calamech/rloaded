@@ -31,3 +31,5 @@ Checked on 2026-10-31 with `singleplayerTest` (CI job `client-game-test`), whose
 ## Enforcement
 
 `ModsBrowserTest`, `ModrinthSearchTest`, `AdminMessagesTest` in `check`; `singleplayerTest` in the `client-game-test` CI job.
+
+Amended 2026-11-01: operators of level 4 of a dedicated server use the Mods screen too, when `[admin] inGame` allows it (ADR 0053).

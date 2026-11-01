@@ -1,6 +1,9 @@
 package io.github.calamech.rloaded.testmods.addtest;
 
+import io.github.calamech.rloaded.protocol.AdminRequest;
+import io.github.calamech.rloaded.runtime.admin.AdminPayloads;
 import io.github.calamech.rloaded.runtime.join.client.JoinClient;
+import io.github.calamech.rloaded.testmods.screens.ModsScreenDriver;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
@@ -15,6 +18,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
@@ -150,10 +154,31 @@ public final class AddClientGameTest implements FabricClientGameTest {
             STEP_TICKS);
         yield "";
       }
+      // Alice, an operator, adds keybind-and-tab from her Mods screen; Bob gets it as for any add.
       case "keybind-and-tab" -> {
+        if (isAlice(context)) {
+          ModsScreenDriver.openModsScreen(context);
+          ModsScreenDriver.search(context, "key");
+          ModsScreenDriver.install(context, "Key mapping and creative tab", "Installed");
+          context.runOnClient(client -> client.gui.setScreen(null));
+        }
         context.waitFor(
             client -> inWorld(client) && hasKeyMapping(client) && hasTab(client), STEP_TICKS);
         yield "";
+      }
+      // Bob is not an operator: he has no Mods button, and the server refuses what he asks anyway.
+      case "no-access" -> {
+        if (isAlice(context)) {
+          yield "";
+        }
+        if (ModsScreenDriver.hasModsButton(context)) {
+          throw new AssertionError("a player who is not an operator has the Mods button");
+        }
+        context.runOnClient(
+            client ->
+                ClientPlayNetworking.send(
+                    AdminPayloads.Request.of(new AdminRequest.Add("bob-1", "kbtProject", null))));
+        yield "asked anyway";
       }
       // A generated mod without code: the loader lists it once it is added.
       default -> {
@@ -227,6 +252,10 @@ public final class AddClientGameTest implements FabricClientGameTest {
   }
 
   // An add must not ask again what the player answered when it joined.
+  private static boolean isAlice(ClientGameTestContext context) {
+    return context.computeOnClient(client -> client.getUser().getName().equals("Alice"));
+  }
+
   private static boolean inWorld(Minecraft client) {
     String question = question(client);
     if (question != null) {
