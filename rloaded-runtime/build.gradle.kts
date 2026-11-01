@@ -166,10 +166,12 @@ tasks.jar {
 fun testMod(
     name: String,
     seesRuntime: Boolean,
+    sharedSources: List<String> = emptyList(),
 ) {
     val main = sourceSets.main.get()
     val sourceSet =
         sourceSets.create(name) {
+            sharedSources.forEach { java.srcDir("src/$it/java") }
             compileClasspath += main.compileClasspath
             runtimeClasspath += main.runtimeClasspath
             if (seesRuntime) {
@@ -218,14 +220,18 @@ testMod("joinTest", seesRuntime = false)
 testMod("throwsOnInit", seesRuntime = false)
 testMod("failsOnClientOnce", seesRuntime = false)
 testMod("failsInRunningServer", seesRuntime = false)
-testMod("addTest", seesRuntime = true)
-testMod("singleplayerTest", seesRuntime = true)
+// Both drive the game's Mods screen; they are never loaded in the same game.
+testMod("addTest", seesRuntime = true, sharedSources = listOf("modsScreenDriver"))
+testMod("singleplayerTest", seesRuntime = true, sharedSources = listOf("modsScreenDriver"))
 
 // After the test mods: they compile against Minecraft and Fabric only, while the game test mod
-// calls the libraries the runtime mod nests.
+// and the add test, which sends the Mods screen's messages itself, call the libraries the runtime
+// mod nests.
 sourceSets.main {
     compileClasspath += files(libraryClasspath)
 }
-sourceSets.named("gametest") {
-    compileClasspath += files(libraryClasspath)
+listOf("gametest", "addTest").forEach { name ->
+    sourceSets.named(name) {
+        compileClasspath += files(libraryClasspath)
+    }
 }

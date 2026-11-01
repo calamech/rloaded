@@ -109,7 +109,7 @@ private const val OFFLINE_REALMS = "Couldn't connect to realms"
 
 // Where each game's own work starts in its log.
 private val MARKS =
-    mapOf("first" to "to the open world", "reopen" to "Installing the mods of Island", "restarted" to "Opening Plain again")
+    mapOf("first" to "asks to add", "reopen" to "Installing the mods of Island", "restarted" to "Opening Plain again")
 
 private const val PLAYER = "Tester"
 private const val MODRINTH_PROPERTY = "rloaded.test.modrinth"

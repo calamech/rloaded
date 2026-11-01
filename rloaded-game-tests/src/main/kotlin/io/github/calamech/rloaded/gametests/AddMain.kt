@@ -23,12 +23,14 @@ import kotlin.system.exitProcess
 /**
  * Adds mods while players are connected, end to end: a server in its own process, two clients that
  * already trust it and stay in the world, and `rloaded add` typed into the server console for
- * content-basic, mixin-field-init, then keybind-and-tab, served by a fake Modrinth. Before the adds the console
- * summons an armor stand; between them it gives each player content-basic's block. Then late-item
- * comes, the players leave, and join again from the same game, which must restart first; the fresh
- * game joins with both items in the player's inventory. Fails unless both
- * players got each mod without leaving their connection, the server says every player got them each
- * time, every entity of the server has mixin-field-init's field, and no log line is an error from
+ * content-basic and mixin-field-init, served by a fake Modrinth; then Alice, made an operator,
+ * adds keybind-and-tab from her Mods screen, while Bob, who is not one, has no Mods button and is
+ * refused when he asks anyway. Before the adds the console summons an armor stand; between them it
+ * gives each player content-basic's block. Then late-item comes, the players leave, and join again
+ * from the same game, which must restart first; the fresh game joins with both items in the
+ * player's inventory. Fails unless both players got each mod without leaving their connection, the
+ * server says every player got them each time, every entity of the server has mixin-field-init's
+ * field, Alice's add and Bob's refusal are in the server's log, and no log line is an error from
  * the first add on. The project owner accepted the Minecraft EULA for the server directory this
  * check creates.
  *
@@ -56,7 +58,10 @@ public fun main(arguments: Array<String>) {
             AddPlan(mods, emptyMap(), ::steps, listOf("fieldinit"), askedAtJoin = true) { serverLog ->
                 val fieldInit = serverLog.lines().lastOrNull { "field-init:" in it }.orEmpty()
                 println("Add check: ${fieldInit.substringAfter("field-init: ")}")
-                FIELD_INIT_PASSED.containsMatchIn(fieldInit)
+                val fromScreen = "Alice asks to add kbtProject" in serverLog
+                val refused = "Bob may not add mods; kbtProject was not added" in serverLog
+                println("Add check: Alice added from her screen: $fromScreen; Bob refused: $refused")
+                FIELD_INIT_PASSED.containsMatchIn(fieldInit) && fromScreen && refused
             },
         )
     exitProcess(if (passed) 0 else 1)
@@ -216,11 +221,13 @@ private fun steps(players: List<AddPlayer>): List<Pair<String, List<String>>> =
     listOf(
         IN_WORLD to emptyList(),
         // An entity from before the adds, which the server must rebuild for mixin-field-init.
-        "content-basic" to listOf("summon minecraft:armor_stand 0 -60 0", "rloaded add cbProject"),
+        // Alice may add from her Mods screen from her next join on, which the add brings.
+        "content-basic" to listOf("op Alice", "summon minecraft:armor_stand 0 -60 0", "rloaded add cbProject"),
         // The server makes the new item for players: it needs the item's components.
         "content-basic-item" to players.map { "give ${it.name} content-basic:basic_block" },
         "mixin-field-init" to listOf("rloaded add mfiProject"),
-        "keybind-and-tab" to listOf("rloaded add kbtProject"),
+        "keybind-and-tab" to emptyList(),
+        "no-access" to emptyList(),
         // An item added once the players' games have synchronized their items with the server.
         "late-item" to listOf("rloaded add liProject"),
         "late-item-given" to players.map { "give ${it.name} late-item:late_item" },

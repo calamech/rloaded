@@ -1,35 +1,22 @@
 package io.github.calamech.rloaded.testmods.singleplayertest;
 
-import com.mojang.blaze3d.platform.InputConstants;
+import io.github.calamech.rloaded.testmods.screens.ModsScreenDriver;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
-import java.util.function.Predicate;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.StringWidget;
-import net.minecraft.client.gui.components.events.ContainerEventHandler;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.GenericMessageScreen;
-import net.minecraft.client.gui.screens.PauseScreen;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.renderer.block.BlockStateModelSet;
 import net.minecraft.client.server.IntegratedServer;
@@ -113,19 +100,19 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
     if (!published) {
       throw new AssertionError("the world could not be opened to the local network");
     }
-    openModsScreen(context);
-    search(context, "content");
-    install(context, CONTENT_BASIC, "Close the world to LAN players first.");
+    ModsScreenDriver.openModsScreen(context);
+    ModsScreenDriver.search(context, "content");
+    ModsScreenDriver.install(context, CONTENT_BASIC, "Close the world to LAN players first.");
     context.runOnClient(client -> server.unpublishServer());
-    install(context, REMOVED, "Modrinth no longer has this mod.");
-    install(context, CONTENT_BASIC, "Installed");
-    search(context, "mixin");
-    install(context, MIXIN_FIELD_INIT, "Installed");
+    ModsScreenDriver.install(context, REMOVED, "Modrinth no longer has this mod.");
+    ModsScreenDriver.install(context, CONTENT_BASIC, "Installed");
+    ModsScreenDriver.search(context, "mixin");
+    ModsScreenDriver.install(context, MIXIN_FIELD_INIT, "Installed");
     // The search result, and the mods the world has.
     context.waitFor(
         client ->
-            titled(client.gui.screen(), MIXIN_FIELD_INIT) == 2
-                && titled(client.gui.screen(), CONTENT_BASIC) == 1,
+            ModsScreenDriver.titled(client.gui.screen(), MIXIN_FIELD_INIT) == 2
+                && ModsScreenDriver.titled(client.gui.screen(), CONTENT_BASIC) == 1,
         STEP_TICKS);
     context.takeScreenshot("rloaded-mods-screen");
     context.runOnClient(client -> client.gui.setScreen(null));
@@ -205,121 +192,6 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-  }
-
-  private static void openModsScreen(ClientGameTestContext context) {
-    context.runOnClient(client -> client.pauseGame(false));
-    context.waitFor(client -> client.gui.screen() instanceof PauseScreen);
-    AbstractWidget mods =
-        context
-            .computeOnClient(
-                client ->
-                    find(
-                        client.gui.screen(),
-                        widget -> widget instanceof Button && "Mods".equals(text(widget))))
-            .orElseThrow(() -> new AssertionError("the pause menu has no Mods button"));
-    click(context, mods);
-    context.waitFor(client -> isModsScreen(client.gui.screen()));
-  }
-
-  private static void search(ClientGameTestContext context, String query) {
-    AbstractWidget field =
-        context
-            .computeOnClient(client -> find(client.gui.screen(), EditBox.class::isInstance))
-            .orElseThrow(() -> new AssertionError("the Mods screen has no search field"));
-    click(context, field);
-    context.runOnClient(client -> ((EditBox) field).setValue(""));
-    context.getInput().typeChars(query);
-    context.waitFor(
-        client ->
-            widgets(client.gui.screen()).stream()
-                .anyMatch(
-                    widget ->
-                        widget instanceof StringWidget
-                            && text(widget).toLowerCase(Locale.ROOT).startsWith(query)),
-        STEP_TICKS);
-  }
-
-  // Clicks Install on the row of [title], then waits until the row shows [outcome]. An add sends
-  // the player through the configuration phase; the game opens the Mods screen again after it.
-  private static void install(ClientGameTestContext context, String title, String outcome) {
-    AbstractWidget button =
-        context
-            .computeOnClient(client -> rowWidget(client.gui.screen(), title, Button.class))
-            .orElseThrow(() -> new AssertionError("no Install button for " + title));
-    click(context, button);
-    context.waitFor(
-        client ->
-            isModsScreen(client.gui.screen())
-                && rowWidget(client.gui.screen(), title, StringWidget.class)
-                    .filter(widget -> outcome.equals(text(widget)))
-                    .isPresent(),
-        STEP_TICKS);
-  }
-
-  // The test mod cannot see the runtime's screen class, which is not public.
-  private static boolean isModsScreen(Screen screen) {
-    return screen != null && screen.getClass().getSimpleName().equals("ModsScreen");
-  }
-
-  // The nearest widget of [type] to the right of the first row whose text starts with [title].
-  private static Optional<AbstractWidget> rowWidget(
-      Screen screen, String title, Class<? extends AbstractWidget> type) {
-    return find(screen, widget -> widget instanceof StringWidget && text(widget).startsWith(title))
-        .flatMap(
-            name ->
-                widgets(screen).stream()
-                    .filter(widget -> widget.getY() == name.getY() && widget.getX() > name.getX())
-                    .filter(type::isInstance)
-                    .min(Comparator.comparingInt(AbstractWidget::getX)));
-  }
-
-  private static long titled(Screen screen, String title) {
-    return widgets(screen).stream()
-        .filter(widget -> widget instanceof StringWidget && text(widget).startsWith(title))
-        .count();
-  }
-
-  // Moves the cursor to the middle of [widget], in window coordinates, and clicks.
-  private static void click(ClientGameTestContext context, AbstractWidget widget) {
-    double scale =
-        context.computeOnClient(
-            client ->
-                client.getWindow().getScreenWidth()
-                    / (double) client.getWindow().getGuiScaledWidth());
-    context
-        .getInput()
-        .setCursorPos(
-            (widget.getX() + widget.getWidth() / 2.0) * scale,
-            (widget.getY() + widget.getHeight() / 2.0) * scale);
-    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
-  }
-
-  private static Optional<AbstractWidget> find(Screen screen, Predicate<AbstractWidget> wanted) {
-    return widgets(screen).stream().filter(wanted).findFirst();
-  }
-
-  private static List<AbstractWidget> widgets(Screen screen) {
-    List<AbstractWidget> found = new ArrayList<>();
-    if (screen != null) {
-      collect(screen, found);
-    }
-    return found;
-  }
-
-  private static void collect(ContainerEventHandler container, List<AbstractWidget> found) {
-    for (GuiEventListener child : container.children()) {
-      if (child instanceof AbstractWidget widget) {
-        found.add(widget);
-      }
-      if (child instanceof ContainerEventHandler nested) {
-        collect(nested, found);
-      }
-    }
-  }
-
-  private static String text(AbstractWidget widget) {
-    return widget.getMessage().getString();
   }
 
   private static BlockPos placeBlock(ClientGameTestContext context, TestSingleplayerContext world) {

@@ -2,6 +2,7 @@ package io.github.calamech.rloaded.runtime;
 
 import io.github.calamech.rloaded.runtime.admin.AdminCommands;
 import io.github.calamech.rloaded.runtime.admin.AdminPayloads;
+import io.github.calamech.rloaded.runtime.admin.ModsChannel;
 import io.github.calamech.rloaded.runtime.engine.DataReload;
 import io.github.calamech.rloaded.runtime.engine.Reconfigurations;
 import io.github.calamech.rloaded.runtime.engine.RegistryThaw;
@@ -23,6 +24,7 @@ public final class RloadedRuntime implements ModInitializer {
     RegistryThaw.rememberIntrusiveRegistries();
     JoinPayloads.register();
     AdminPayloads.register();
+    ModsChannel.register();
     Reconfigurations.register();
     // A dedicated server and the server of a singleplayer world both reload data packs after an
     // add.

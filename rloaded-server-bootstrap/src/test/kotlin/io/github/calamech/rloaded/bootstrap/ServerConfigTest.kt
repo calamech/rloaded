@@ -64,6 +64,12 @@ class ServerConfigTest {
     }
 
     @Test
+    fun `reads whether operators may add mods in the game`() {
+        assertEquals(Outcome.Ok(ServerConfig(admin = AdminSection(false))), ServerConfig.parse("[admin]\ninGame = false\n"))
+        assertTrue(ServerConfig.parse("[admin]\ninGame = \"no\"\n") is Outcome.Err)
+    }
+
+    @Test
     fun `passes the settings the game reads as system properties`() {
         assertEquals(
             mapOf(
@@ -72,6 +78,7 @@ class ServerConfigTest {
                 "rloaded.reputation.min-project-downloads" to "1000",
                 "rloaded.staging.enabled" to "true",
                 "rloaded.staging.timeout-seconds" to "180",
+                "rloaded.admin.in-game" to "true",
             ),
             ServerConfig().gameProperties(),
         )
