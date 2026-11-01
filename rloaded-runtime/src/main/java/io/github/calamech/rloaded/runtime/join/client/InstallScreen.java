@@ -36,8 +36,8 @@ final class InstallScreen extends Screen {
   private final Map<String, String> titles;
   private final InstallProgress progress;
   private final Runnable onLeave;
-  private final HeaderAndFooterLayout layout =
-      new HeaderAndFooterLayout(this, HEADER_HEIGHT, HEADER_HEIGHT / 2);
+  // Made again at each init: a layout keeps every child added to it.
+  private HeaderAndFooterLayout layout;
   private InstallProgress.Snapshot shown;
 
   InstallScreen(
@@ -58,6 +58,7 @@ final class InstallScreen extends Screen {
 
   @Override
   protected void init() {
+    layout = new HeaderAndFooterLayout(this, HEADER_HEIGHT, HEADER_HEIGHT / 2);
     LinearLayout header = layout.addToHeader(LinearLayout.vertical().spacing(SPACING));
     header.defaultCellSetting().alignHorizontallyCenter();
     header.addChild(new StringWidget(getTitle(), font));
