@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-30
 - Amended: 2026-10-30, client side and resource reload (see the end of Decision)
+- Amended: 2026-11-01, mods with nested jars load with them (ADR 0060)
 
 ## Context
 

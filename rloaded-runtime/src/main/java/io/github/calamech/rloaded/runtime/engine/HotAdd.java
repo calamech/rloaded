@@ -5,6 +5,7 @@ import io.github.calamech.rloaded.core.admission.JarReport;
 import io.github.calamech.rloaded.core.admission.Refusal;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.runtime.engine.LoaderBridge.ModJar;
+import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.nio.file.Path;
@@ -15,6 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -23,6 +25,8 @@ import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.ModContainer;
+import net.fabricmc.loader.api.Version;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
 import net.fabricmc.loader.api.metadata.ModDependency;
 import net.minecraft.core.Registry;
@@ -48,8 +52,11 @@ public final class HotAdd {
    */
   public static List<String> load(List<Path> jars, Instrumentation instrumentation)
       throws HotAddRefusal {
-    List<ModJar> ordered = dependencyOrder(checked(read(jars)));
+    List<ModJar> ordered = new ArrayList<>();
     try {
+      for (ModJar mod : dependencyOrder(checked(read(jars)))) {
+        ordered.add(LoaderBridge.extracted(mod));
+      }
       for (ModJar mod : ordered) {
         LoaderBridge.register(mod);
       }
@@ -58,7 +65,7 @@ public final class HotAdd {
           LateMixins.apply(config, instrumentation);
         }
       }
-    } catch (ReflectiveOperationException | UnmodifiableClassException e) {
+    } catch (ReflectiveOperationException | UnmodifiableClassException | IOException e) {
       throw new IllegalStateException("cannot register the mods " + ids(ordered), e);
     }
     runEntrypoints(ordered);
@@ -77,19 +84,44 @@ public final class HotAdd {
   private static List<ModJar> read(List<Path> jars) throws HotAddRefusal {
     List<ModJar> mods = new ArrayList<>();
     for (Path jar : jars) {
-      mods.add(LoaderBridge.read(jar));
+      mods.addAll(LoaderBridge.read(jar));
     }
     return mods;
   }
 
+  // Nested mods follow Fabric's rule at startup: the newest version of a mod wins. One the game
+  // already runs in that version or a newer one is left out; a newer one cannot replace it.
   private static Map<String, ModJar> checked(List<ModJar> mods) throws HotAddRefusal {
     Map<String, ModJar> byId = new LinkedHashMap<>();
     for (ModJar mod : mods) {
-      if (FabricLoader.getInstance().isModLoaded(mod.id())) {
-        throw new HotAddRefusal(mod.path(), "a mod with id " + mod.id() + " is already loaded");
+      Optional<ModContainer> loaded = FabricLoader.getInstance().getModContainer(mod.id());
+      if (mod.nested().isEmpty()) {
+        if (loaded.isPresent()) {
+          throw new HotAddRefusal(mod.path(), "a mod with id " + mod.id() + " is already loaded");
+        }
+        ModJar earlier = byId.get(mod.id());
+        if (earlier != null && earlier.nested().isEmpty()) {
+          throw new HotAddRefusal(mod.path(), "another jar of the add has id " + mod.id());
+        }
+      } else if (loaded.isPresent()) {
+        Version running = loaded.get().getMetadata().getVersion();
+        if (running.compareTo(mod.metadata().getVersion()) >= 0) {
+          continue;
+        }
+        throw new HotAddRefusal(
+            mod.path(),
+            "it nests "
+                + mod.id()
+                + " "
+                + mod.metadata().getVersion().getFriendlyString()
+                + ", newer than the "
+                + running.getFriendlyString()
+                + " the game runs");
       }
-      if (byId.put(mod.id(), mod) != null) {
-        throw new HotAddRefusal(mod.path(), "another jar of the add has id " + mod.id());
+      ModJar earlier = byId.get(mod.id());
+      if (earlier == null
+          || earlier.metadata().getVersion().compareTo(mod.metadata().getVersion()) < 0) {
+        byId.put(mod.id(), mod);
       }
     }
     for (ModJar mod : mods) {
@@ -105,14 +137,14 @@ public final class HotAdd {
       throw new HotAddRefusal(
           mod.path(), "it does not load on the " + environment.name().toLowerCase(Locale.ROOT));
     }
-    if (!mod.metadata().getJars().isEmpty()) {
-      throw new HotAddRefusal(
-          mod.path(), "it contains nested jars, which cannot be added to a running game yet");
-    }
     if (mod.metadata().getClassTweaker() != null) {
       throw new HotAddRefusal(
           mod.path(),
           "it widens access to game classes, which cannot be done in a running game yet");
+    }
+    // The classifier reads nested jars with the jar that holds them.
+    if (mod.nested().isPresent()) {
+      return;
     }
     switch (Admission.classifier().classify(mod.path())) {
       case Outcome.Ok<?> ok -> {
