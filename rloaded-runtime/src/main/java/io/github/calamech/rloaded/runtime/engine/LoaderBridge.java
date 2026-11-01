@@ -21,6 +21,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import net.fabricmc.api.EnvType;
@@ -32,6 +34,9 @@ import net.fabricmc.loader.impl.ModContainerImpl;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.entrypoint.EntrypointStorage;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
+import net.fabricmc.loader.impl.lib.classtweaker.api.ClassTweaker;
+import net.fabricmc.loader.impl.lib.classtweaker.api.ClassTweakerReader;
+import net.fabricmc.loader.impl.lib.classtweaker.api.visitor.ClassTweakerVisitor;
 import net.fabricmc.loader.impl.metadata.DependencyOverrides;
 import net.fabricmc.loader.impl.metadata.EntrypointMetadata;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
@@ -210,6 +215,76 @@ public final class LoaderBridge {
       return MessageDigest.getInstance("SHA-256").digest(bytes);
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException("the JDK has no SHA-256", e);
+    }
+  }
+
+  /**
+   * Reads the class tweaker (or access widener) {@code mod} declares, without giving it to the
+   * game.
+   *
+   * @return the parsed class tweaker, or empty when the mod declares none
+   * @throws HotAddRefusal if the file is missing or cannot be read
+   */
+  public static Optional<ClassTweaker> classTweaker(ModJar mod) throws HotAddRefusal {
+    String location = mod.metadata().getClassTweaker();
+    if (location == null) {
+      return Optional.empty();
+    }
+    ClassTweaker parsed = ClassTweaker.newInstance();
+    read(mod, location, parsed);
+    return Optional.of(parsed);
+  }
+
+  /**
+   * Gives the class tweaker {@code mod} declares to the game's, which Fabric applies to each class
+   * as it loads.
+   *
+   * @return the binary names of the classes it changes, to redefine those already loaded
+   */
+  public static Set<String> applyClassTweaker(ModJar mod) throws HotAddRefusal {
+    Optional<ClassTweaker> parsed = classTweaker(mod);
+    if (parsed.isEmpty()) {
+      return Set.of();
+    }
+    read(mod, mod.metadata().getClassTweaker(), FabricLoaderImpl.INSTANCE.getClassTweaker());
+    return parsed.get().getTargets().stream()
+        .map(name -> name.replace('/', '.'))
+        .collect(Collectors.toSet());
+  }
+
+  private static void read(ModJar mod, String location, ClassTweakerVisitor into)
+      throws HotAddRefusal {
+    byte[] bytes = entry(mod, location);
+    try {
+      ClassTweakerReader.create(into)
+          .read(
+              bytes,
+              FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace());
+    } catch (RuntimeException e) {
+      throw new HotAddRefusal(
+          mod.path(), "its class tweaker " + location + " cannot be read: " + e.getMessage());
+    }
+  }
+
+  // A file of the mod's own jar, nested or not.
+  private static byte[] entry(ModJar mod, String location) throws HotAddRefusal {
+    try {
+      byte[] bytes;
+      if (mod.nested().isPresent()) {
+        bytes = zipEntries(mod.nested().get().bytes()).get(location);
+      } else {
+        try (FileSystem files = FileSystems.newFileSystem(mod.path())) {
+          Path file = files.getPath(location);
+          bytes = Files.isRegularFile(file) ? Files.readAllBytes(file) : null;
+        }
+      }
+      if (bytes == null) {
+        throw new HotAddRefusal(
+            mod.path(), "it declares " + location + ", which its jar does not contain");
+      }
+      return bytes;
+    } catch (IOException e) {
+      throw new HotAddRefusal(mod.path(), "it cannot be read: " + e.getMessage());
     }
   }
 

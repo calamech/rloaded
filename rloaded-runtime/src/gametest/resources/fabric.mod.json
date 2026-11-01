@@ -17,6 +17,7 @@
     "fabric-gametest": [
       "io.github.calamech.rloaded.gametest.AdminAddGameTest",
       "io.github.calamech.rloaded.gametest.BlockEntityCyclingGameTest",
+      "io.github.calamech.rloaded.gametest.ClassTweakerGameTest",
       "io.github.calamech.rloaded.gametest.ConsoleOnlyAddGameTest",
       "io.github.calamech.rloaded.gametest.EntityCyclingGameTest",
       "io.github.calamech.rloaded.gametest.HotAddGameTest",

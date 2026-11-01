@@ -29,6 +29,7 @@ import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.Version;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
 import net.fabricmc.loader.api.metadata.ModDependency;
+import net.fabricmc.loader.impl.lib.classtweaker.api.ClassTweaker;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 
@@ -60,6 +61,16 @@ public final class HotAdd {
       for (ModJar mod : ordered) {
         LoaderBridge.register(mod);
       }
+      Set<String> tweaked = new LinkedHashSet<>();
+      for (ModJar mod : ordered) {
+        try {
+          tweaked.addAll(LoaderBridge.applyClassTweaker(mod));
+        } catch (HotAddRefusal e) {
+          // The same file was read before anything was registered; past that point it is a defect.
+          throw new IllegalStateException(e.getMessage(), e);
+        }
+      }
+      LateMixins.redefineLoaded(tweaked, instrumentation);
       for (ModJar mod : ordered) {
         for (String config : LoaderBridge.mixinConfigs(mod)) {
           LateMixins.apply(config, instrumentation);
@@ -137,10 +148,17 @@ public final class HotAdd {
       throw new HotAddRefusal(
           mod.path(), "it does not load on the " + environment.name().toLowerCase(Locale.ROOT));
     }
-    if (mod.metadata().getClassTweaker() != null) {
-      throw new HotAddRefusal(
-          mod.path(),
-          "it widens access to game classes, which cannot be done in a running game yet");
+    Optional<ClassTweaker> tweaker = LoaderBridge.classTweaker(mod);
+    if (tweaker.isPresent()) {
+      for (String target : tweaker.get().getTargets()) {
+        if (!tweaker.get().getEnumExtensions(target).isEmpty()) {
+          throw new HotAddRefusal(
+              mod.path(),
+              "it adds constants to the enum "
+                  + target.replace('/', '.')
+                  + ", which cannot be done in a running game");
+        }
+      }
     }
     // The classifier reads nested jars with the jar that holds them.
     if (mod.nested().isPresent()) {
