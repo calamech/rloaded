@@ -155,6 +155,10 @@ public final class JoinServer {
 
   private static void endExpiredJoins() {
     for (ServerConfigurationPacketListenerImpl listener : deadlines.expired()) {
+      // The game's own "lost connection" line can lose the reason (ADR 0056): say it here.
+      LOGGER.warn(
+          "{} stopped answering while installing the server's mods and was disconnected",
+          listener.getOwner().name());
       listener.disconnect(
           Component.translatableWithFallback(
               "rloaded.disconnect.timeout",

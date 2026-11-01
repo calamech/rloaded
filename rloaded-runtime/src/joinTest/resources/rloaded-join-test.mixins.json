@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.calamech.rloaded.testmods.jointest.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "LateDisconnectReason"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
