@@ -123,7 +123,8 @@ private fun passed(
         joined.startsWith(
             "joined after the install screen",
         ) &&
-        disconnected.endsWith(TIMEOUT_MESSAGE)
+        disconnected.startsWith("disconnected: ") &&
+        TIMED_OUT in serverLog
 }
 
 /** A player of the join check, with its own game and launcher data. */
@@ -156,7 +157,10 @@ private val FILE_DELAY: Duration = Duration.ofSeconds(FILE_DELAY_SECONDS)
 // Below the client's 30 seconds of silence allowed on a socket, so the download itself does not fail.
 private const val STALL_SECONDS = 28L
 private val STALL: Duration = Duration.ofSeconds(STALL_SECONDS)
-private const val TIMEOUT_MESSAGE = "Your game stopped answering while it installed this server's mods."
+
+// The client may show the game's generic reason instead of the server's (ADR 0056), so the timeout
+// is read in the server's log.
+private const val TIMED_OUT = "Stalled stopped answering while installing the server's mods and was disconnected"
 
 private const val FIXED_PATHS = 5
 private const val AGENT_ARGUMENT = 3
