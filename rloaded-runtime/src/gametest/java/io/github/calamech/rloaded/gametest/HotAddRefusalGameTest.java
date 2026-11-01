@@ -44,7 +44,8 @@ public final class HotAddRefusalGameTest {
         directory,
         "nested.jar",
         mod("nested", "\"jars\": [{\"file\": \"META-INF/jars/lib.jar\"}],"),
-        "nested.jar is refused: it contains nested jars, which cannot be added to a running game yet");
+        "nested.jar is refused: it lists the nested jar META-INF/jars/lib.jar, which it does not"
+            + " contain");
     expect(
         mismatches,
         directory,
