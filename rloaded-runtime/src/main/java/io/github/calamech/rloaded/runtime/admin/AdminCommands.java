@@ -69,13 +69,13 @@ public final class AdminCommands {
           JoinServer.recordFailuresIn(compat);
           staging = staging(server);
           live = new LiveAdd(server, new DedicatedServerHost(server));
-          boolean inGame =
+          InGameAdmin inGame =
               switch (InGameAdmin.Companion.fromProperties(System::getProperty)) {
-                case Outcome.Ok<?> ok -> ((InGameAdmin) ok.getValue()).getEnabled();
+                case Outcome.Ok<?> ok -> (InGameAdmin) ok.getValue();
                 case Outcome.Err<?> err ->
                     throw new IllegalStateException(err.getError().toString());
               };
-          if (!inGame) {
+          if (!inGame.getEnabled()) {
             LOGGER.info("Adding mods from the game is off in rloaded-server.toml");
           }
           ModsChannel.serve(new DedicatedAdmin(server, () -> service(server), live, inGame));

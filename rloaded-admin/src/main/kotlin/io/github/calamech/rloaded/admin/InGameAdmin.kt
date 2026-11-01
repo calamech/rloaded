@@ -6,6 +6,9 @@ import io.github.calamech.rloaded.protocol.Outcome
 public data class InGameAdmin(
     val enabled: Boolean,
 ) {
+    /** Whether a player may add mods from the Mods screen: only an operator of level 4, and only when [enabled]. */
+    public fun allows(ownerLevel: Boolean): Boolean = enabled && ownerLevel
+
     /** The system property that carries the setting to the game. */
     public companion object {
         /** `true` or `false`, as a system property. */
