@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** The version of the messages in this file. A peer with another version is refused. */
-public const val PROTOCOL_VERSION: Int = 1
+public const val PROTOCOL_VERSION: Int = 2
 
 /** Sent by the server when a client starts configuration. */
 @Serializable
@@ -31,6 +31,8 @@ public data class ClientHello(
     /** SHA-256 of the canonical list of mods the client's game has loaded. */
     @Serializable(with = Sha256Serializer::class)
     val loadedSetHash: Checksum,
+    /** What the server signs with the manifest it sends in answer. */
+    val challenge: JoinChallenge,
 ) {
     init {
         require(protocol >= 1) { "protocol must be at least 1" }
@@ -76,7 +78,10 @@ public enum class ManifestKind {
     DELTA,
 }
 
-/** The mods a client must load, signed by the server's key. Build one with [ManifestSigning.sign]. */
+/**
+ * The mods a client must load, signed by the server's key with the client's [JoinChallenge]. Build
+ * one with [ManifestSigning.sign].
+ */
 @Serializable
 public data class Manifest(
     val kind: ManifestKind,

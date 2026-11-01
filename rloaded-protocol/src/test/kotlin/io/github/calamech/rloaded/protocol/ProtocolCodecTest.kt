@@ -16,8 +16,9 @@ class ProtocolCodecTest {
         val messages =
             listOf(
                 ServerHello.serializer() to ServerHello(PROTOCOL_VERSION, serverKey, "Friends", sha256('a')),
-                ClientHello.serializer() to ClientHello(PROTOCOL_VERSION, "0.1.0", sha256('b')),
-                Manifest.serializer() to ManifestSigning.sign(ManifestKind.FULL, listOf(entry("P7dR8mSH")), key.private),
+                ClientHello.serializer() to ClientHello(PROTOCOL_VERSION, "0.1.0", sha256('b'), JoinChallenge.random()),
+                Manifest.serializer() to
+                    ManifestSigning.sign(ManifestKind.FULL, listOf(entry("P7dR8mSH")), JoinChallenge.random(), key.private),
                 Progress.serializer() to Progress(InstallStage.DOWNLOAD, 40),
                 InstallResult.serializer() to InstallResult.Loaded,
                 InstallResult.serializer() to InstallResult.RefusedByUser,
@@ -67,7 +68,7 @@ class ProtocolCodecTest {
         val valid =
             ProtocolCodec.encode(
                 Manifest.serializer(),
-                ManifestSigning.sign(ManifestKind.DELTA, listOf(entry("AANobbMI")), key.private),
+                ManifestSigning.sign(ManifestKind.DELTA, listOf(entry("AANobbMI")), JoinChallenge.random(), key.private),
             )
 
         repeat(GARBAGE_RUNS) {
@@ -89,7 +90,7 @@ class ProtocolCodecTest {
         ) { entry("P7dR8mSH", fileName = "notes.txt") }
         assertRefused("size must be between 1 and 536870912 bytes") { entry("P7dR8mSH", size = 0) }
         assertRefused("a manifest lists each project once") {
-            ManifestSigning.sign(ManifestKind.FULL, listOf(entry("P7dR8mSH"), entry("P7dR8mSH")), key.private)
+            ManifestSigning.sign(ManifestKind.FULL, listOf(entry("P7dR8mSH"), entry("P7dR8mSH")), JoinChallenge.random(), key.private)
         }
     }
 

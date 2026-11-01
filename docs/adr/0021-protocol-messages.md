@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Amended: 2026-11-01, the manifest is signed with a challenge from the client's hello, so it cannot be replayed (ADR 0058)
 
 ## Context
 

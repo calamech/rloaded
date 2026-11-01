@@ -31,7 +31,8 @@ public sealed interface JoinRefusal {
 
 /**
  * The server's side of a join, without the game: the messages it sends and how it reads the
- * client's answers. The manifest lists every mod of the lockfile, signed with the server identity.
+ * client's answers. The manifest lists every mod of the lockfile, signed with the server identity
+ * and the challenge of the client's hello, so it is sent in answer to that hello.
  */
 public class ServerJoin(
     private val identity: ServerIdentity,
@@ -42,11 +43,11 @@ public class ServerJoin(
     public fun hello(): ByteArray =
         ProtocolCodec.encode(ServerHello.serializer(), ServerHello(PROTOCOL_VERSION, identity.publicKey, serverName, lockfile.hash()))
 
-    /** The encoded full manifest. */
-    public fun manifest(): ByteArray =
+    /** The encoded full manifest, for the join whose client sent [hello]. */
+    public fun manifest(hello: ClientHello): ByteArray =
         ProtocolCodec.encode(
             Manifest.serializer(),
-            identity.sign(ManifestKind.FULL, lockfile.entries()),
+            identity.sign(ManifestKind.FULL, lockfile.entries(), hello.challenge),
         )
 
     /** Reads the client's hello, refusing another protocol version. */

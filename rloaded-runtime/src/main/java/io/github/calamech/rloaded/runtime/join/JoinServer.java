@@ -8,6 +8,7 @@ import io.github.calamech.rloaded.core.join.ServerJoin;
 import io.github.calamech.rloaded.core.lockfile.LockedMod;
 import io.github.calamech.rloaded.core.lockfile.Lockfile;
 import io.github.calamech.rloaded.core.trust.ServerIdentity;
+import io.github.calamech.rloaded.protocol.ClientHello;
 import io.github.calamech.rloaded.protocol.InstallResult;
 import io.github.calamech.rloaded.protocol.ModEntry;
 import io.github.calamech.rloaded.protocol.Outcome;
@@ -68,8 +69,16 @@ public final class JoinServer {
     ServerConfigurationNetworking.registerGlobalReceiver(
         JoinPayloads.Hello.TYPE,
         (payload, context) -> {
-          if (join.clientHello(payload.bytes()) instanceof Outcome.Err<?> refused) {
-            context.packetListener().disconnect(refusal((JoinRefusal) refused.getError()));
+          ServerJoin current = join;
+          switch (current.clientHello(payload.bytes())) {
+            // The manifest is signed with the challenge of this hello, so it answers it.
+            case Outcome.Ok<?> ok ->
+                context
+                    .responseSender()
+                    .sendPacket(
+                        new JoinPayloads.Manifest(current.manifest((ClientHello) ok.getValue())));
+            case Outcome.Err<?> refused ->
+                context.packetListener().disconnect(refusal((JoinRefusal) refused.getError()));
           }
         });
     ServerConfigurationNetworking.registerGlobalReceiver(
@@ -278,9 +287,6 @@ public final class JoinServer {
       sender.accept(
           ServerConfigurationNetworking.createClientboundPacket(
               new JoinPayloads.Hello(join.hello())));
-      sender.accept(
-          ServerConfigurationNetworking.createClientboundPacket(
-              new JoinPayloads.Manifest(join.manifest())));
     }
 
     @Override
