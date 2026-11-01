@@ -111,10 +111,11 @@ class ModsBrowserTest {
     private fun statusOf(projectId: String): InstallStatus? =
         (browser.view.search as? SearchView.Found)?.rows?.find { it.projectId == projectId }?.status
 
+    // Waits for the view the screen gets: the browser changes its state first, then calls the screen.
     private fun awaitView(condition: (ModsView) -> Boolean): ModsView {
         val deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos()
-        while (!condition(browser.view)) {
-            check(System.nanoTime() < deadline) { "the view never got there: ${browser.view}; log: $logged" }
+        while (views.lastOrNull()?.let(condition) != true) {
+            check(System.nanoTime() < deadline) { "the screen never got there: ${views.lastOrNull()}; log: $logged" }
             Thread.sleep(10)
         }
         assertEquals(browser.view, views.last(), "the screen got the last view")
