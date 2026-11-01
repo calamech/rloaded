@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Amended: 2026-11-01, deadlines are checked each time the server ticks its connections, also while it pauses with no player in its list, and a timeout is logged by Rloaded (ADR 0056)
 
 ## Context
 
