@@ -83,7 +83,7 @@ internal fun trustServer(
 ) {
     val trusted =
         ServerIdentity.loadOrCreate(serverDirectory.resolve("rloaded").resolve("identity.key")).flatMap { identity ->
-            TrustStore.open(launcherData.trustStore).flatMap { it.trust(TrustedServer(identity.publicKey, name, emptySet())) }
+            TrustStore.open(launcherData.trustStore).flatMap { it.trust(TrustedServer(identity.publicKey, name, emptySet(), emptyList())) }
         }
     if (trusted is Outcome.Err) failCheck("cannot trust the server: ${trusted.error}")
 }

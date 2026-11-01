@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Amended: 2026-11-01, the store also keeps the addresses a key was joined at, and warns when another key answers at one of them (ADR 0059)
 
 ## Context
 

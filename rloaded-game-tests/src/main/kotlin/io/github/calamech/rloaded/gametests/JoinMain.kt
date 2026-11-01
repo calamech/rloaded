@@ -8,16 +8,22 @@ import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
 import io.github.calamech.rloaded.core.download.Origin
 import io.github.calamech.rloaded.core.download.UrlPolicy
+import io.github.calamech.rloaded.core.trust.ServerIdentity
+import io.github.calamech.rloaded.core.trust.TrustStore
+import io.github.calamech.rloaded.core.trust.TrustedServer
 import io.github.calamech.rloaded.launcher.ClientDirectories
 import io.github.calamech.rloaded.modrinth.ModInstaller
 import io.github.calamech.rloaded.modrinth.Modrinth
 import io.github.calamech.rloaded.modrinth.ModrinthSettings
 import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.ServerKey
+import io.github.calamech.rloaded.protocol.flatMap
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.net.ServerSocket
 import java.net.URI
 import java.nio.file.Path
+import java.security.KeyPairGenerator
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.appendText
@@ -35,7 +41,9 @@ import kotlin.system.exitProcess
  * the base set joins it, accepts the trust screen, downloads both mods from a fake Modrinth, loads them
  * before the world exists, and uses them in the world without a restart. That client is slow, but keeps
  * reporting progress, so the server keeps waiting for it; a second client whose downloads stall is
- * disconnected when the join timeout runs out, although the server paused before they joined.
+ * disconnected when the join timeout runs out, although the server paused before they joined. The
+ * slow client trusted another key at the server's address before, so it is warned that the
+ * server's identity changed, and accepts the new one.
  *
  * The project owner accepted the Minecraft EULA for the server directory this check creates.
  *
@@ -88,9 +96,12 @@ public fun main(arguments: Array<String>) {
 
     val players =
         listOf(
-            JoinPlayer("Tester", run.resolve("tester"), slowModrinth.url, TRUST_SECONDS, expectDisconnect = false),
-            JoinPlayer("Stalled", run.resolve("stalled"), stalledModrinth.url, 0, expectDisconnect = true),
+            JoinPlayer("Tester", run.resolve("tester"), slowModrinth.url, TRUST_SECONDS, expectDisconnect = false, keyChanged = true),
+            JoinPlayer("Stalled", run.resolve("stalled"), stalledModrinth.url, 0, expectDisconnect = true, keyChanged = false),
         )
+    // The tester trusted another key at this address before: the server's identity changed for it.
+    val address = TrustedServer.addressOf(LOOPBACK, port)
+    trustAnotherKeyAt(players.first().launcherData, address)
     val clients =
         players.associate { player ->
             val launch = ClientLaunch(client, directories, player.launcherData, agent, paths[RUNTIME_MOD_ARGUMENT], clientMods)
@@ -101,7 +112,36 @@ public fun main(arguments: Array<String>) {
     stopServer(serverProcess)
 
     val serverLog = serverDirectory.resolve("logs").resolve("latest.log").readText()
-    exitProcess(if (passed(players, mods.size, serverLog)) 0 else 1)
+    val newKeyTrusted = trustsServerAt(serverDirectory, players.first().launcherData, address)
+    println("Join check: the tester now trusts the server's key at $address: $newKeyTrusted")
+    exitProcess(if (passed(players, mods.size, serverLog) && newKeyTrusted) 0 else 1)
+}
+
+private fun trustAnotherKeyAt(
+    launcherData: ClientDirectories,
+    address: String,
+) {
+    val earlier = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+    val seeded =
+        TrustStore
+            .open(launcherData.trustStore)
+            .flatMap { it.trust(TrustedServer(ServerKey.of(earlier.public), "Old Friends", emptySet(), listOf(address))) }
+    if (seeded is Outcome.Err) failCheck("cannot write the tester's trust store: ${seeded.error}")
+}
+
+private fun trustsServerAt(
+    serverDirectory: Path,
+    launcherData: ClientDirectories,
+    address: String,
+): Boolean {
+    val serverKey =
+        (
+            ServerIdentity.loadOrCreate(
+                serverDirectory.resolve("rloaded").resolve("identity.key"),
+            ) as? Outcome.Ok
+        )?.value?.publicKey
+    val trusted = (TrustStore.open(launcherData.trustStore) as? Outcome.Ok)?.value?.at(address)?.key
+    return serverKey != null && trusted == serverKey
 }
 
 private fun passed(
@@ -138,6 +178,7 @@ private class JoinPlayer(
     val modrinthUrl: String,
     val trustSeconds: Int,
     val expectDisconnect: Boolean,
+    val keyChanged: Boolean,
 ) {
     val launcherData = ClientDirectories(directory.resolve("launcher-data"))
     val report: Path = directory.resolve("report.txt")
@@ -149,6 +190,7 @@ private class JoinPlayer(
             "rloaded.join-test.report" to report.toString(),
             "rloaded.join-test.trust-seconds" to trustSeconds.toString(),
             "rloaded.join-test.expect-disconnect" to expectDisconnect.toString(),
+            "rloaded.join-test.key-changed" to keyChanged.toString(),
             "rloaded.test.modrinth" to modrinthUrl,
         )
 }

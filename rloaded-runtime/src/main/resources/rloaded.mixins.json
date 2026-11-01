@@ -17,6 +17,7 @@
     "UnconfiguredOutboundMixin"
   ],
   "client": [
+    "ClientCommonPacketListenerImplAccess",
     "KeyMappingRegistryMixin",
     "WorldOpenFlowsMixin"
   ],
