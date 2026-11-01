@@ -64,7 +64,8 @@ public fun main(arguments: Array<String>) {
                 println("Add check: Alice added from her screen: $fromScreen; Bob refused: $refused")
                 val audited = auditTrail(serverDirectory.resolve("rloaded").resolve("audit.log"))
                 println("Add check: audit log: $audited")
-                FIELD_INIT_PASSED.containsMatchIn(fieldInit) && fromScreen && refused && audited == AUDITED
+                FIELD_INIT_PASSED.containsMatchIn(fieldInit) && fromScreen && refused &&
+                    audited.groupBy { it.substringBefore(" ") } == AUDITED.groupBy { it.substringBefore(" ") }
             },
         )
     exitProcess(if (passed) 0 else 1)
@@ -326,12 +327,16 @@ internal class AddPlayer(
 }
 
 // The players and the armor stand at least, every one with the field.
-// The console adds three mods, Alice one from her Mods screen, and Bob, who is no operator, is refused.
+// The console adds three mods, Alice one from her Mods screen, which she removes and keeps, and Bob,
+// who is no operator, is refused. Each one's requests are in order; the players' requests may
+// interleave.
 private val AUDITED =
     listOf(
         "console cbProject: added",
         "console mfiProject: added",
         "Alice kbtProject: added",
+        "Alice kbtProject: marked",
+        "Alice kbtProject: kept",
         "Bob kbtProject: refused NOT_ALLOWED",
         "console liProject: added",
     )

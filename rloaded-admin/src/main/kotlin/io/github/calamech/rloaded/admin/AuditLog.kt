@@ -1,6 +1,5 @@
 package io.github.calamech.rloaded.admin
 
-import io.github.calamech.rloaded.protocol.AddProblem
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.map
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -38,6 +37,13 @@ public enum class AuditAction {
     KEEP,
 }
 
+/** What a request asks for: to [action] [project], at [version] for an add or its newest release when null. */
+public data class AuditRequest(
+    val action: AuditAction,
+    val project: String,
+    val version: String?,
+)
+
 /**
  * Appends every change of mods asked of a server or a world to [file], one JSON object per line: a
  * `requested` line before anything happens, then its outcome with the same `request` id (`added`,
@@ -55,33 +61,30 @@ public class AuditLog(
 ) {
     private val random = SecureRandom()
 
-    /** Records that [actor] asks to [action] [project], at [version] for an add or its newest release when null. */
+    /** Records that [actor] asks for [request]. */
     public fun requested(
         actor: AddActor,
-        action: AuditAction,
-        project: String,
-        version: String?,
+        request: AuditRequest,
     ): Outcome<AuditedRequest, AuditError> {
-        val request = timeOrderedId()
+        val id = timeOrderedId()
         return append(
-            line(request, "requested") {
-                put("action", action.name.lowercase(Locale.ROOT))
+            line(id, "requested") {
+                put("action", request.action.name.lowercase(Locale.ROOT))
                 actor(actor)
-                put("project", project)
-                put("version", version)
+                put("project", request.project)
+                put("version", request.version)
             },
-        ).map { AuditedRequest(this, request) }
+        ).map { AuditedRequest(this, id) }
     }
 
-    /** Records an add a surface refused before asking for it, with the [problem] it shows. */
+    /** Records a request a surface refused before acting on it, with the [problem] it shows. */
     public fun refused(
         actor: AddActor,
-        project: String,
-        version: String?,
-        problem: AddProblem,
+        request: AuditRequest,
+        problem: Enum<*>,
         reason: String,
     ) {
-        when (val requested = requested(actor, AuditAction.ADD, project, version)) {
+        when (val requested = requested(actor, request)) {
             is Outcome.Err -> onLateFailure(requested.error)
             is Outcome.Ok -> requested.value.refused(problem, reason)
         }

@@ -102,12 +102,12 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
     }
     ModsScreenDriver.openModsScreen(context);
     ModsScreenDriver.search(context, "content");
-    ModsScreenDriver.install(context, CONTENT_BASIC, "Close the world to LAN players first.");
+    ModsScreenDriver.press(context, CONTENT_BASIC, "Close the world to LAN players first.");
     context.runOnClient(client -> server.unpublishServer());
-    ModsScreenDriver.install(context, REMOVED, "Modrinth no longer has this mod.");
-    ModsScreenDriver.install(context, CONTENT_BASIC, "Installed");
+    ModsScreenDriver.press(context, REMOVED, "Modrinth no longer has this mod.");
+    ModsScreenDriver.press(context, CONTENT_BASIC, "Installed");
     ModsScreenDriver.search(context, "mixin");
-    ModsScreenDriver.install(context, MIXIN_FIELD_INIT, "Installed");
+    ModsScreenDriver.press(context, MIXIN_FIELD_INIT, "Installed");
     // The search result, and the mods the world has.
     context.waitFor(
         client ->

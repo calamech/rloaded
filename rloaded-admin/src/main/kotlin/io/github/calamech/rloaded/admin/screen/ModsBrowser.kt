@@ -6,6 +6,7 @@ import io.github.calamech.rloaded.protocol.AddProblem
 import io.github.calamech.rloaded.protocol.AdminEvent
 import io.github.calamech.rloaded.protocol.AdminRequest
 import io.github.calamech.rloaded.protocol.Outcome
+import io.github.calamech.rloaded.protocol.RemovalProblem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,6 +30,18 @@ public sealed interface InstallStatus {
     /** The server did not add it, for [problem]. */
     public data class Refused(
         val problem: AddProblem,
+    ) : InstallStatus
+
+    /** The server has it, and removes it at its next start. */
+    public data object RemovedAtRestart : InstallStatus
+
+    /** The server is marking it for removal, or keeping it. */
+    public data object Changing : InstallStatus
+
+    /** The server did not mark it, or did not keep it, for [problem]; [neededBy] names the mods that need it. */
+    public data class NotChanged(
+        val problem: RemovalProblem,
+        val neededBy: List<String>,
     ) : InstallStatus
 }
 
@@ -65,6 +78,8 @@ public data class ModsView(
     val search: SearchView,
     /** The mods the server has, as its lockfile lists them. */
     val installed: List<ModRow>,
+    /** Whether the player may remove mods here. */
+    val removals: Boolean,
 )
 
 /**
@@ -84,23 +99,6 @@ public class ModsBrowser(
     private val state = AtomicReference(State())
     private val requests = AtomicLong()
     private val searching = AtomicReference<Job?>()
-
-    // The facts the view is made of: what the server said, what Modrinth said, what was asked.
-    private data class State(
-        val serverMods: List<String> = emptyList(),
-        val query: String = "",
-        val hits: List<ModrinthHit>? = null,
-        val searching: Boolean = false,
-        val searchFailed: Boolean = false,
-        val known: Map<String, Known> = emptyMap(),
-        // By project id: the request that asks for it, and where it stands after the server's answer.
-        val asked: Map<String, Ask> = emptyMap(),
-    )
-
-    private data class Ask(
-        val requestId: String,
-        val status: InstallStatus,
-    )
 
     /** What the screen shows now. */
     public val view: ModsView get() = render(state.get())
@@ -148,51 +146,70 @@ public class ModsBrowser(
         send(AdminRequest.Add(requestId, projectId, null))
     }
 
+    /** Asks the server to remove [projectId] at its next start. */
+    public fun remove(projectId: String) {
+        val requestId = "remove-${requests.incrementAndGet()}"
+        change { it.copy(changes = it.changes + (projectId to Ask(requestId, InstallStatus.Changing))) }
+        send(AdminRequest.Remove(requestId, projectId))
+    }
+
+    /** Asks the server to keep [projectId], marked for removal. */
+    public fun keep(projectId: String) {
+        val requestId = "keep-${requests.incrementAndGet()}"
+        change { it.copy(changes = it.changes + (projectId to Ask(requestId, InstallStatus.Changing))) }
+        send(AdminRequest.Keep(requestId, projectId))
+    }
+
     /** Whether [event] answers a request this browser sent. */
     public fun answers(event: AdminEvent): Boolean {
         val requestId =
             when (event) {
                 is AdminEvent.Added -> event.requestId
                 is AdminEvent.Refused -> event.requestId
+                is AdminEvent.Changed -> event.requestId
+                is AdminEvent.RemovalRefused -> event.requestId
                 is AdminEvent.Access, is AdminEvent.Mods -> return false
             }
-        return state
-            .get()
-            .asked.values
-            .any { it.requestId == requestId }
+        val current = state.get()
+        return (current.asked.values + current.changes.values).any { it.requestId == requestId }
     }
 
     /** Follows what the server says. */
     public fun onEvent(event: AdminEvent) {
         when (event) {
-            is AdminEvent.Access -> {}
+            is AdminEvent.Access -> {
+                change { it.copy(removals = event.removals) }
+            }
 
             is AdminEvent.Mods -> {
-                change { it.copy(serverMods = event.projectIds) }
+                change { it.copy(serverMods = event.projectIds, pendingRemovals = event.pendingRemovals) }
                 scope.launch { describe(event.projectIds) }
             }
 
+            is AdminEvent.Changed -> {
+                change { current -> current.copy(changes = current.changes.filterValues { it.requestId != event.requestId }) }
+                send(AdminRequest.ListMods)
+            }
+
+            is AdminEvent.RemovalRefused -> {
+                log("The server did not change a mod: ${event.problem}, ${event.detail}")
+                change { it.copy(changes = it.changes.answered(event.requestId, InstallStatus.NotChanged(event.problem, event.neededBy))) }
+            }
+
             is AdminEvent.Added -> {
-                answer(event.requestId, InstallStatus.Installed)
+                change { it.copy(asked = it.asked.answered(event.requestId, InstallStatus.Installed)) }
                 send(AdminRequest.ListMods)
             }
 
             is AdminEvent.Refused -> {
                 log("The server did not add a mod: ${event.problem}, ${event.detail}")
-                answer(event.requestId, InstallStatus.Refused(event.problem))
+                change { it.copy(asked = it.asked.answered(event.requestId, InstallStatus.Refused(event.problem))) }
             }
         }
     }
 
     override fun close() {
         scope.cancel()
-    }
-
-    private fun answer(
-        requestId: String,
-        status: InstallStatus,
-    ) = change { current ->
-        current.copy(asked = current.asked.mapValues { (_, ask) -> if (ask.requestId == requestId) ask.copy(status = status) else ask })
     }
 
     // Titles and authors of the server's mods that no search showed yet.
@@ -220,24 +237,6 @@ public class ModsBrowser(
         onChange(render(state.updateAndGet(transform)))
     }
 
-    private fun render(state: State): ModsView {
-        val installed = state.serverMods.toSet()
-
-        fun row(projectId: String): ModRow {
-            val known = state.known[projectId]
-            val status = if (projectId in installed) InstallStatus.Installed else state.asked[projectId]?.status ?: InstallStatus.Available
-            return ModRow(projectId, known?.title, known?.author, known?.downloads, status)
-        }
-        val search =
-            when {
-                state.searching -> SearchView.Searching
-                state.searchFailed -> SearchView.Failed
-                state.hits == null -> SearchView.Idle
-                else -> SearchView.Found(state.hits.map { row(it.projectId) })
-            }
-        return ModsView(state.query, search, state.serverMods.map { row(it) })
-    }
-
     private companion object {
         const val MAX_HITS = 20
     }
@@ -251,3 +250,54 @@ private data class Known(
 )
 
 private fun known(hit: ModrinthHit) = Known(hit.title, hit.author.ifEmpty { null }, hit.downloads)
+
+// The facts the view is made of: what the server said, what Modrinth said, what was asked.
+private data class State(
+    val serverMods: List<String> = emptyList(),
+    val pendingRemovals: List<String> = emptyList(),
+    val removals: Boolean = false,
+    val query: String = "",
+    val hits: List<ModrinthHit>? = null,
+    val searching: Boolean = false,
+    val searchFailed: Boolean = false,
+    val known: Map<String, Known> = emptyMap(),
+    // By project id: the request that asks for it, and where it stands after the server's answer.
+    val asked: Map<String, Ask> = emptyMap(),
+    // The same for removals and keeps, until the server's mods show the change.
+    val changes: Map<String, Ask> = emptyMap(),
+)
+
+private data class Ask(
+    val requestId: String,
+    val status: InstallStatus,
+)
+
+private fun render(state: State): ModsView {
+    val installed = state.serverMods.toSet()
+
+    fun row(projectId: String): ModRow {
+        val known = state.known[projectId]
+        val status =
+            when {
+                projectId !in installed -> state.asked[projectId]?.status ?: InstallStatus.Available
+                projectId in state.changes -> state.changes.getValue(projectId).status
+                projectId in state.pendingRemovals -> InstallStatus.RemovedAtRestart
+                else -> InstallStatus.Installed
+            }
+        return ModRow(projectId, known?.title, known?.author, known?.downloads, status)
+    }
+    val search =
+        when {
+            state.searching -> SearchView.Searching
+            state.searchFailed -> SearchView.Failed
+            state.hits == null -> SearchView.Idle
+            else -> SearchView.Found(state.hits.map { row(it.projectId) })
+        }
+    return ModsView(state.query, search, state.serverMods.map { row(it) }, state.removals)
+}
+
+// The asks with the one [requestId] names now at [status].
+private fun Map<String, Ask>.answered(
+    requestId: String,
+    status: InstallStatus,
+): Map<String, Ask> = mapValues { (_, ask) -> if (ask.requestId == requestId) ask.copy(status = status) else ask }

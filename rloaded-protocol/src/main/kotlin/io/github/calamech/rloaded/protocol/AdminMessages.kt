@@ -26,27 +26,86 @@ public sealed interface AdminRequest {
     @Serializable
     @SerialName("mods")
     public data object ListMods : AdminRequest
+
+    /** Remove [projectId] at the next start of the server. */
+    @Serializable
+    @SerialName("remove")
+    public data class Remove(
+        val requestId: String,
+        val projectId: String,
+    ) : AdminRequest {
+        init {
+            require(AdminLimits.REQUEST_ID.matches(requestId)) { "requestId must be 1 to 64 letters, digits or dashes" }
+            require(Limits.MODRINTH_ID.matches(projectId)) { "projectId must be a Modrinth id" }
+        }
+    }
+
+    /** Keep [projectId], marked for removal. */
+    @Serializable
+    @SerialName("keep")
+    public data class Keep(
+        val requestId: String,
+        val projectId: String,
+    ) : AdminRequest {
+        init {
+            require(AdminLimits.REQUEST_ID.matches(requestId)) { "requestId must be 1 to 64 letters, digits or dashes" }
+            require(Limits.MODRINTH_ID.matches(projectId)) { "projectId must be a Modrinth id" }
+        }
+    }
 }
 
 /** What the server tells a player's Mods screen. */
 @Serializable
 public sealed interface AdminEvent {
-    /** Whether the player may add mods; sent each time the player enters the world. */
+    /**
+     * Whether the player may add mods, and remove them; sent each time the player enters the world.
+     */
     @Serializable
     @SerialName("access")
     public data class Access(
         val allowed: Boolean,
+        val removals: Boolean,
     ) : AdminEvent
 
-    /** The Modrinth project ids of the mods the lockfile lists, in its order. */
+    /**
+     * The Modrinth project ids of the mods the lockfile lists, in its order, and those of them
+     * removed at the next start.
+     */
     @Serializable
     @SerialName("mods")
     public data class Mods(
         val projectIds: List<String>,
+        val pendingRemovals: List<String>,
     ) : AdminEvent {
         init {
             require(projectIds.size <= Limits.ENTRIES) { "at most ${Limits.ENTRIES} mods" }
             require(projectIds.all { Limits.MODRINTH_ID.matches(it) }) { "projectIds must be Modrinth ids" }
+            require(pendingRemovals.all { it in projectIds }) { "pendingRemovals must be among projectIds" }
+        }
+    }
+
+    /** The mod is marked for removal, or kept, as the request asked. */
+    @Serializable
+    @SerialName("changed")
+    public data class Changed(
+        val requestId: String,
+    ) : AdminEvent
+
+    /**
+     * The removal, or the keep, was refused for [problem]; [neededBy] names the mods that need it
+     * when the problem is [RemovalProblem.NEEDED], and [detail] says more, for a log.
+     */
+    @Serializable
+    @SerialName("removal_refused")
+    public data class RemovalRefused(
+        val requestId: String,
+        val problem: RemovalProblem,
+        val neededBy: List<String>,
+        val detail: String,
+    ) : AdminEvent {
+        init {
+            require(detail.length in 1..Limits.REPORT) { "detail must have 1 to ${Limits.REPORT} characters" }
+            require(neededBy.size <= Limits.ENTRIES && neededBy.all { it.length in 1..Limits.NAME }) { "neededBy must be mod titles" }
         }
     }
 

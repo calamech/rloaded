@@ -5,12 +5,17 @@ import io.github.calamech.rloaded.admin.AddProblemsKt;
 import io.github.calamech.rloaded.admin.AddRefusal;
 import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
+import io.github.calamech.rloaded.admin.AuditAction;
+import io.github.calamech.rloaded.admin.AuditRequest;
 import io.github.calamech.rloaded.admin.LockfileLocation;
+import io.github.calamech.rloaded.admin.RemovalRefusal;
+import io.github.calamech.rloaded.admin.Removals;
 import io.github.calamech.rloaded.core.lockfile.Lockfile;
 import io.github.calamech.rloaded.protocol.AddProblem;
 import io.github.calamech.rloaded.protocol.AdminEvent;
 import io.github.calamech.rloaded.protocol.AdminRequest;
 import io.github.calamech.rloaded.protocol.Outcome;
+import io.github.calamech.rloaded.protocol.RemovalProblem;
 import io.github.calamech.rloaded.runtime.ServerLockfile;
 import java.nio.file.Files;
 import java.util.List;
@@ -53,6 +58,9 @@ public final class ModsChannel {
     /** Whether {@code player} may add mods here. */
     boolean allows(ServerPlayer player);
 
+    /** Whether mods can be removed here, by the players who may add them. */
+    boolean removals();
+
     /** Why no add can start now though the player may add, or empty. */
     Optional<Refusal> blocked();
 
@@ -76,7 +84,8 @@ public final class ModsChannel {
           Target current = target;
           if (current != null && current.server().equals(server)) {
             ServerPlayer player = listener.getPlayer();
-            send(player, new AdminEvent.Access(current.allows(player)));
+            boolean allowed = current.allows(player);
+            send(player, new AdminEvent.Access(allowed, allowed && current.removals()));
           }
         });
     ServerPlayNetworking.registerGlobalReceiver(
@@ -116,9 +125,13 @@ public final class ModsChannel {
           case AdminRequest.Add add -> add(current, player, add);
           case AdminRequest.ListMods list -> {
             if (current.allows(player)) {
-              mods(current).ifPresent(ids -> send(player, new AdminEvent.Mods(ids)));
+              mods(current).ifPresent(mods -> send(player, mods));
             }
           }
+          case AdminRequest.Remove remove ->
+              change(current, player, remove.getRequestId(), remove.getProjectId(), true);
+          case AdminRequest.Keep keep ->
+              change(current, player, keep.getRequestId(), keep.getProjectId(), false);
           default -> throw new IllegalStateException("unknown Mods request");
         }
       }
@@ -135,7 +148,11 @@ public final class ModsChannel {
       current
           .service()
           .getAudit()
-          .refused(actor, add.getProjectId(), add.getVersionId(), AddProblem.NOT_ALLOWED, detail);
+          .refused(
+              actor,
+              new AuditRequest(AuditAction.ADD, add.getProjectId(), add.getVersionId()),
+              AddProblem.NOT_ALLOWED,
+              detail);
       refuse(current, player.getUUID(), add, AddProblem.NOT_ALLOWED, detail);
     } else if (blocked.isPresent()) {
       Refusal refusal = blocked.get();
@@ -143,7 +160,10 @@ public final class ModsChannel {
           .service()
           .getAudit()
           .refused(
-              actor, add.getProjectId(), add.getVersionId(), refusal.problem(), refusal.detail());
+              actor,
+              new AuditRequest(AuditAction.ADD, add.getProjectId(), add.getVersionId()),
+              refusal.problem(),
+              refusal.detail());
       refuse(current, player.getUUID(), add, refusal.problem(), refusal.detail());
     } else {
       LOGGER.info("{} asks to add {}", name, add.getProjectId());
@@ -211,14 +231,80 @@ public final class ModsChannel {
     }
   }
 
+  // Marks a mod for removal at the next start, or keeps it, for a player who may add mods.
+  private static void change(
+      Target current, ServerPlayer player, String requestId, String projectId, boolean remove) {
+    String name = player.getName().getString();
+    AddActor actor = current.actor(player);
+    AuditAction action = remove ? AuditAction.REMOVE : AuditAction.KEEP;
+    UUID id = player.getUUID();
+    if (!current.allows(player) || !current.removals()) {
+      String detail = name + " may not remove mods";
+      LOGGER.warn("{}; {} was not changed", detail, projectId);
+      current
+          .service()
+          .getAudit()
+          .refused(
+              actor, new AuditRequest(action, projectId, null), RemovalProblem.NOT_ALLOWED, detail);
+      send(
+          current,
+          id,
+          new AdminEvent.RemovalRefused(requestId, RemovalProblem.NOT_ALLOWED, List.of(), detail));
+      return;
+    }
+    Removals removals = current.service().getRemovals();
+    CompletableFuture<?> _ =
+        (remove ? removals.removeAsync(projectId, actor) : removals.keepAsync(projectId, actor))
+            .whenComplete(
+                (outcome, error) ->
+                    current
+                        .server()
+                        .execute(() -> changed(current, id, requestId, projectId, outcome, error)));
+  }
+
+  private static void changed(
+      Target current,
+      UUID player,
+      String requestId,
+      String projectId,
+      Outcome<String, RemovalRefusal> outcome,
+      Throwable error) {
+    switch (outcome) {
+      case null -> {
+        LOGGER.error("Changing {} failed on an unexpected error", projectId, error);
+        send(
+            current,
+            player,
+            new AdminEvent.RemovalRefused(
+                requestId, RemovalProblem.STORAGE, List.of(), "unexpected error: " + error));
+      }
+      case Outcome.Ok<?> ok -> {
+        LOGGER.info("{} is now {}", projectId, requestId.startsWith("keep") ? "kept" : "marked");
+        send(current, player, new AdminEvent.Changed(requestId));
+      }
+      case Outcome.Err<?> err -> {
+        RemovalRefusal refusal = (RemovalRefusal) err.getError();
+        LOGGER.warn("Did not change {}: {}", projectId, refusal.getReason());
+        send(
+            current,
+            player,
+            new AdminEvent.RemovalRefused(
+                requestId,
+                refusal.getProblem(),
+                refusal instanceof RemovalRefusal.Needed needed ? needed.getBy() : List.of(),
+                refusal.getReason()));
+      }
+    }
+  }
+
   // The mods the lockfile lists; empty when it cannot be read, which is logged.
-  private static Optional<List<String>> mods(Target current) {
+  private static Optional<AdminEvent.Mods> mods(Target current) {
     LockfileLocation location = ServerLockfile.of(current.server());
     if (!Files.exists(location.getPath())) {
-      return Optional.of(ids(location.getWhenMissing()));
+      return Optional.of(event(location.getWhenMissing()));
     }
     return switch (Lockfile.Companion.read(location.getPath())) {
-      case Outcome.Ok<?> ok -> Optional.of(ids((Lockfile) ok.getValue()));
+      case Outcome.Ok<?> ok -> Optional.of(event((Lockfile) ok.getValue()));
       case Outcome.Err<?> err -> {
         LOGGER.error("The lockfile cannot be read: {}", err.getError());
         yield Optional.empty();
@@ -226,8 +312,11 @@ public final class ModsChannel {
     };
   }
 
-  private static List<String> ids(Lockfile lockfile) {
-    return lockfile.getMods().stream().map(mod -> mod.getEntry().getProjectId()).toList();
+  private static AdminEvent.Mods event(Lockfile lockfile) {
+    List<String> ids =
+        lockfile.getMods().stream().map(mod -> mod.getEntry().getProjectId()).toList();
+    return new AdminEvent.Mods(
+        ids, lockfile.getPendingRemovals().stream().filter(ids::contains).toList());
   }
 
   private static void refuse(

@@ -90,7 +90,6 @@ public final class ModsClient {
         AdminEvent event = (AdminEvent) ok.getValue();
         if (event instanceof AdminEvent.Access access) {
           allowed = access.getAllowed();
-          return;
         }
         boolean answer = browser().answers(event);
         browser().onEvent(event);

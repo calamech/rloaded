@@ -24,7 +24,7 @@ class AuditLogTest {
         val at = Instant.parse("2026-11-01T03:00:00Z")
         val log = AuditLog(file, Clock.fixed(at, ZoneOffset.UTC)) { throw AssertionError("unexpected failure $it") }
 
-        val ids = List(3) { (log.requested(AddActor.Console, AuditAction.ADD, "menu", null) as Outcome.Ok).value.id }
+        val ids = List(3) { (log.requested(AddActor.Console, AuditRequest(AuditAction.ADD, "menu", null)) as Outcome.Ok).value.id }
 
         assertEquals(listOf(7, 7, 7), ids.map { it.version() })
         assertEquals(listOf(2, 2, 2), ids.map { it.variant() })
@@ -37,8 +37,8 @@ class AuditLogTest {
         val log = AuditLog(file, Clock.systemUTC()) { throw AssertionError("unexpected failure $it") }
         val id = UUID.fromString("0f1c2a6e-2f7e-4b2a-9d0e-3c1c4d5e6f70")
 
-        log.requested(AddActor.WorldPlayer("Alice", id), AuditAction.ADD, "menu", null)
-        log.requested(AddActor.DedicatedPlayer("Alice", id), AuditAction.ADD, "menu", null)
+        log.requested(AddActor.WorldPlayer("Alice", id), AuditRequest(AuditAction.ADD, "menu", null))
+        log.requested(AddActor.DedicatedPlayer("Alice", id), AuditRequest(AuditAction.ADD, "menu", null))
 
         assertEquals(
             listOf("\"world_player\"", "\"player\""),

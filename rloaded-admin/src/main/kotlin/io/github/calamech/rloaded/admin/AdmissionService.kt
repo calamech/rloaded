@@ -243,7 +243,7 @@ public class AdmissionService(
         version: String?,
         actor: AddActor,
     ): Outcome<List<AddedMod>, AddRefusal> =
-        when (val requested = audit.requested(actor, AuditAction.ADD, project, version)) {
+        when (val requested = audit.requested(actor, AuditRequest(AuditAction.ADD, project, version))) {
             is Outcome.Err -> {
                 Outcome.Err(AddRefusal.NotAudited(requested.error))
             }

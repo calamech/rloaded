@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-31
+- Amended: 2026-11-01, installed mods have Remove and Keep buttons on dedicated servers (ADR 0062)
 
 ## Context
 

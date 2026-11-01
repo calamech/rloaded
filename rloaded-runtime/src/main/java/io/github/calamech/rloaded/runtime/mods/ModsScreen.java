@@ -107,15 +107,51 @@ final class ModsScreen extends Screen {
       case InstallStatus.Available available -> line.addChild(installButton(row));
       case InstallStatus.Installing installing ->
           line.addChild(status(Component.translatable("rloaded.mods.installing")));
-      case InstallStatus.Installed installed ->
-          line.addChild(status(Component.translatable("rloaded.mods.installed")));
       // Some refusals pass, such as another add running: the player may try again.
       case InstallStatus.Refused refused -> {
         line.addChild(status(Component.translatable(refusal(refused.getProblem()))));
         line.addChild(installButton(row));
       }
+      case InstallStatus.Installed installed -> {
+        line.addChild(status(Component.translatable("rloaded.mods.installed")));
+        if (shown.getRemovals()) {
+          line.addChild(button("rloaded.mods.remove", () -> browser.remove(row.getProjectId())));
+        }
+      }
+      case InstallStatus.RemovedAtRestart marked -> {
+        line.addChild(status(Component.translatable("rloaded.mods.removed_at_restart")));
+        line.addChild(button("rloaded.mods.keep", () -> browser.keep(row.getProjectId())));
+      }
+      case InstallStatus.Changing changing ->
+          line.addChild(status(Component.translatable("rloaded.mods.changing")));
+      case InstallStatus.NotChanged notChanged -> {
+        line.addChild(status(notChanged(notChanged)));
+        line.addChild(button("rloaded.mods.remove", () -> browser.remove(row.getProjectId())));
+      }
     }
     return line;
+  }
+
+  private Button button(String key, Runnable action) {
+    return Button.builder(Component.translatable(key), button -> action.run())
+        .width(INSTALL_WIDTH)
+        .build();
+  }
+
+  private static Component notChanged(InstallStatus.NotChanged notChanged) {
+    return switch (notChanged.getProblem()) {
+      case NOT_ALLOWED -> Component.translatable("rloaded.mods.not_changed.not_allowed");
+      case BUSY -> Component.translatable("rloaded.mods.not_changed.busy");
+      case NOT_INSTALLED -> Component.translatable("rloaded.mods.not_changed.not_installed");
+      case BASE_SET -> Component.translatable("rloaded.mods.not_changed.base_set");
+      case ALREADY_MARKED -> Component.translatable("rloaded.mods.not_changed.already_marked");
+      case NOT_MARKED -> Component.translatable("rloaded.mods.not_changed.not_marked");
+      case NEEDED ->
+          Component.translatable(
+              "rloaded.mods.not_changed.needed", String.join(", ", notChanged.getNeededBy()));
+      case UNAVAILABLE -> Component.translatable("rloaded.mods.not_changed.unavailable");
+      case STORAGE -> Component.translatable("rloaded.mods.not_changed.storage");
+    };
   }
 
   private Button installButton(ModRow row) {

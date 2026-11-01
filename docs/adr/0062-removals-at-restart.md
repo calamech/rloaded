@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-01
+- Amended: 2026-11-01, the Mods screen has Remove and Keep buttons on dedicated servers; worlds come later
 
 ## Context
 
@@ -22,7 +23,7 @@ The product owner decided on 2026-11-01 that:
 - The audit log goes to schema 2: each request names its action (`add`, `remove`, `keep`) and its id is `request`; marks end with `marked` or `kept`, and starts write `removed` (with the backup's name) or `postponed` (with the reason), as actor `restart`.
 - Players need nothing: a game that loaded mods from a server starts again before it joins one (ADR 0047), and a new game loads only what the manifest lists.
 
-The Mods screen's buttons and singleplayer worlds come in their own changes.
+The Mods screen shows Remove on installed mods and Keep on marked ones, for players who may add mods on a dedicated server (`AdminRequest.Remove`/`Keep`, `AdminEvent.Changed`/`RemovalRefused` with the names of the mods that need it, `AdminEvent.Access.removals`). Singleplayer worlds come in their own change; until then their screen has no Remove button.
 
 ## Alternatives
 
@@ -41,3 +42,4 @@ The Mods screen's buttons and singleplayer worlds come in their own changes.
 
 - `RemovalsTest` (marking by id or slug, refusals, keep, nothing changed without an audit line) and `PendingRemovalsTest` (backup then removal, three backups kept, mods kept when the backup fails, nothing done when nothing is marked) in `check`.
 - `AdminAddGameTest` (CI job `game-test`): `rloaded remove`, `rloaded keep` and an unknown project from the console, with the lockfile and the audit trail they leave.
+- `ModsBrowserTest` in `check`, and `addTest` (CI job `client-game-test`): Alice removes and keeps a mod from her Mods screen, and the audit log shows it.
