@@ -40,21 +40,27 @@ public final class LateMixins {
    */
   public static List<String> apply(String config, Instrumentation instrumentation)
       throws ReflectiveOperationException, UnmodifiableClassException {
-    Mixins.addConfiguration(config);
-    skipLoadedTargetCheck(config);
     IMixinTransformer transformer =
         (IMixinTransformer) MixinEnvironment.getCurrentEnvironment().getActiveTransformer();
     Object processor = processorOf(transformer);
-    select(processor);
-    Set<String> targets = targetsOf(processor, config);
     Object knotClassLoader = knotClassLoader();
     List<ClassDefinition> definitions = new ArrayList<>();
-    for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
-      if (targets.contains(loaded.getName())) {
-        byte[] preMixin = preMixinBytes(knotClassLoader, loaded.getName());
-        byte[] transformed =
-            transformer.transformClassBytes(loaded.getName(), loaded.getName(), preMixin);
-        definitions.add(new ClassDefinition(loaded, transformed));
+    // Every class transformation holds the transformer's monitor, then its processor's, while it
+    // reads the configurations, and may select pending ones itself. Without it, a class loaded on
+    // another thread sees the lists change under it, or selects this configuration before its
+    // tracker is replaced. Taking the processor's monitor alone deadlocks against that order.
+    synchronized (transformer) {
+      Mixins.addConfiguration(config);
+      skipLoadedTargetCheck(config);
+      select(processor);
+      Set<String> targets = targetsOf(processor, config);
+      for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
+        if (targets.contains(loaded.getName())) {
+          byte[] preMixin = preMixinBytes(knotClassLoader, loaded.getName());
+          byte[] transformed =
+              transformer.transformClassBytes(loaded.getName(), loaded.getName(), preMixin);
+          definitions.add(new ClassDefinition(loaded, transformed));
+        }
       }
     }
     instrumentation.redefineClasses(definitions.toArray(new ClassDefinition[0]));
