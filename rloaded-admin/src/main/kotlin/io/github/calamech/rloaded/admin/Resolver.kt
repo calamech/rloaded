@@ -112,8 +112,8 @@ public sealed interface ResolveError {
  * not installed yet. Optional and embedded dependencies are left out; betas and alphas are refused.
  */
 public class Resolver(
-    private val modrinth: Modrinth,
-    private val gameVersion: String,
+    internal val modrinth: Modrinth,
+    internal val gameVersion: String,
 ) {
     /**
      * Resolves [project], an id or a slug, at [version], a version number or id, or its newest

@@ -10,7 +10,7 @@ internal fun auditTrail(audit: Path): List<String> {
     val requests = lines.filter { field(it, "event") == "requested" }
     return requests.map { request ->
         val who = field(request, "player") ?: field(request, "actor")
-        val outcome = lines.firstOrNull { field(it, "add") == field(request, "add") && it != request }
+        val outcome = lines.firstOrNull { field(it, "request") == field(request, "request") && it != request }
         val result = outcome?.let { field(it, "event") + (field(it, "problem")?.let { problem -> " $problem" } ?: "") }
         "$who ${field(request, "project")}: $result"
     }

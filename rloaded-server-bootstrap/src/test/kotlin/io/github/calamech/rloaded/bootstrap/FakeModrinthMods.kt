@@ -8,9 +8,12 @@ import io.github.calamech.rloaded.core.download.respond
 import io.github.calamech.rloaded.modrinth.ModInstaller
 import io.github.calamech.rloaded.modrinth.Modrinth
 import io.github.calamech.rloaded.modrinth.ModrinthSettings
+import java.io.OutputStream
+import java.io.PrintStream
 import java.net.URLDecoder
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.time.Clock
 
 /** A mod of a test lockfile: Modrinth's record of it is served by [FakeModrinthMods]. */
 data class LockedJar(
@@ -66,6 +69,7 @@ class FakeModrinthMods(
                 Modrinth(http, ModrinthSettings(apiUrl = server.url("/v2"))),
                 ArtifactStore(store, http, RetryPolicy(maxAttempts = 1)),
             ),
+            PendingRemovals(ServerFolder(store.resolveSibling("server")), Clock.systemUTC(), PrintStream(OutputStream.nullOutputStream())),
         )
 
     private companion object {

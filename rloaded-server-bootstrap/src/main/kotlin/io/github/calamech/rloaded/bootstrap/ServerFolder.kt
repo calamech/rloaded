@@ -73,6 +73,18 @@ public class ServerFolder(
 
     private fun properties(file: Path): Properties = Properties().also { properties -> file.reader().use { properties.load(it) } }
 
+    /** The world folder, as `level-name` in `server.properties` names it. */
+    public val world: Path get() =
+        root.resolve(
+            if (serverProperties.exists()) properties(serverProperties).getProperty("level-name", "world").ifBlank { "world" } else "world",
+        )
+
+    /** Where world backups go. */
+    public val backups: Path get() = data.resolve("backups")
+
+    /** The audit log of the server's mods. */
+    public val auditLog: Path get() = data.resolve("audit.log")
+
     /** The configured server name, or the folder name when it is empty. */
     public fun serverName(config: ServerConfig): String =
         config.server.name.ifBlank {

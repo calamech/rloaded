@@ -122,6 +122,37 @@ public enum class AddProblem {
     STORAGE,
 }
 
+/** Why the server did not mark a mod for removal, or did not keep one marked. */
+@Serializable
+public enum class RemovalProblem {
+    /** The player may not change the mods here. */
+    NOT_ALLOWED,
+
+    /** An add or another change is running. */
+    BUSY,
+
+    /** The server does not have the mod. */
+    NOT_INSTALLED,
+
+    /** The mod is part of the base set every server runs. */
+    BASE_SET,
+
+    /** The mod is already marked for removal. */
+    ALREADY_MARKED,
+
+    /** The mod is not marked for removal. */
+    NOT_MARKED,
+
+    /** Other mods of the server need it. */
+    NEEDED,
+
+    /** Modrinth cannot be reached. */
+    UNAVAILABLE,
+
+    /** The list of mods cannot be read or written. */
+    STORAGE,
+}
+
 /** Bounds of the admin messages' fields. */
 internal object AdminLimits {
     val REQUEST_ID = Regex("[A-Za-z0-9-]{1,64}")

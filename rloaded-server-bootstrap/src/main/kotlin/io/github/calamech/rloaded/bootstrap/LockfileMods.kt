@@ -15,11 +15,13 @@ import java.nio.file.Path
 import kotlin.io.path.exists
 
 /**
- * The mods a server runs from its lockfile, obtained the way a joining player obtains them: each
- * entry checked against Modrinth's record, its file downloaded from that record into the store.
+ * The mods a server runs from its lockfile, once the [removals] marked in it applied, obtained the
+ * way a joining player obtains them: each entry checked against Modrinth's record, its file
+ * downloaded from that record into the store.
  */
 public class LockfileMods(
     private val installer: ModInstaller,
+    private val removals: PendingRemovals,
 ) {
     /**
      * Returns the jars of the mods in the lockfile at [path] that run on the server, in lockfile
@@ -28,6 +30,7 @@ public class LockfileMods(
      */
     public suspend fun obtain(path: Path): Outcome<List<Path>, String> {
         if (!path.exists()) return Outcome.Ok(emptyList())
+        removals.apply()
         return Lockfile
             .read(path)
             .mapError<Lockfile, LockfileError, String> { "rloaded/lockfile.json cannot be used: $it" }

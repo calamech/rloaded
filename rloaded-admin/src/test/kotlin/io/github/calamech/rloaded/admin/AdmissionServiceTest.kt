@@ -288,17 +288,18 @@ class AdmissionServiceTest {
         val (library, menu) = ok(add("menu")).map { it.entry.sha512.hex }
 
         val (requested, added) = auditLines()
-        assertEquals(requested["add"], added["add"])
+        assertEquals(requested["request"], added["request"])
         assertEquals(
             mapOf(
-                "schema" to "1",
+                "schema" to "2",
                 "time" to "\"$now\"",
                 "event" to "\"requested\"",
+                "action" to "\"add\"",
                 "actor" to "\"console\"",
                 "project" to "\"menu\"",
                 "version" to "null",
             ),
-            requested.filterKeys { it != "add" }.mapValues { it.value.toString() },
+            requested.filterKeys { it != "request" }.mapValues { it.value.toString() },
         )
         assertEquals("\"added\"", added["event"].toString())
         assertEquals(
@@ -317,7 +318,7 @@ class AdmissionServiceTest {
         add("unloadable")
 
         val (requested, refused) = auditLines()
-        assertEquals(requested["add"], refused["add"])
+        assertEquals(requested["request"], refused["request"])
         assertEquals("\"refused\"", refused["event"].toString())
         assertEquals("\"FAILED\"", refused["problem"].toString())
         assertEquals("\"the server could not load them: a mod with id unloadable is already loaded\"", refused["reason"].toString())

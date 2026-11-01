@@ -10,6 +10,8 @@ import io.github.calamech.rloaded.admin.AdmissionService;
 import io.github.calamech.rloaded.admin.InGameAdmin;
 import io.github.calamech.rloaded.admin.LiveGame;
 import io.github.calamech.rloaded.admin.LocalCompat;
+import io.github.calamech.rloaded.admin.RemovalRefusal;
+import io.github.calamech.rloaded.admin.Removals;
 import io.github.calamech.rloaded.admin.ReputationRules;
 import io.github.calamech.rloaded.admin.staging.Staging;
 import io.github.calamech.rloaded.admin.staging.StagingServer;
@@ -99,7 +101,67 @@ public final class AdminCommands {
                                                     add(
                                                         command,
                                                         StringArgumentType.getString(
-                                                            command, VERSION))))))));
+                                                            command, VERSION))))))
+                    .then(
+                        Commands.literal("remove")
+                            .then(
+                                Commands.argument(PROJECT, StringArgumentType.word())
+                                    .executes(command -> change(command, true))))
+                    .then(
+                        Commands.literal("keep")
+                            .then(
+                                Commands.argument(PROJECT, StringArgumentType.word())
+                                    .executes(command -> change(command, false))))));
+  }
+
+  // Marks a mod for removal at the next start of the server, or keeps one that was.
+  private static int change(CommandContext<CommandSourceStack> command, boolean remove) {
+    CommandSourceStack source = command.getSource();
+    MinecraftServer server = source.getServer();
+    String project = StringArgumentType.getString(command, PROJECT);
+    Removals removals = service(server).getRemovals();
+    CompletableFuture<?> _ =
+        (remove
+                ? removals.removeAsync(project, AddActor.Console.INSTANCE)
+                : removals.keepAsync(project, AddActor.Console.INSTANCE))
+            .whenComplete(
+                (outcome, error) ->
+                    server.execute(() -> reportChange(source, project, remove, outcome, error)));
+    return 1;
+  }
+
+  private static void reportChange(
+      CommandSourceStack source,
+      String project,
+      boolean remove,
+      Outcome<String, RemovalRefusal> outcome,
+      Throwable error) {
+    String reason =
+        switch (outcome) {
+          case null -> "unexpected error: " + error;
+          case Outcome.Ok<?> ok -> null;
+          case Outcome.Err<?> err -> ((RemovalRefusal) err.getError()).getReason();
+        };
+    if (reason != null) {
+      LOGGER.warn("Did not {} {}: {}", remove ? "remove" : "keep", project, reason);
+      source.sendFailure(
+          remove
+              ? Component.translatableWithFallback(
+                  "rloaded.admin.not_removed", "%s was not removed: %s", project, reason)
+              : Component.translatableWithFallback(
+                  "rloaded.admin.not_kept", "%s was not kept: %s", project, reason));
+      return;
+    }
+    LOGGER.info("{} {} at the next start", remove ? "Removing" : "Keeping", project);
+    source.sendSuccess(
+        () ->
+            remove
+                ? Component.translatableWithFallback(
+                    "rloaded.admin.removing",
+                    "%s is removed at the next start of the server, after the world is saved.",
+                    project)
+                : Component.translatableWithFallback("rloaded.admin.kept", "%s stays.", project),
+        false);
   }
 
   // The server console or RCON: not a player, whatever their level, and not a command block.
