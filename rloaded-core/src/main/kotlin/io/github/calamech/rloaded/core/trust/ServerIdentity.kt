@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.core.trust
 
+import io.github.calamech.rloaded.protocol.JoinChallenge
 import io.github.calamech.rloaded.protocol.Manifest
 import io.github.calamech.rloaded.protocol.ManifestKind
 import io.github.calamech.rloaded.protocol.ManifestSigning
@@ -32,7 +33,8 @@ public class ServerIdentity private constructor(
     public fun sign(
         kind: ManifestKind,
         entries: List<ModEntry>,
-    ): Manifest = ManifestSigning.sign(kind, entries, keys.private)
+        challenge: JoinChallenge,
+    ): Manifest = ManifestSigning.sign(kind, entries, challenge, keys.private)
 
     override fun toString(): String = "ServerIdentity(${publicKey.bytes().toHexString()})"
 
@@ -90,8 +92,9 @@ public class ServerIdentity private constructor(
         }
 
         private fun matches(keys: KeyPair): Boolean {
-            val probe = ManifestSigning.sign(ManifestKind.FULL, emptyList(), keys.private)
-            return ManifestSigning.verify(probe, ServerKey.of(keys.public)) is Outcome.Ok
+            val challenge = JoinChallenge.random()
+            val probe = ManifestSigning.sign(ManifestKind.FULL, emptyList(), challenge, keys.private)
+            return ManifestSigning.verify(probe, challenge, ServerKey.of(keys.public)) is Outcome.Ok
         }
     }
 }

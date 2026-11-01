@@ -9,6 +9,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.security.KeyFactory
 import java.security.PublicKey
+import java.security.SecureRandom
 import java.security.spec.X509EncodedKeySpec
 
 /** A server's Ed25519 public key: the identity a player trusts. Create one with [ServerKey.of]. */
@@ -78,6 +79,40 @@ public class ManifestSignature private constructor(
     }
 }
 
+/**
+ * Random bytes a client sends in its hello, which the server signs with the manifest it sends back:
+ * a manifest signed for another join, even by the same server, does not verify. Create one with
+ * [JoinChallenge.random] or [JoinChallenge.of].
+ */
+@Serializable(with = JoinChallengeSerializer::class)
+public class JoinChallenge private constructor(
+    private val raw: ByteArray,
+) {
+    /** The 32 bytes of the challenge. */
+    public fun bytes(): ByteArray = raw.copyOf()
+
+    override fun equals(other: Any?): Boolean = other is JoinChallenge && other.raw.contentEquals(raw)
+
+    override fun hashCode(): Int = raw.contentHashCode()
+
+    override fun toString(): String = "JoinChallenge(${raw.toHexString()})"
+
+    /** Constructors. */
+    public companion object {
+        /** The size of a challenge. */
+        public const val SIZE: Int = 32
+
+        private val random = SecureRandom()
+
+        /** A new challenge from a strong random source. */
+        public fun random(): JoinChallenge = JoinChallenge(ByteArray(SIZE).also(random::nextBytes))
+
+        /** Reads a challenge from its bytes, refusing any other size. */
+        public fun of(bytes: ByteArray): Outcome<JoinChallenge, InvalidLength> =
+            if (bytes.size == SIZE) Outcome.Ok(JoinChallenge(bytes.copyOf())) else Outcome.Err(InvalidLength(SIZE, bytes.size))
+    }
+}
+
 /** A key or signature with [actual] bytes where [expected] are needed. */
 public data class InvalidLength(
     val expected: Int,
@@ -117,5 +152,24 @@ internal object ManifestSignatureSerializer : KSerializer<ManifestSignature> {
             is Outcome.Err -> {
                 throw SerializationException("a manifest signature has ${signature.error.expected} bytes, not ${signature.error.actual}")
             }
+        }
+}
+
+internal object JoinChallengeSerializer : KSerializer<JoinChallenge> {
+    override val descriptor: SerialDescriptor =
+        SerialDescriptor("io.github.calamech.rloaded.JoinChallenge", ByteArraySerializer().descriptor)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: JoinChallenge,
+    ): Unit = encoder.encodeSerializableValue(ByteArraySerializer(), value.bytes())
+
+    override fun deserialize(decoder: Decoder): JoinChallenge =
+        when (val challenge = JoinChallenge.of(decoder.decodeSerializableValue(ByteArraySerializer()))) {
+            is Outcome.Ok -> challenge.value
+
+            is Outcome.Err -> throw SerializationException(
+                "a join challenge has ${challenge.error.expected} bytes, not ${challenge.error.actual}",
+            )
         }
 }

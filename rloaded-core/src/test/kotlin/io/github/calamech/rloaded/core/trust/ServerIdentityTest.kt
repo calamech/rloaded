@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.core.trust
 
+import io.github.calamech.rloaded.protocol.JoinChallenge
 import io.github.calamech.rloaded.protocol.ManifestKind
 import io.github.calamech.rloaded.protocol.ManifestSigning
 import io.github.calamech.rloaded.protocol.Outcome
@@ -27,8 +28,9 @@ class ServerIdentityTest {
         val reloaded = ok(ServerIdentity.loadOrCreate(file))
 
         assertEquals(created.publicKey, reloaded.publicKey)
-        val manifest = reloaded.sign(ManifestKind.FULL, emptyList())
-        assertIs<Outcome.Ok<*>>(ManifestSigning.verify(manifest, created.publicKey))
+        val challenge = JoinChallenge.random()
+        val manifest = reloaded.sign(ManifestKind.FULL, emptyList(), challenge)
+        assertIs<Outcome.Ok<*>>(ManifestSigning.verify(manifest, challenge, created.publicKey))
     }
 
     @Test

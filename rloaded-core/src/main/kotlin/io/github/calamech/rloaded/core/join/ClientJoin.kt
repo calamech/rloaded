@@ -11,6 +11,7 @@ import io.github.calamech.rloaded.protocol.DecodeError
 import io.github.calamech.rloaded.protocol.HashAlgorithm
 import io.github.calamech.rloaded.protocol.InstallResult
 import io.github.calamech.rloaded.protocol.InstallStage
+import io.github.calamech.rloaded.protocol.JoinChallenge
 import io.github.calamech.rloaded.protocol.Manifest
 import io.github.calamech.rloaded.protocol.ManifestSigning
 import io.github.calamech.rloaded.protocol.ModEntry
@@ -63,8 +64,9 @@ public sealed interface ManifestStep {
 }
 
 /**
- * The client's side of a join, without the game: it answers the server's hello, checks the manifest
- * against the key the server announced, looks the key up in the trust store, and picks the entries
+ * The client's side of a join, without the game: it answers the server's hello with a new challenge,
+ * checks the manifest against the key the server announced and that challenge, looks the key up in
+ * the trust store, and picks the entries
  * to install. One instance serves one join; [loaded] maps the project ids this game already loaded to
  * their version ids.
  */
@@ -74,6 +76,7 @@ public class ClientJoin(
     private val rloadedVersion: String,
 ) {
     private var hello: ServerHello? = null
+    private val challenge = JoinChallenge.random()
 
     /** The name the server gave in its hello, once it came. */
     public val serverName: String? get() = hello?.serverName
@@ -82,7 +85,7 @@ public class ClientJoin(
     public fun serverHello(bytes: ByteArray): Outcome<ByteArray, JoinFailure> =
         ProtocolCodec.decode(ServerHello.serializer(), bytes).mapError { JoinFailure.Malformed(it.toString()) }.map { received ->
             hello = received
-            ProtocolCodec.encode(ClientHello.serializer(), ClientHello(PROTOCOL_VERSION, rloadedVersion, loadedSetHash(loaded)))
+            ProtocolCodec.encode(ClientHello.serializer(), ClientHello(PROTOCOL_VERSION, rloadedVersion, loadedSetHash(loaded), challenge))
         }
 
     /** Reads and checks the manifest, and says whether to install at once or ask the player first. */
@@ -91,7 +94,7 @@ public class ClientJoin(
         return ProtocolCodec
             .decode(Manifest.serializer(), bytes)
             .mapError<Manifest, DecodeError, JoinFailure> { JoinFailure.Malformed(it.toString()) }
-            .flatMap { manifest -> ManifestSigning.verify(manifest, server.serverKey).mapError { JoinFailure.BadSignature } }
+            .flatMap { manifest -> ManifestSigning.verify(manifest, challenge, server.serverKey).mapError { JoinFailure.BadSignature } }
             .flatMap { manifest ->
                 when (val trusted = trustStore.find(server.serverKey)) {
                     null -> Outcome.Ok(ManifestStep.AskTrust(server.serverName, manifest.entries))
