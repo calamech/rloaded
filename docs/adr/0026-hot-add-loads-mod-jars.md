@@ -4,6 +4,7 @@
 - Date: 2026-10-30
 - Amended: 2026-10-30, client side and resource reload (see the end of Decision)
 - Amended: 2026-11-01, mods with nested jars load with them (ADR 0060)
+- Amended: 2026-11-01, access wideners and class tweakers apply to loaded classes; enum extensions are refused (ADR 0061)
 
 ## Context
 

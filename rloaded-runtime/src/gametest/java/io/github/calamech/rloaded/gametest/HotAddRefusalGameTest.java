@@ -15,6 +15,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.minecraft.gametest.framework.GameTestHelper;
 
 /**
@@ -51,7 +52,19 @@ public final class HotAddRefusalGameTest {
         directory,
         "widener.jar",
         mod("widener", "\"accessWidener\": \"widener.accesswidener\","),
-        "widener.jar is refused: it widens access to game classes, which cannot be done in a running game yet");
+        "widener.jar is refused: it declares widener.accesswidener, which its jar does not contain");
+    expect(
+        mismatches,
+        directory,
+        "enum.jar",
+        mod("enum", "\"accessWidener\": \"enum.classtweaker\","),
+        Map.of(
+            "enum.classtweaker",
+            "classTweaker\tv2\t"
+                + FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace()
+                + "\nextend-enum\tnet/minecraft/world/Difficulty\tHARDEST\n"),
+        "enum.jar is refused: it adds constants to the enum net.minecraft.world.Difficulty, which"
+            + " cannot be done in a running game");
     expect(
         mismatches,
         directory,
@@ -114,6 +127,7 @@ public final class HotAddRefusalGameTest {
             "only-client",
             "nested",
             "widener",
+            "enum",
             "adapter",
             "foreign",
             "prelaunch",

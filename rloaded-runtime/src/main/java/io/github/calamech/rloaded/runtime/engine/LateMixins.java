@@ -53,20 +53,53 @@ public final class LateMixins {
       Mixins.addConfiguration(config);
       skipLoadedTargetCheck(config);
       select(processor);
-      Set<String> targets = targetsOf(processor, config);
-      for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
-        if (targets.contains(loaded.getName())) {
-          byte[] preMixin = preMixinBytes(knotClassLoader, loaded.getName());
-          byte[] transformed =
-              transformer.transformClassBytes(loaded.getName(), loaded.getName(), preMixin);
-          definitions.add(new ClassDefinition(loaded, transformed));
-        }
-      }
+      definitions.addAll(
+          rebuilt(targetsOf(processor, config), transformer, knotClassLoader, instrumentation));
     }
     instrumentation.redefineClasses(definitions.toArray(new ClassDefinition[0]));
     return definitions.stream()
         .map(definition -> definition.getDefinitionClass().getName())
         .toList();
+  }
+
+  /**
+   * Redefines the classes named in {@code classNames} that are already loaded, from their bytes as
+   * Fabric and Mixin would transform them now, after a class tweaker was given to the game.
+   *
+   * @return the names of the classes that were redefined
+   */
+  public static List<String> redefineLoaded(Set<String> classNames, Instrumentation instrumentation)
+      throws ReflectiveOperationException, UnmodifiableClassException {
+    IMixinTransformer transformer =
+        (IMixinTransformer) MixinEnvironment.getCurrentEnvironment().getActiveTransformer();
+    List<ClassDefinition> definitions;
+    synchronized (transformer) {
+      definitions = rebuilt(classNames, transformer, knotClassLoader(), instrumentation);
+    }
+    instrumentation.redefineClasses(definitions.toArray(new ClassDefinition[0]));
+    return definitions.stream()
+        .map(definition -> definition.getDefinitionClass().getName())
+        .toList();
+  }
+
+  // Each loaded class of targets, rebuilt from its pre-Mixin bytes with every Mixin that targets
+  // it.
+  private static List<ClassDefinition> rebuilt(
+      Set<String> targets,
+      IMixinTransformer transformer,
+      Object knotClassLoader,
+      Instrumentation instrumentation)
+      throws ReflectiveOperationException {
+    List<ClassDefinition> definitions = new ArrayList<>();
+    for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
+      if (targets.contains(loaded.getName())) {
+        byte[] preMixin = preMixinBytes(knotClassLoader, loaded.getName());
+        byte[] transformed =
+            transformer.transformClassBytes(loaded.getName(), loaded.getName(), preMixin);
+        definitions.add(new ClassDefinition(loaded, transformed));
+      }
+    }
+    return definitions;
   }
 
   // MixinInfo refuses a mixin whose target is loaded, because Mixin alone could not apply it any
