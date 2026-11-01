@@ -8,6 +8,7 @@ import io.github.calamech.rloaded.core.join.InstallProgress;
 import io.github.calamech.rloaded.core.join.JoinFailure;
 import io.github.calamech.rloaded.core.join.ManifestStep;
 import io.github.calamech.rloaded.core.trust.TrustStore;
+import io.github.calamech.rloaded.core.trust.TrustedServer;
 import io.github.calamech.rloaded.modrinth.InstallError;
 import io.github.calamech.rloaded.modrinth.InstalledMod;
 import io.github.calamech.rloaded.modrinth.ModInstaller;
@@ -27,6 +28,7 @@ import io.github.calamech.rloaded.runtime.engine.HotAddFailure;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
 import io.github.calamech.rloaded.runtime.engine.LateKeyMappings;
 import io.github.calamech.rloaded.runtime.join.JoinPayloads;
+import io.github.calamech.rloaded.runtime.mixin.ClientCommonPacketListenerImplAccess;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,9 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,7 +114,12 @@ public final class JoinClient {
     ClientConfigurationNetworking.registerGlobalReceiver(
         JoinPayloads.Hello.TYPE,
         (payload, context) ->
-            context.client().execute(() -> onHello(payload, context.responseSender())));
+            context
+                .client()
+                .execute(
+                    () ->
+                        onHello(
+                            payload, address(context.packetListener()), context.responseSender())));
     ClientConfigurationNetworking.registerGlobalReceiver(
         JoinPayloads.Manifest.TYPE,
         (payload, context) ->
@@ -126,7 +136,17 @@ public final class JoinClient {
     addedInSession = true;
   }
 
-  private static void onHello(JoinPayloads.Hello payload, PacketSender sender) {
+  // Where the player joins, as the trust store keeps it; null when the game has no server entry.
+  private static String address(ClientConfigurationPacketListenerImpl listener) {
+    ServerData server = ((ClientCommonPacketListenerImplAccess) listener).rloaded$serverData();
+    if (server == null) {
+      return null;
+    }
+    ServerAddress parsed = ServerAddress.parseString(server.ip);
+    return TrustedServer.Companion.addressOf(parsed.getHost(), parsed.getPort());
+  }
+
+  private static void onHello(JoinPayloads.Hello payload, String address, PacketSender sender) {
     Connection setup = connection();
     TrustStore store = setup == null ? null : open(setup.trustStore());
     if (store == null) {
@@ -136,7 +156,7 @@ public final class JoinClient {
     }
     ended = false;
     relaunch = false;
-    current = new ClientJoin(store, LoadedMods.snapshot(), rloadedVersion());
+    current = new ClientJoin(store, LoadedMods.snapshot(), rloadedVersion(), address);
     switch (current.serverHello(payload.bytes())) {
       case Outcome.Ok<?> ok -> sender.sendPacket(new JoinPayloads.Hello((byte[]) ok.getValue()));
       case Outcome.Err<?> err ->
@@ -158,10 +178,26 @@ public final class JoinClient {
           case ManifestStep.Install install ->
               install(setup, client, sender, install.getEntries(), Map.of());
           case ManifestStep.AskTrust ask -> askTrust(setup, client, sender, ask);
+          case ManifestStep.KeyChanged changed -> warnKeyChanged(setup, client, sender, changed);
           default -> throw new IllegalStateException("unknown manifest step");
         }
       }
     }
+  }
+
+  private static void warnKeyChanged(
+      Connection setup, Minecraft client, PacketSender sender, ManifestStep.KeyChanged changed) {
+    Screen previous = client.gui.screen();
+    client.gui.setScreen(
+        new KeyChangedScreen(
+            previous,
+            changed.getPreviousName(),
+            () -> {
+              client.gui.setScreen(previous);
+              askTrust(setup, client, sender, changed.getAsk());
+            },
+            () -> leave(client, sender, previous),
+            () -> progress(sender, InstallStage.TRUST, 0)));
   }
 
   private static void askTrust(

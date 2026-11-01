@@ -27,7 +27,9 @@ import net.minecraft.world.item.Items;
  * rloaded.join-test.trust-seconds}, accepts its mods, and checks that content-basic and
  * mixin-loaded-class work once in the world, without a restart. With {@code
  * rloaded.join-test.expect-disconnect}, the downloads are expected to stall: the test then waits to
- * be disconnected and reports the reason.
+ * be disconnected and reports the reason. With {@code rloaded.join-test.key-changed}, the server's
+ * identity changed since the player last trusted this address: the test expects the warning first
+ * and trusts the new identity.
  */
 public final class JoinClientGameTest implements FabricClientGameTest {
   private static final Identifier BASIC_BLOCK =
@@ -49,6 +51,11 @@ public final class JoinClientGameTest implements FabricClientGameTest {
                 new ServerData("Join test", address, ServerData.Type.OTHER),
                 false,
                 null));
+    if (Boolean.getBoolean("rloaded.join-test.key-changed")) {
+      context.waitFor(client -> screenNamed(client, "KeyChangedScreen"), JOIN_TICKS);
+      context.takeScreenshot("rloaded-key-changed");
+      context.clickScreenButton("rloaded.key_changed.trust");
+    }
     context.waitFor(
         client ->
             client.gui.screen() != null

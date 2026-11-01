@@ -26,6 +26,10 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 
 class JoinTest {
+    private companion object {
+        const val ADDRESS = "127.0.0.1:25565"
+    }
+
     @TempDir
     lateinit var directory: Path
 
@@ -41,7 +45,7 @@ class JoinTest {
     @Test
     fun `a first join asks for trust, and the next one installs at once without the opted out mod`() {
         val serverJoin = ServerJoin(identity, lockfile, "Friends SMP")
-        val first = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0")
+        val first = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", ADDRESS)
 
         val hello = ok(serverJoin.clientHello(ok(first.serverHello(serverJoin.hello()))))
         assertEquals("0.1.0", hello.rloadedVersion)
@@ -49,16 +53,46 @@ class JoinTest {
         assertEquals(ManifestStep.AskTrust("Friends SMP", listOf(both, client, server)), step)
         assertEquals(listOf(both), ok(first.trust(listOf(both, client, server), setOf("clientMod"))))
 
-        val second = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0")
+        val second = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", ADDRESS)
 
         assertEquals(ManifestStep.Install(listOf(both)), ok(second.manifest(manifestFor(second, serverJoin))))
+    }
+
+    @Test
+    fun `warns when another key answers at an address where the player trusted a server`() {
+        trustFriendsAt(ADDRESS)
+        val reinstalled = ServerJoin(ok(ServerIdentity.loadOrCreate(directory.resolve("reinstalled.key"))), lockfile, "Friends SMP")
+        val join = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", ADDRESS)
+
+        val step = ok(join.manifest(manifestFor(join, reinstalled)))
+
+        assertEquals(ManifestStep.KeyChanged("Friends SMP", ManifestStep.AskTrust("Friends SMP", listOf(both, client, server))), step)
+        ok(join.trust(listOf(both, client, server), emptySet()))
+        val moved = ok(TrustStore.open(trustFile))
+        assertEquals(listOf(ADDRESS), moved.at(ADDRESS)?.addresses)
+        assertNotEquals(identity.publicKey, moved.at(ADDRESS)?.key)
+        assertEquals(emptyList(), moved.find(identity.publicKey)?.addresses, "the old key keeps its trust, not the address")
+    }
+
+    @Test
+    fun `asks as for a new server when the address was never trusted, and remembers a new address of a trusted key`() {
+        trustFriendsAt(ADDRESS)
+        val serverJoin = ServerJoin(identity, lockfile, "Friends SMP")
+        val elsewhere = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", "friends.example.org:25565")
+
+        assertEquals(ManifestStep.Install(listOf(both, client)), ok(elsewhere.manifest(manifestFor(elsewhere, serverJoin))))
+        assertEquals(listOf(ADDRESS, "friends.example.org:25565"), ok(TrustStore.open(trustFile)).find(identity.publicKey)?.addresses)
+
+        val stranger = ServerJoin(ok(ServerIdentity.loadOrCreate(directory.resolve("stranger.key"))), lockfile, "Stranger")
+        val unknown = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", "stranger.example.org:25565")
+        assertIs<ManifestStep.AskTrust>(ok(unknown.manifest(manifestFor(unknown, stranger))))
     }
 
     @Test
     fun `refuses a manifest signed by another key than the one announced`() {
         val announced = ServerJoin(identity, lockfile, "Friends SMP")
         val impostor = ServerJoin(ok(ServerIdentity.loadOrCreate(directory.resolve("impostor.key"))), lockfile, "Friends SMP")
-        val join = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0")
+        val join = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", ADDRESS)
         val hello = ok(announced.clientHello(ok(join.serverHello(announced.hello()))))
 
         assertEquals(Outcome.Err(JoinFailure.BadSignature), join.manifest(impostor.manifest(hello)))
@@ -67,9 +101,9 @@ class JoinTest {
     @Test
     fun `refuses a manifest the server signed for another join`() {
         val serverJoin = ServerJoin(identity, lockfile, "Friends SMP")
-        val earlier = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0")
+        val earlier = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", ADDRESS)
         val replayed = manifestFor(earlier, serverJoin)
-        val join = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0")
+        val join = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", ADDRESS)
         ok(join.serverHello(serverJoin.hello()))
 
         assertEquals(Outcome.Err(JoinFailure.BadSignature), join.manifest(replayed))
@@ -77,9 +111,9 @@ class JoinTest {
 
     @Test
     fun `refuses a manifest that comes before the hello, and bytes that are not a message`() {
-        val join = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0")
+        val join = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", ADDRESS)
 
-        val other = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0")
+        val other = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", ADDRESS)
 
         assertEquals(Outcome.Err(JoinFailure.NoHello), join.manifest(manifestFor(other, ServerJoin(identity, lockfile, "Friends SMP"))))
         assertIs<JoinFailure.Malformed>((join.serverHello(byteArrayOf(1, 2, 3)) as Outcome.Err).error)
@@ -88,7 +122,7 @@ class JoinTest {
     @Test
     fun `reports mods the game loaded in another version`() {
         val serverJoin = ServerJoin(identity, lockfile, "Friends SMP")
-        val join = ClientJoin(ok(TrustStore.open(trustFile)), mapOf("bothMod" to "old"), "0.1.0")
+        val join = ClientJoin(ok(TrustStore.open(trustFile)), mapOf("bothMod" to "old"), "0.1.0", ADDRESS)
         ok(join.manifest(manifestFor(join, serverJoin)))
 
         assertEquals(
@@ -128,6 +162,12 @@ class JoinTest {
 
         assertEquals(one, reversed)
         assertNotEquals(one, other)
+    }
+
+    private fun trustFriendsAt(address: String) {
+        val first = ClientJoin(ok(TrustStore.open(trustFile)), emptyMap(), "0.1.0", address)
+        ok(first.manifest(manifestFor(first, ServerJoin(identity, lockfile, "Friends SMP"))))
+        ok(first.trust(listOf(both, client, server), emptySet()))
     }
 
     // The client answers the server's hello, and the server signs its manifest for that answer.

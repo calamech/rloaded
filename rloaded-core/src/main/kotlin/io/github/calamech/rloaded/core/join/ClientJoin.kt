@@ -61,6 +61,15 @@ public sealed interface ManifestStep {
         val serverName: String,
         val entries: List<ModEntry>,
     ) : ManifestStep
+
+    /**
+     * Another key than the one the player trusted at this address answers, [previousName] being the
+     * server they trusted there: warn them first, then [ask] as for a new server.
+     */
+    public data class KeyChanged(
+        val previousName: String,
+        val ask: AskTrust,
+    ) : ManifestStep
 }
 
 /**
@@ -68,12 +77,14 @@ public sealed interface ManifestStep {
  * checks the manifest against the key the server announced and that challenge, looks the key up in
  * the trust store, and picks the entries
  * to install. One instance serves one join; [loaded] maps the project ids this game already loaded to
- * their version ids.
+ * their version ids, and [address] is where the player joins, as [TrustedServer.addressOf] writes it,
+ * or null when the game does not know it.
  */
 public class ClientJoin(
     private var trustStore: TrustStore,
     private val loaded: Map<String, String>,
     private val rloadedVersion: String,
+    private val address: String?,
 ) {
     private var hello: ServerHello? = null
     private val challenge = JoinChallenge.random()
@@ -97,11 +108,33 @@ public class ClientJoin(
             .flatMap { manifest -> ManifestSigning.verify(manifest, challenge, server.serverKey).mapError { JoinFailure.BadSignature } }
             .flatMap { manifest ->
                 when (val trusted = trustStore.find(server.serverKey)) {
-                    null -> Outcome.Ok(ManifestStep.AskTrust(server.serverName, manifest.entries))
-                    else -> plan(manifest.entries, trusted.optedOutMods).map { ManifestStep.Install(it) }
+                    null -> Outcome.Ok(askTrust(server.serverName, manifest.entries))
+                    else -> remember(trusted).flatMap { plan(manifest.entries, trusted.optedOutMods) }.map { ManifestStep.Install(it) }
                 }
             }
     }
+
+    private fun askTrust(
+        serverName: String,
+        entries: List<ModEntry>,
+    ): ManifestStep {
+        val ask = ManifestStep.AskTrust(serverName, entries)
+        val previous = address?.let { trustStore.at(it) }
+        return if (previous == null) ask else ManifestStep.KeyChanged(previous.name, ask)
+    }
+
+    // A trusted server joined at a new address keeps that address too.
+    private fun remember(trusted: TrustedServer): Outcome<Unit, JoinFailure> =
+        if (address == null || address in trusted.addresses) {
+            Outcome.Ok(Unit)
+        } else {
+            save(trusted.at(address))
+        }
+
+    private fun save(server: TrustedServer): Outcome<Unit, JoinFailure> =
+        trustStore.trust(server).mapError<TrustStore, TrustStoreError, JoinFailure> { JoinFailure.Trust(it) }.map { updated ->
+            trustStore = updated
+        }
 
     /**
      * Records that the player trusts the server, leaving out the client-only mods in [optedOut], and
@@ -112,13 +145,8 @@ public class ClientJoin(
         optedOut: Set<String>,
     ): Outcome<List<ModEntry>, JoinFailure> {
         val server = hello ?: return Outcome.Err(JoinFailure.NoHello)
-        return trustStore
-            .trust(TrustedServer(server.serverKey, server.serverName, optedOut))
-            .mapError<TrustStore, TrustStoreError, JoinFailure> { JoinFailure.Trust(it) }
-            .flatMap { updated ->
-                trustStore = updated
-                plan(entries, optedOut)
-            }
+        return save(TrustedServer(server.serverKey, server.serverName, optedOut, listOfNotNull(address)))
+            .flatMap { plan(entries, optedOut) }
     }
 
     private fun plan(
