@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.gametest;
 
+import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import io.github.calamech.rloaded.core.lockfile.LockedMod;
@@ -9,6 +10,7 @@ import io.github.calamech.rloaded.protocol.Side;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -51,7 +53,9 @@ public final class AdminAddGameTest {
   public void consoleAddWritesTheLockfileOrSaysWhyNot(GameTestHelper helper) throws Exception {
     MinecraftServer server = helper.getLevel().getServer();
     Path lockfile = server.getServerDirectory().resolve("rloaded").resolve("lockfile.json");
+    Path audit = lockfile.resolveSibling("audit.log");
     Files.deleteIfExists(lockfile);
+    Files.deleteIfExists(audit);
     HttpServer modrinth =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     String url = "http://127.0.0.1:" + modrinth.getAddress().getPort();
@@ -163,6 +167,20 @@ public final class AdminAddGameTest {
               "projects in the lockfile");
           helper.assertValueEqual(mods.getFirst().getEntry().getSide(), Side.BOTH, "side");
           helper.assertValueEqual(mods.getFirst().getAddedBy(), "console", "added by");
+          helper.assertValueEqual(
+              auditTrail(audit),
+              List.of(
+                  "requested admintest by console",
+                  "added [admintest]",
+                  "requested admintestworld by console",
+                  "refused UNSUPPORTED",
+                  "requested admintestfresh by console",
+                  "refused UNSUITABLE",
+                  "requested admintestfast by console",
+                  "refused UNSUITABLE",
+                  "requested throwsoninit by console",
+                  "refused UNSUPPORTED"),
+              "audit log");
           modrinth.stop(0);
           try {
             Files.deleteIfExists(lockfile);
@@ -170,6 +188,33 @@ public final class AdminAddGameTest {
             throw new IllegalStateException(e);
           }
         });
+  }
+
+  // Each line of the audit log, in short: what happened, and to what or why.
+  private static List<String> auditTrail(Path audit) {
+    try {
+      return Files.readAllLines(audit).stream()
+          .map(line -> JsonParser.parseString(line).getAsJsonObject())
+          .map(
+              line ->
+                  switch (line.get("event").getAsString()) {
+                    case "requested" ->
+                        "requested "
+                            + line.get("project").getAsString()
+                            + " by "
+                            + line.get("actor").getAsString();
+                    case "added" ->
+                        "added "
+                            + line.getAsJsonArray("mods").asList().stream()
+                                .map(mod -> mod.getAsJsonObject().get("project").getAsString())
+                                .toList();
+                    case "refused" -> "refused " + line.get("problem").getAsString();
+                    default -> "unknown " + line;
+                  })
+          .toList();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   private static void pace() {

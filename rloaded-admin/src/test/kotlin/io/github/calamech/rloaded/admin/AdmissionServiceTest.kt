@@ -15,21 +15,27 @@ import io.github.calamech.rloaded.core.lockfile.Lockfile
 import io.github.calamech.rloaded.core.lockfile.LockfileError
 import io.github.calamech.rloaded.modrinth.Modrinth
 import io.github.calamech.rloaded.modrinth.ModrinthSettings
+import io.github.calamech.rloaded.protocol.AddProblem
 import io.github.calamech.rloaded.protocol.Checksum
 import io.github.calamech.rloaded.protocol.HashAlgorithm
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.Side
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayOutputStream
+import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -60,6 +66,8 @@ class AdmissionServiceTest {
     private var whileChecking: () -> Unit = {}
     private var game = LiveGame.DEDICATED_SERVER
     private val lockfile get() = directory.resolve("rloaded/lockfile.json")
+    private val audit get() = directory.resolve("rloaded/audit.log")
+    private val lateFailures = mutableListOf<AuditError>()
     private val base = BaseSetEntry("P7dR8mSH", "EQKgpeKu", sha("fabric api"))
     private val empty = Lockfile("26.3", "0.1.0", listOf(base), emptyList(), emptyList())
 
@@ -262,7 +270,7 @@ class AdmissionServiceTest {
             checking.countDown()
             release.await(5, TimeUnit.SECONDS)
         }
-        val first = service.addAsync("slow", null, "console")
+        val first = service.addAsync("slow", null, AddActor.Console)
         checking.await(5, TimeUnit.SECONDS)
 
         val second = add("slow")
@@ -272,7 +280,103 @@ class AdmissionServiceTest {
         assertIs<Outcome.Ok<*>>(first.get(5, TimeUnit.SECONDS))
     }
 
-    private fun add(project: String) = runBlocking { service.add(project, null, "console") }
+    @Test
+    fun `records the request, then the mods it added, in the audit log`() {
+        publish("library", jar("library", environment = "*"))
+        publish("menu", jar("menu", environment = "client"), dependsOn = "library")
+
+        val (library, menu) = ok(add("menu")).map { it.entry.sha512.hex }
+
+        val (requested, added) = auditLines()
+        assertEquals(requested["add"], added["add"])
+        assertEquals(
+            mapOf(
+                "schema" to "1",
+                "time" to "\"$now\"",
+                "event" to "\"requested\"",
+                "actor" to "\"console\"",
+                "project" to "\"menu\"",
+                "version" to "null",
+            ),
+            requested.filterKeys { it != "add" }.mapValues { it.value.toString() },
+        )
+        assertEquals("\"added\"", added["event"].toString())
+        assertEquals(
+            """[{"project":"library","version":"vlibrary","versionNumber":"1.0.0","sha512":"$library"},""" +
+                """{"project":"menu","version":"vmenu","versionNumber":"1.0.0","sha512":"$menu"}]""",
+            added["mods"].toString(),
+        )
+        assertEquals(emptyList(), lateFailures)
+    }
+
+    @Test
+    fun `records a refused add with the problem the player sees`() {
+        publish("unloadable", jar("unloadable"))
+        applyFailure = "a mod with id unloadable is already loaded"
+
+        add("unloadable")
+
+        val (requested, refused) = auditLines()
+        assertEquals(requested["add"], refused["add"])
+        assertEquals("\"refused\"", refused["event"].toString())
+        assertEquals("\"FAILED\"", refused["problem"].toString())
+        assertEquals("\"the server could not load them: a mod with id unloadable is already loaded\"", refused["reason"].toString())
+    }
+
+    @Test
+    fun `starts no add it cannot record in the audit log`() {
+        publish("menu", jar("menu"))
+        audit.toFile().mkdirs()
+
+        val refusal = (add("menu") as Outcome.Err).error
+
+        assertIs<AddRefusal.NotAudited>(refusal)
+        assertEquals(audit, refusal.error.file)
+        assertEquals(emptyList(), applied)
+        assertEquals(0, server.hits("/cdn/menu.jar"))
+        assertFalse(lockfile.exists())
+    }
+
+    @Test
+    fun `records an add the surface refused before asking for it`() {
+        val bob = AddActor.DedicatedPlayer("Bob", UUID.fromString("0f1c2a6e-2f7e-4b2a-9d0e-3c1c4d5e6f70"))
+
+        service.audit.refused(bob, "menu", "vmenu", AddProblem.NOT_ALLOWED, "Bob may not add mods")
+
+        val (requested, refused) = auditLines()
+        assertEquals(
+            mapOf(
+                "actor" to "\"player\"",
+                "player" to "\"Bob\"",
+                "playerId" to "\"0f1c2a6e-2f7e-4b2a-9d0e-3c1c4d5e6f70\"",
+                "version" to "\"vmenu\"",
+            ),
+            requested.filterKeys { it in setOf("actor", "player", "playerId", "version") }.mapValues { it.value.toString() },
+        )
+        assertEquals(
+            listOf("\"NOT_ALLOWED\"", "\"Bob may not add mods\""),
+            listOf(refused["problem"].toString(), refused["reason"].toString()),
+        )
+        assertEquals(emptyList(), applied)
+    }
+
+    @Test
+    fun `reports an outcome the audit log cannot take, and keeps the add`() {
+        publish("loaded", jar("loaded"))
+        whileApplying = {
+            Files.delete(audit)
+            audit.toFile().mkdirs()
+        }
+
+        val added = ok(add("loaded"))
+
+        assertEquals(listOf("loaded"), added.map { it.entry.projectId })
+        assertEquals(listOf(audit), lateFailures.map { it.file })
+    }
+
+    private fun auditLines(): List<JsonObject> = Files.readAllLines(audit).map { Json.parseToJsonElement(it).jsonObject }
+
+    private fun add(project: String) = runBlocking { service.add(project, null, AddActor.Console) }
 
     // One service for the whole test, so concurrent adds share its lock.
     private val service by lazy {
@@ -303,6 +407,7 @@ class AdmissionServiceTest {
                     CompletableFuture.completedFuture(applyFailure?.let { Outcome.Err(it) } ?: Outcome.Ok(Unit))
                 },
                 game,
+                AuditLog(audit, clock) { lateFailures += it },
             ),
             clock,
         )

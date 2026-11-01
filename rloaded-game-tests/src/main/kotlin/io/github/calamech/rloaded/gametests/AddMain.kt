@@ -55,13 +55,16 @@ public fun main(arguments: Array<String>) {
     val passed =
         runAddCheck(
             arguments,
-            AddPlan(mods, emptyMap(), ::steps, listOf("fieldinit"), askedAtJoin = true) { serverLog ->
+            AddPlan(mods, emptyMap(), ::steps, listOf("fieldinit"), askedAtJoin = true) { serverDirectory ->
+                val serverLog = serverDirectory.resolve("logs").resolve("latest.log").readText()
                 val fieldInit = serverLog.lines().lastOrNull { "field-init:" in it }.orEmpty()
                 println("Add check: ${fieldInit.substringAfter("field-init: ")}")
                 val fromScreen = "Alice asks to add kbtProject" in serverLog
                 val refused = "Bob may not add mods; kbtProject was not added" in serverLog
                 println("Add check: Alice added from her screen: $fromScreen; Bob refused: $refused")
-                FIELD_INIT_PASSED.containsMatchIn(fieldInit) && fromScreen && refused
+                val audited = auditTrail(serverDirectory.resolve("rloaded").resolve("audit.log"))
+                println("Add check: audit log: $audited")
+                FIELD_INIT_PASSED.containsMatchIn(fieldInit) && fromScreen && refused && audited == AUDITED
             },
         )
     exitProcess(if (passed) 0 else 1)
@@ -71,8 +74,8 @@ public fun main(arguments: Array<String>) {
  * What an add check does: the [mods] the fake Modrinth serves, the [serverProperties] the server
  * starts with, the [steps] both players must reach with the console commands that lead there, the
  * commands typed once all passed ([finally]), whether the server has a code of conduct and a
- * resource pack that players answer when they join ([askedAtJoin]), and what the server's log must
- * show ([serverChecks]).
+ * resource pack that players answer when they join ([askedAtJoin]), and what the server's folder,
+ * its log first, must show ([serverChecks]).
  */
 internal class AddPlan(
     val mods: List<FakeMod>,
@@ -80,7 +83,7 @@ internal class AddPlan(
     val steps: (List<AddPlayer>) -> List<Pair<String, List<String>>>,
     val finally: List<String>,
     val askedAtJoin: Boolean = false,
-    val serverChecks: (String) -> Boolean,
+    val serverChecks: (serverDirectory: Path) -> Boolean,
 )
 
 /**
@@ -149,15 +152,16 @@ internal fun runAddCheck(
     waitForClients(clients, serverProcess, deadline) { true }
     stopServer(serverProcess)
     val joins = 1 + steps.count { (step, _) -> step == REJOIN }
-    return passed(plan, players, joins, serverDirectory.resolve("logs").resolve("latest.log").readText())
+    return passed(plan, players, joins, serverDirectory)
 }
 
 private fun passed(
     plan: AddPlan,
     players: List<AddPlayer>,
     joins: Int,
-    serverLog: String,
+    serverDirectory: Path,
 ): Boolean {
+    val serverLog = serverDirectory.resolve("logs").resolve("latest.log").readText()
     val rollouts = serverLog.lines().count { "Every player has the new mods" in it }
     val errors = errorsFromFirstAdd(serverLog, players)
     // An add is no reason to tell the chat that players left and joined: each did so only for real.
@@ -177,7 +181,7 @@ private fun passed(
         }
     println("Add check: players answered what the server asks at join, and only then: $answered")
     return rollouts == plan.mods.size && errors.isEmpty() && announced.values.all { it == listOf(joins, joins) } && answered &&
-        plan.serverChecks(serverLog)
+        plan.serverChecks(serverDirectory)
 }
 
 // A code of conduct and an optional resource pack, which a player answers when it joins.
@@ -322,6 +326,16 @@ internal class AddPlayer(
 }
 
 // The players and the armor stand at least, every one with the field.
+// The console adds three mods, Alice one from her Mods screen, and Bob, who is no operator, is refused.
+private val AUDITED =
+    listOf(
+        "console cbProject: added",
+        "console mfiProject: added",
+        "Alice kbtProject: added",
+        "Bob kbtProject: refused NOT_ALLOWED",
+        "console liProject: added",
+    )
+
 private val FIELD_INIT_PASSED = Regex("""field-init: ([3-9]|\d{2,}) entities, 0 without the field""")
 private const val IN_WORLD = "in the world"
 private const val REJOIN = "rejoin"

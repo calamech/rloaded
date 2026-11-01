@@ -2,12 +2,12 @@ package io.github.calamech.rloaded.admin
 
 import io.github.calamech.rloaded.protocol.AddProblem
 
-/** What the launcher tells the player about this refusal. */
+/** What the Mods screen tells the player about this refusal. */
 public fun AddRefusal.problem(): AddProblem =
     when (this) {
         AddRefusal.Busy -> AddProblem.BUSY
 
-        is AddRefusal.LockfileProblem, is AddRefusal.NotRecorded -> AddProblem.STORAGE
+        is AddRefusal.LockfileProblem, is AddRefusal.NotRecorded, is AddRefusal.NotAudited -> AddProblem.STORAGE
 
         is AddRefusal.Unresolved -> error.problem()
 

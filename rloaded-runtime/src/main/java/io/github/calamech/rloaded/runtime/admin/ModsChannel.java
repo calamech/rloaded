@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.runtime.admin;
 
+import io.github.calamech.rloaded.admin.AddActor;
 import io.github.calamech.rloaded.admin.AddProblemsKt;
 import io.github.calamech.rloaded.admin.AddRefusal;
 import io.github.calamech.rloaded.admin.AddedMod;
@@ -55,8 +56,8 @@ public final class ModsChannel {
     /** Why no add can start now though the player may add, or empty. */
     Optional<Refusal> blocked();
 
-    /** Who the lockfile says added the mods. */
-    String addedBy(ServerPlayer player);
+    /** Who {@code player} is to an add. */
+    AddActor actor(ServerPlayer player);
 
     /** The mods of an add are recorded; runs on the server thread. */
     void added(List<AddedMod> mods);
@@ -127,18 +128,30 @@ public final class ModsChannel {
   private static void add(Target current, ServerPlayer player, AdminRequest.Add add) {
     String name = player.getName().getString();
     Optional<Refusal> blocked = current.blocked();
+    AddActor actor = current.actor(player);
     if (!current.allows(player)) {
       LOGGER.warn("{} may not add mods; {} was not added", name, add.getProjectId());
-      refuse(current, player.getUUID(), add, AddProblem.NOT_ALLOWED, name + " may not add mods");
+      String detail = name + " may not add mods";
+      current
+          .service()
+          .getAudit()
+          .refused(actor, add.getProjectId(), add.getVersionId(), AddProblem.NOT_ALLOWED, detail);
+      refuse(current, player.getUUID(), add, AddProblem.NOT_ALLOWED, detail);
     } else if (blocked.isPresent()) {
-      refuse(current, player.getUUID(), add, blocked.get().problem(), blocked.get().detail());
+      Refusal refusal = blocked.get();
+      current
+          .service()
+          .getAudit()
+          .refused(
+              actor, add.getProjectId(), add.getVersionId(), refusal.problem(), refusal.detail());
+      refuse(current, player.getUUID(), add, refusal.problem(), refusal.detail());
     } else {
       LOGGER.info("{} asks to add {}", name, add.getProjectId());
       UUID id = player.getUUID();
       CompletableFuture<?> _ =
           current
               .service()
-              .addAsync(add.getProjectId(), add.getVersionId(), current.addedBy(player))
+              .addAsync(add.getProjectId(), add.getVersionId(), actor)
               .whenComplete(
                   (outcome, error) ->
                       current.server().execute(() -> finish(current, id, add, outcome, error)));

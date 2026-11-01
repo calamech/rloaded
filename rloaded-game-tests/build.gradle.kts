@@ -107,6 +107,7 @@ kover {
                     "io.github.calamech.rloaded.gametests.SeparateProcessesKt*",
                     "io.github.calamech.rloaded.gametests.JoinMainKt*",
                     "io.github.calamech.rloaded.gametests.AddMainKt*",
+                    "io.github.calamech.rloaded.gametests.AuditTrailKt*",
                     "io.github.calamech.rloaded.gametests.SoakMainKt*",
                     "io.github.calamech.rloaded.gametests.RecoveryMainKt*",
                     "io.github.calamech.rloaded.gametests.SingleplayerMainKt*",

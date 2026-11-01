@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.runtime.singleplayer;
 
+import io.github.calamech.rloaded.admin.AddActor;
 import io.github.calamech.rloaded.admin.AddTarget;
 import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
@@ -64,7 +65,11 @@ public final class SingleplayerAdmin implements ModsChannel.Target {
             rules,
             () -> compat,
             Staging.Companion.getOFF(),
-            new AddTarget(ServerLockfile.of(server), live, LiveGame.SINGLEPLAYER));
+            new AddTarget(
+                ServerLockfile.of(server),
+                live,
+                LiveGame.SINGLEPLAYER,
+                Admissions.auditLog(ServerLockfile.of(server))));
   }
 
   /** Serves the Mods screen of singleplayer worlds; the client calls it once. */
@@ -135,8 +140,8 @@ public final class SingleplayerAdmin implements ModsChannel.Target {
   }
 
   @Override
-  public String addedBy(ServerPlayer player) {
-    return "owner";
+  public AddActor actor(ServerPlayer player) {
+    return new AddActor.WorldPlayer(player.getName().getString(), player.getUUID());
   }
 
   @Override
