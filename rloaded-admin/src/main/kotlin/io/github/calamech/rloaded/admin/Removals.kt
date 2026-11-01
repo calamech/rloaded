@@ -138,7 +138,7 @@ public class Removals internal constructor(
         actor: AddActor,
         action: AuditAction,
     ): Outcome<String, RemovalRefusal> =
-        when (val requested = target.audit.requested(actor, action, project, null)) {
+        when (val requested = target.audit.requested(actor, AuditRequest(action, project, null))) {
             is Outcome.Err -> {
                 Outcome.Err(RemovalRefusal.NotAudited(requested.error))
             }

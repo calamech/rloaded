@@ -10,6 +10,7 @@ import io.github.calamech.rloaded.modrinth.SearchRecordings
 import io.github.calamech.rloaded.protocol.AddProblem
 import io.github.calamech.rloaded.protocol.AdminEvent
 import io.github.calamech.rloaded.protocol.AdminRequest
+import io.github.calamech.rloaded.protocol.RemovalProblem
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import java.time.Duration
@@ -39,7 +40,7 @@ class ModsBrowserTest {
         describeProjects()
 
         browser.open()
-        browser.onEvent(AdminEvent.Mods(listOf("P7dR8mSH")))
+        browser.onEvent(AdminEvent.Mods(listOf("P7dR8mSH"), emptyList()))
 
         assertEquals(listOf<AdminRequest>(AdminRequest.ListMods), sent)
         val view = awaitView { it.installed.firstOrNull()?.title != null }
@@ -49,7 +50,7 @@ class ModsBrowserTest {
     @Test
     fun `searches Modrinth, marks the mods the server has, and clears on a blank query`() {
         serveSearch()
-        browser.onEvent(AdminEvent.Mods(listOf("AANobbMI")))
+        browser.onEvent(AdminEvent.Mods(listOf("AANobbMI"), emptyList()))
 
         browser.search("sodium")
 
@@ -75,12 +76,47 @@ class ModsBrowserTest {
         assertEquals(listOf("PtjYWJkn", "Bh37bMuy"), listOf(first.projectId, second.projectId))
         assertEquals(true, browser.answers(AdminEvent.Added(first.requestId, emptyList())))
         assertEquals(false, browser.answers(AdminEvent.Refused("someone-else", AddProblem.NOT_ALLOWED, "not ours")))
-        assertEquals(false, browser.answers(AdminEvent.Mods(emptyList())))
+        assertEquals(false, browser.answers(AdminEvent.Mods(emptyList(), emptyList())))
         browser.onEvent(AdminEvent.Refused(second.requestId, AddProblem.BUSY, "another add is running"))
         browser.onEvent(AdminEvent.Added(first.requestId, listOf("sodium-extra.jar")))
         assertEquals(InstallStatus.Refused(AddProblem.BUSY), statusOf("Bh37bMuy"))
         assertEquals(InstallStatus.Installed, statusOf("PtjYWJkn"))
         assertEquals(AdminRequest.ListMods, sent.last())
+    }
+
+    @Test
+    fun `marks a mod for removal, keeps it, and shows what the server refused`() {
+        describeProjects()
+        browser.onEvent(AdminEvent.Access(allowed = true, removals = true))
+        browser.onEvent(AdminEvent.Mods(listOf("P7dR8mSH", "AANobbMI"), emptyList()))
+
+        browser.remove("AANobbMI")
+        browser.remove("P7dR8mSH")
+
+        assertEquals(true, browser.view.removals)
+        assertEquals(listOf(InstallStatus.Changing, InstallStatus.Changing), browser.view.installed.map { it.status })
+        val (sodium, fabricApi) = sent.filterIsInstance<AdminRequest.Remove>()
+        assertEquals(true, browser.answers(AdminEvent.Changed(sodium.requestId)))
+        browser.onEvent(AdminEvent.RemovalRefused(fabricApi.requestId, RemovalProblem.BASE_SET, emptyList(), "part of the base set"))
+        browser.onEvent(AdminEvent.Changed(sodium.requestId))
+        assertEquals(AdminRequest.ListMods, sent.last())
+        browser.onEvent(AdminEvent.Mods(listOf("P7dR8mSH", "AANobbMI"), listOf("AANobbMI")))
+        assertEquals(
+            listOf(InstallStatus.NotChanged(RemovalProblem.BASE_SET, emptyList()), InstallStatus.RemovedAtRestart),
+            browser.view.installed.map { it.status },
+        )
+
+        browser.keep("AANobbMI")
+        val keep = sent.filterIsInstance<AdminRequest.Keep>().single()
+        assertEquals("AANobbMI", keep.projectId)
+        browser.onEvent(AdminEvent.Changed(keep.requestId))
+        browser.onEvent(AdminEvent.Mods(listOf("P7dR8mSH", "AANobbMI"), emptyList()))
+        assertEquals(
+            InstallStatus.Installed,
+            browser.view.installed
+                .last()
+                .status,
+        )
     }
 
     @Test

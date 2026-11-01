@@ -19,7 +19,7 @@ import net.minecraft.client.gui.screens.Screen;
 
 /**
  * Plays a player on the game's Mods screen with the mouse and the keyboard: opens it from the pause
- * menu, types into its search field, clicks Install on a row and reads the row's outcome.
+ * menu, types into its search field, clicks a row's button and reads the row's outcome.
  */
 public final class ModsScreenDriver {
   private static final int STEP_TICKS = 20 * 60 * 3;
@@ -68,13 +68,14 @@ public final class ModsScreenDriver {
         STEP_TICKS);
   }
 
-  // Clicks Install on the row of [title], then waits until the row shows [outcome]. An add sends
-  // the player through the configuration phase; the game opens the Mods screen again after it.
-  public static void install(ClientGameTestContext context, String title, String outcome) {
+  // Clicks the button of the row of [title], Install, Remove or Keep, then waits until the row
+  // shows [outcome]. An add sends the player through the configuration phase; the game opens the
+  // Mods screen again after it.
+  public static void press(ClientGameTestContext context, String title, String outcome) {
     AbstractWidget button =
         context
             .computeOnClient(client -> rowWidget(client.gui.screen(), title, Button.class))
-            .orElseThrow(() -> new AssertionError("no Install button for " + title));
+            .orElseThrow(() -> new AssertionError("no button for " + title));
     click(context, button);
     context.waitFor(
         client ->

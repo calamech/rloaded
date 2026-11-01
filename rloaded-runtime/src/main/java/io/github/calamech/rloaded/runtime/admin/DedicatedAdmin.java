@@ -53,6 +53,11 @@ final class DedicatedAdmin implements ModsChannel.Target {
   }
 
   @Override
+  public boolean removals() {
+    return true;
+  }
+
+  @Override
   public Optional<ModsChannel.Refusal> blocked() {
     return Optional.empty();
   }

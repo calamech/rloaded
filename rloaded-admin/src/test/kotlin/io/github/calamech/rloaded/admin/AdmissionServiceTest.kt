@@ -342,7 +342,7 @@ class AdmissionServiceTest {
     fun `records an add the surface refused before asking for it`() {
         val bob = AddActor.DedicatedPlayer("Bob", UUID.fromString("0f1c2a6e-2f7e-4b2a-9d0e-3c1c4d5e6f70"))
 
-        service.audit.refused(bob, "menu", "vmenu", AddProblem.NOT_ALLOWED, "Bob may not add mods")
+        service.audit.refused(bob, AuditRequest(AuditAction.ADD, "menu", "vmenu"), AddProblem.NOT_ALLOWED, "Bob may not add mods")
 
         val (requested, refused) = auditLines()
         assertEquals(

@@ -155,11 +155,16 @@ public final class AddClientGameTest implements FabricClientGameTest {
         yield "";
       }
       // Alice, an operator, adds keybind-and-tab from her Mods screen; Bob gets it as for any add.
+      // She also removes it and keeps it, which only changes the lockfile.
       case "keybind-and-tab" -> {
         if (isAlice(context)) {
           ModsScreenDriver.openModsScreen(context);
           ModsScreenDriver.search(context, "key");
-          ModsScreenDriver.install(context, "Key mapping and creative tab", "Installed");
+          ModsScreenDriver.press(context, "Key mapping and creative tab", "Installed");
+          // Then she marks it for removal at the next start, and changes her mind.
+          ModsScreenDriver.press(
+              context, "Key mapping and creative tab", "Removed at next restart");
+          ModsScreenDriver.press(context, "Key mapping and creative tab", "Installed");
           context.runOnClient(client -> client.gui.setScreen(null));
         }
         context.waitFor(
