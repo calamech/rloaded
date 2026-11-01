@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
+- Amended: 2026-11-01, removals marked in the lockfile apply before the mods are obtained, after the world is saved (ADR 0062)
 
 ## Context
 

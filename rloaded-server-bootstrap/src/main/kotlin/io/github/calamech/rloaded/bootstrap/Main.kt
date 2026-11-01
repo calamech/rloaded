@@ -12,6 +12,7 @@ import io.github.calamech.rloaded.protocol.Outcome
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.nio.file.Path
+import java.time.Clock
 import kotlin.system.exitProcess
 
 /** Entry point of `rloaded-server.jar`, started in the server folder. */
@@ -31,8 +32,13 @@ public fun main(arguments: Array<String>) {
     val code =
         KtorHttp(UrlPolicy.PRODUCTION, HttpSettings()).use { http ->
             val installer = ServerInstaller(http, folder.data, platform, RuntimePins.CURRENT)
-            val mods = LockfileMods(ModInstaller(Modrinth(http), ArtifactStore(folder.data.resolve("cache/mods"), http)))
-            val bootstrap = Bootstrap(folder, installer, mods, InheritedIoProcess, System.out)
+            val mods =
+                LockfileMods(
+                    ModInstaller(Modrinth(http), ArtifactStore(folder.data.resolve("cache/mods"), http)),
+                    PendingRemovals(folder, Clock.systemUTC(), System.out),
+                )
+            val bootstrap =
+                Bootstrap(folder, installer, mods, InheritedIoProcess, System.out)
             runBlocking { bootstrap.run(arguments.toList()) }
         }
     exitProcess(code)

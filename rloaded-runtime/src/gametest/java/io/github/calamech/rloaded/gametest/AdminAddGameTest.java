@@ -107,26 +107,39 @@ public final class AdminAddGameTest {
 
     List<String> messages = new CopyOnWriteArrayList<>();
     CommandSourceStack console = server.createCommandSourceStack().withSource(capturing(messages));
-    List<String> projects =
-        List.of("admintest", "admintestworld", "admintestfresh", "admintestfast", "throwsoninit");
+    List<String> commands =
+        List.of(
+            "add admintest",
+            "add admintestworld",
+            "add admintestfresh",
+            "add admintestfast",
+            "add throwsoninit",
+            "remove admintest",
+            "keep admintest",
+            "remove admintestnone");
     int[] sent = {0};
     helper.succeedWhen(
         () -> {
-          // One add at a time: the next starts once the previous one answered.
-          long answered =
-              messages.stream()
-                  .filter(m -> m.startsWith("Added ") || m.contains(" was not added: "))
-                  .count();
-          if (answered == sent[0] && sent[0] < projects.size()) {
+          // One command at a time: the next starts once the previous one answered.
+          long answered = messages.stream().filter(AdminAddGameTest::isAnswer).count();
+          if (answered == sent[0] && sent[0] < commands.size()) {
             server
                 .getCommands()
-                .performPrefixedCommand(console, "rloaded add " + projects.get(sent[0]));
+                .performPrefixedCommand(console, "rloaded " + commands.get(sent[0]));
             sent[0]++;
           }
-          if (answered < projects.size()) {
+          if (answered < commands.size()) {
             pace();
           }
-          helper.assertTrue(answered == projects.size(), "adds still running: " + messages);
+          helper.assertTrue(answered == commands.size(), "commands still running: " + messages);
+          helper.assertTrue(
+              messages.containsAll(
+                  List.of(
+                      "admintest is removed at the next start of the server, after the world is"
+                          + " saved.",
+                      "admintest stays.",
+                      "admintestnone was not removed: admintestnone is not installed")),
+              "the removal commands did not answer as expected: " + messages);
           helper.assertTrue(
               messages.stream()
                   .anyMatch(
@@ -162,6 +175,8 @@ public final class AdminAddGameTest {
                   + messages);
           List<LockedMod> mods = mods(lockfile);
           helper.assertValueEqual(
+              read(lockfile).getPendingRemovals(), List.of(), "mods still to remove after keep");
+          helper.assertValueEqual(
               mods.stream().map(mod -> mod.getEntry().getProjectId()).toList(),
               List.of("admintest"),
               "projects in the lockfile");
@@ -170,16 +185,22 @@ public final class AdminAddGameTest {
           helper.assertValueEqual(
               auditTrail(audit),
               List.of(
-                  "requested admintest by console",
+                  "requested add admintest by console",
                   "added [admintest]",
-                  "requested admintestworld by console",
+                  "requested add admintestworld by console",
                   "refused UNSUPPORTED",
-                  "requested admintestfresh by console",
+                  "requested add admintestfresh by console",
                   "refused UNSUITABLE",
-                  "requested admintestfast by console",
+                  "requested add admintestfast by console",
                   "refused UNSUITABLE",
-                  "requested throwsoninit by console",
-                  "refused UNSUPPORTED"),
+                  "requested add throwsoninit by console",
+                  "refused UNSUPPORTED",
+                  "requested remove admintest by console",
+                  "marked",
+                  "requested keep admintest by console",
+                  "kept",
+                  "requested remove admintestnone by console",
+                  "refused NOT_INSTALLED"),
               "audit log");
           modrinth.stop(0);
           try {
@@ -200,6 +221,8 @@ public final class AdminAddGameTest {
                   switch (line.get("event").getAsString()) {
                     case "requested" ->
                         "requested "
+                            + line.get("action").getAsString()
+                            + " "
                             + line.get("project").getAsString()
                             + " by "
                             + line.get("actor").getAsString();
@@ -209,12 +232,22 @@ public final class AdminAddGameTest {
                                 .map(mod -> mod.getAsJsonObject().get("project").getAsString())
                                 .toList();
                     case "refused" -> "refused " + line.get("problem").getAsString();
+                    case "marked", "kept" -> line.get("event").getAsString();
                     default -> "unknown " + line;
                   })
           .toList();
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  private static boolean isAnswer(String message) {
+    return message.startsWith("Added ")
+        || message.contains(" was not added: ")
+        || message.contains(" is removed at the next start")
+        || message.endsWith(" stays.")
+        || message.contains(" was not removed: ")
+        || message.contains(" was not kept: ");
   }
 
   private static void pace() {
@@ -227,8 +260,12 @@ public final class AdminAddGameTest {
   }
 
   private static List<LockedMod> mods(Path lockfile) {
+    return read(lockfile).getMods();
+  }
+
+  private static Lockfile read(Path lockfile) {
     return switch (Lockfile.Companion.read(lockfile)) {
-      case Outcome.Ok<?> ok -> ((Lockfile) ok.getValue()).getMods();
+      case Outcome.Ok<?> ok -> (Lockfile) ok.getValue();
       case Outcome.Err<?> err -> throw new AssertionError("lockfile: " + err.getError());
     };
   }

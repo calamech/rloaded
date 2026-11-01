@@ -1,8 +1,10 @@
 package io.github.calamech.rloaded.gametests
 
 import io.github.calamech.rloaded.bootstrap.LockfileMods
+import io.github.calamech.rloaded.bootstrap.PendingRemovals
 import io.github.calamech.rloaded.bootstrap.RolloutSection
 import io.github.calamech.rloaded.bootstrap.ServerConfig
+import io.github.calamech.rloaded.bootstrap.ServerFolder
 import io.github.calamech.rloaded.core.download.ArtifactStore
 import io.github.calamech.rloaded.core.download.HttpSettings
 import io.github.calamech.rloaded.core.download.KtorHttp
@@ -24,6 +26,7 @@ import java.net.ServerSocket
 import java.net.URI
 import java.nio.file.Path
 import java.security.KeyPairGenerator
+import java.time.Clock
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.appendText
@@ -224,7 +227,15 @@ private fun lockfileMods(
     return KtorHttp(UrlPolicy(setOf(Origin(uri.scheme, uri.host, uri.port))), HttpSettings()).use { http ->
         val installer =
             ModInstaller(Modrinth(http, ModrinthSettings(apiUrl = "$modrinthUrl/v2")), ArtifactStore(data.resolve("cache/mods"), http))
-        when (val obtained = runBlocking { LockfileMods(installer).obtain(data.resolve("lockfile.json")) }) {
+        when (
+            val obtained =
+                runBlocking {
+                    LockfileMods(
+                        installer,
+                        PendingRemovals(ServerFolder(serverDirectory), Clock.systemUTC(), System.out),
+                    ).obtain(data.resolve("lockfile.json"))
+                }
+        ) {
             is Outcome.Ok -> obtained.value
             is Outcome.Err -> failCheck(obtained.error)
         }

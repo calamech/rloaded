@@ -19,6 +19,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import java.nio.file.Path
+import java.time.Clock
 import java.util.jar.JarFile
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
@@ -230,7 +231,14 @@ class BootstrapTest {
 
             assertEquals(
                 ExitCode.FAILED,
-                Bootstrap(folder, installer(), lockfileMods(), process, PrintStream(output), maxRestarts = 3).run(emptyList()),
+                Bootstrap(
+                    folder,
+                    installer(),
+                    lockfileMods(),
+                    process,
+                    PrintStream(output),
+                    maxRestarts = 3,
+                ).run(emptyList()),
             )
             assertEquals(4, process.commands.size)
             assertTrue("asked for 3 restarts in a row" in printed())
@@ -288,7 +296,14 @@ class BootstrapTest {
             assertFalse(folder.data.resolve("agent/rloaded-agent.jar").exists())
         }
 
-    private fun bootstrap(process: ServerProcess) = Bootstrap(folder, installer(), lockfileMods(), process, PrintStream(output))
+    private fun bootstrap(process: ServerProcess) =
+        Bootstrap(
+            folder,
+            installer(),
+            lockfileMods(),
+            process,
+            PrintStream(output),
+        )
 
     private fun lockfileMods() = modrinth.lockfileMods(http, folder.data.resolve("cache/mods"))
 

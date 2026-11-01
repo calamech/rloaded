@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-01
+- Amended: 2026-11-01, schema 2: each request names its action (add, remove, keep) and its id is `request`; restarts add `removed` and `postponed` lines (ADR 0062)
 
 ## Context
 

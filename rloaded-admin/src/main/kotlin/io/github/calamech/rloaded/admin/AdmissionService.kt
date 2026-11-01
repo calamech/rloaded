@@ -234,13 +234,16 @@ public class AdmissionService(
     public val audit: AuditLog = target.audit
     private val running = Mutex()
 
+    /** Marks mods for removal at the next restart, never while an add runs. */
+    public val removals: Removals = Removals(running, target, resolver.modrinth, resolver.gameVersion)
+
     /** Adds [project] at [version], or its newest release when null, for [actor]. */
     public suspend fun add(
         project: String,
         version: String?,
         actor: AddActor,
     ): Outcome<List<AddedMod>, AddRefusal> =
-        when (val requested = audit.requested(actor, project, version)) {
+        when (val requested = audit.requested(actor, AuditAction.ADD, project, version)) {
             is Outcome.Err -> {
                 Outcome.Err(AddRefusal.NotAudited(requested.error))
             }
