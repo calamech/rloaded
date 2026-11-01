@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.bootstrap
 
 import com.akuleshov7.ktoml.Toml
+import io.github.calamech.rloaded.admin.InGameAdmin
 import io.github.calamech.rloaded.admin.ReputationRules
 import io.github.calamech.rloaded.admin.staging.StagingSettings
 import io.github.calamech.rloaded.core.join.JoinDeadlines
@@ -16,6 +17,7 @@ public data class ServerConfig(
     val rollout: RolloutSection = RolloutSection(),
     val reputation: ReputationSection = ReputationSection(),
     val staging: StagingSection = StagingSection(),
+    val admin: AdminSection = AdminSection(),
 ) {
     /** The settings the game reads, as the system properties the bootstrap starts it with. */
     public fun gameProperties(): Map<String, String> =
@@ -25,6 +27,7 @@ public data class ServerConfig(
             ReputationRules.DOWNLOADS_PROPERTY to reputation.minProjectDownloads.toString(),
             StagingSettings.ENABLED_PROPERTY to staging.enabled.toString(),
             StagingSettings.TIMEOUT_PROPERTY to staging.timeoutSeconds.toString(),
+            InGameAdmin.PROPERTY to admin.inGame.toString(),
         )
 
     /** Reading and writing `rloaded-server.toml`. */
@@ -57,6 +60,10 @@ public data class ServerConfig(
             enabled = true
             # Seconds the test server may run before the mod is refused.
             timeoutSeconds = 180
+
+            [admin]
+            # Operators of level 4 may add mods from the game's Mods screen, in the pause menu.
+            inGame = true
 
             """.trimIndent()
 
@@ -138,4 +145,10 @@ public data class ReputationSection(
 public data class StagingSection(
     val enabled: Boolean = true,
     val timeoutSeconds: Long = StagingSettings.DEFAULT_TIMEOUT_SECONDS,
+)
+
+/** The `[admin]` table. */
+@Serializable
+public data class AdminSection(
+    val inGame: Boolean = true,
 )

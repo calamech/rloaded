@@ -97,12 +97,6 @@ public class ModsBrowser(
         val asked: Map<String, Ask> = emptyMap(),
     )
 
-    private data class Known(
-        val title: String,
-        val author: String?,
-        val downloads: Long,
-    )
-
     private data class Ask(
         val requestId: String,
         val status: InstallStatus,
@@ -152,6 +146,20 @@ public class ModsBrowser(
         val requestId = "add-${requests.incrementAndGet()}"
         change { it.copy(asked = it.asked + (projectId to Ask(requestId, InstallStatus.Installing))) }
         send(AdminRequest.Add(requestId, projectId, null))
+    }
+
+    /** Whether [event] answers a request this browser sent. */
+    public fun answers(event: AdminEvent): Boolean {
+        val requestId =
+            when (event) {
+                is AdminEvent.Added -> event.requestId
+                is AdminEvent.Refused -> event.requestId
+                is AdminEvent.Access, is AdminEvent.Mods -> return false
+            }
+        return state
+            .get()
+            .asked.values
+            .any { it.requestId == requestId }
     }
 
     /** Follows what the server says. */
@@ -206,8 +214,6 @@ public class ModsBrowser(
         }
     }
 
-    private fun known(hit: ModrinthHit) = Known(hit.title, hit.author.ifEmpty { null }, hit.downloads)
-
     // Under the lock, the views reach the screen in the order the changes happened.
     @Synchronized
     private fun change(transform: (State) -> State) {
@@ -236,3 +242,12 @@ public class ModsBrowser(
         const val MAX_HITS = 20
     }
 }
+
+// What Modrinth said about a mod.
+private data class Known(
+    val title: String,
+    val author: String?,
+    val downloads: Long,
+)
+
+private fun known(hit: ModrinthHit) = Known(hit.title, hit.author.ifEmpty { null }, hit.downloads)
