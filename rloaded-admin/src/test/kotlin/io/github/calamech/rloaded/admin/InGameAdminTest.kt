@@ -18,4 +18,10 @@ class InGameAdminTest {
             InGameAdmin.fromProperties(mapOf(InGameAdmin.PROPERTY to "yes")::get),
         )
     }
+
+    @Test
+    fun `lets only operators of level 4 add, and nobody when the setting is off`() {
+        assertEquals(listOf(true, false), listOf(true, false).map { InGameAdmin(true).allows(ownerLevel = it) })
+        assertEquals(listOf(false, false), listOf(true, false).map { InGameAdmin(false).allows(ownerLevel = it) })
+    }
 }

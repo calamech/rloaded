@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-01
+- Amended: 2026-11-01, the rule "level 4 and `[admin] inGame` on" is `InGameAdmin.allows`, tested by `InGameAdminTest`
 
 ## Context
 

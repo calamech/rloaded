@@ -38,3 +38,4 @@ Checked on 2026-10-31 with `AdminAddGameTest` on the game test server: against a
 
 Amended 2026-10-31: the staging dry-run is described in ADR 0039; the reputation guard and the compatibility database in ADR 0037 and ADR 0038.
 Amended 2026-10-31: an added mod is now loaded into the running server and installed by connected players at once (ADR 0041).
+Amended 2026-11-01: `ConsoleOnlyAddGameTest` checks that an entity of level 4 and a command block get the unknown command error.
