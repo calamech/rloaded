@@ -8,12 +8,16 @@ import java.nio.file.Path;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.events.ContainerEventHandler;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -62,6 +66,16 @@ public final class JoinClientGameTest implements FabricClientGameTest {
       context.runOnClient(client -> client.gui.setScreen(new TitleScreen()));
       return;
     }
+    // The install screen rebuilds its widgets when a file arrives; it must not keep the old ones.
+    context.waitFor(
+        client -> hasText(client, Component.translatable("rloaded.install.downloaded")),
+        JOIN_TICKS);
+    int titles =
+        context.computeOnClient(
+            client -> countText(client, client.gui.screen().getTitle().getString()));
+    if (titles != 1) {
+      throw new AssertionError("the install screen shows its title " + titles + " times");
+    }
     context.takeScreenshot("rloaded-install-screen");
     context.waitFor(client -> client.level != null && client.player != null, JOIN_TICKS);
 
@@ -82,6 +96,27 @@ public final class JoinClientGameTest implements FabricClientGameTest {
   private static boolean screenNamed(Minecraft client, String name) {
     return client.gui.screen() != null
         && client.gui.screen().getClass().getSimpleName().equals(name);
+  }
+
+  private static boolean hasText(Minecraft client, Component text) {
+    return screenNamed(client, "InstallScreen") && countText(client, text.getString()) > 0;
+  }
+
+  private static int countText(Minecraft client, String text) {
+    return countText(client.gui.screen(), text);
+  }
+
+  // Rows sit in the container of a scrollable layout, not directly in the screen.
+  private static int countText(ContainerEventHandler container, String text) {
+    int count = 0;
+    for (GuiEventListener child : container.children()) {
+      if (child instanceof StringWidget widget && widget.getMessage().getString().equals(text)) {
+        count++;
+      } else if (child instanceof ContainerEventHandler nested) {
+        count += countText(nested, text);
+      }
+    }
+    return count;
   }
 
   private static void write(Path report, String line) {
