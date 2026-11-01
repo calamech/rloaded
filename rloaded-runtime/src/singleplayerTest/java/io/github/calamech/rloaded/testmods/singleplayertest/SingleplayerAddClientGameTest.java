@@ -15,6 +15,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.GenericMessageScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -39,8 +40,9 @@ import net.minecraft.world.level.storage.LevelResource;
  * content-basic's block and checks that the client shows it with its model, that the client's
  * entities have mixin-field-init's field, and that the world's lockfile lists both mods; it opens
  * the world again and finds the block. The second, a fresh game, opens the world, which installs
- * its mods first, finds the block, then opens a world without mods and starts again. The third
- * opens that world by itself, without the mods.
+ * its mods first, finds the block, marks mixin-field-init for removal from the Mods screen, then
+ * opens a world without mods and starts again. The third opens that world by itself, without the
+ * mods, then opens the first world, which loses mixin-field-init after a backup.
  */
 public final class SingleplayerAddClientGameTest implements FabricClientGameTest {
   private static final Identifier BASIC_BLOCK =
@@ -59,7 +61,7 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
     switch (System.getProperty("rloaded.singleplayer-test.step")) {
       case "first" -> first(context, state);
       case "reopen" -> reopen(context, state);
-      case "restarted" -> restarted(context);
+      case "restarted" -> restarted(context, state);
       default -> throw new IllegalStateException("unknown step");
     }
   }
@@ -126,6 +128,11 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
     open(context, ISLAND);
     checkBlockAt(context, pos);
     checkEntities(context);
+    // The owner marks mixin-field-init for removal; it leaves when the world opens next.
+    ModsScreenDriver.openModsScreen(context);
+    ModsScreenDriver.search(context, "mixin");
+    ModsScreenDriver.press(context, MIXIN_FIELD_INIT, "Removed at next restart");
+    context.runOnClient(client -> client.gui.setScreen(null));
     leave(context);
     passed("a fresh game installs the mods of a world it opens");
     context.runOnClient(client -> client.createWorldOpenFlows().openWorld(PLAIN, () -> {}));
@@ -138,8 +145,9 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
     }
   }
 
-  // The game started again opens Plain by itself, without the mods it had loaded for Island.
-  private static void restarted(ClientGameTestContext context) {
+  // The game started again opens Plain by itself, without the mods it had loaded for Island. Then
+  // it opens Island, whose marked mod leaves first, after a backup of the world.
+  private static void restarted(ClientGameTestContext context, Path state) {
     context.waitFor(
         client -> client.level != null && client.player != null && client.gui.screen() == null,
         STEP_TICKS);
@@ -154,6 +162,33 @@ public final class SingleplayerAddClientGameTest implements FabricClientGameTest
     }
     leave(context);
     passed("a game with mods a world does not list starts again to open it");
+
+    List<Integer> xyz = Arrays.stream(read(state).split(" ", -1)).map(Integer::parseInt).toList();
+    open(context, ISLAND);
+    checkBlockAt(context, new BlockPos(xyz.get(0), xyz.get(1), xyz.get(2)));
+    if (FabricLoader.getInstance().isModLoaded("mixin-field-init")) {
+      throw new AssertionError("mixin-field-init is still loaded after its removal");
+    }
+    Path world =
+        context
+            .computeOnClient(Minecraft::getSingleplayerServer)
+            .getWorldPath(LevelResource.ROOT)
+            .resolve("rloaded");
+    try {
+      String lockfile = Files.readString(world.resolve("lockfile.json"), StandardCharsets.UTF_8);
+      if (lockfile.contains("mfiProject") || !lockfile.contains("cbProject")) {
+        throw new AssertionError("the world's lockfile after the removal: " + lockfile);
+      }
+      try (var backups = Files.list(world.resolve("backups"))) {
+        if (backups.noneMatch(file -> file.getFileName().toString().endsWith(".zip"))) {
+          throw new AssertionError("the world was not saved before the removal");
+        }
+      }
+    } catch (IOException e) {
+      throw new AssertionError("the world's files cannot be read", e);
+    }
+    leave(context);
+    passed("a mod removed from the Mods screen leaves the world when it opens next");
   }
 
   private static TestWorldBuilder named(ClientGameTestContext context, String name) {

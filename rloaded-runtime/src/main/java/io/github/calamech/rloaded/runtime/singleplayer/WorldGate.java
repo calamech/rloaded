@@ -1,5 +1,8 @@
 package io.github.calamech.rloaded.runtime.singleplayer;
 
+import io.github.calamech.rloaded.admin.AuditLog;
+import io.github.calamech.rloaded.admin.RemovalsAtStart;
+import io.github.calamech.rloaded.admin.RemovalsOutcome;
 import io.github.calamech.rloaded.core.lockfile.Lockfile;
 import io.github.calamech.rloaded.core.lockfile.WorldOpening;
 import io.github.calamech.rloaded.modrinth.InstalledMod;
@@ -17,8 +20,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import kotlin.Unit;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.AlertScreen;
@@ -75,13 +80,9 @@ public final class WorldGate {
       return true;
     }
     Minecraft client = Minecraft.getInstance();
-    Path path =
-        client
-            .getLevelSource()
-            .getBaseDir()
-            .resolve(levelId)
-            .resolve("rloaded")
-            .resolve("lockfile.json");
+    Path world = client.getLevelSource().getBaseDir().resolve(levelId);
+    Path path = world.resolve("rloaded").resolve("lockfile.json");
+    applyRemovals(levelId, world, path);
     List<ModEntry> worldMods;
     if (Files.exists(path)) {
       switch (Lockfile.Companion.read(path)) {
@@ -114,6 +115,41 @@ public final class WorldGate {
       }
       default -> throw new IllegalStateException("unknown world opening");
     };
+  }
+
+  // The mods the owner marked for removal leave the world before it opens, after a backup of it.
+  private static void applyRemovals(String levelId, Path world, Path lockfile) {
+    Clock clock = Clock.systemUTC();
+    Path data = world.resolve("rloaded");
+    RemovalsAtStart removals =
+        new RemovalsAtStart(
+            lockfile,
+            world,
+            data.resolve("backups"),
+            new AuditLog(
+                data.resolve("audit.log"),
+                clock,
+                error -> {
+                  LOGGER.error("The audit log of {} cannot be written: {}", levelId, error);
+                  return Unit.INSTANCE;
+                }),
+            clock,
+            RemovalsAtStart.KEEP_BACKUPS);
+    switch (removals.apply()) {
+      case RemovalsOutcome.Removed removed ->
+          LOGGER.info(
+              "Removed {} from {}; the world was saved to {}",
+              removed.getProjects(),
+              levelId,
+              removed.getBackup());
+      case RemovalsOutcome.Postponed postponed ->
+          LOGGER.error(
+              "Kept {} in {}, still to be removed at a later opening: {}",
+              postponed.getProjects(),
+              levelId,
+              postponed.getReason());
+      default -> {}
+    }
   }
 
   /** Whether the game creates a world now; a game that loaded mods starts again first. */

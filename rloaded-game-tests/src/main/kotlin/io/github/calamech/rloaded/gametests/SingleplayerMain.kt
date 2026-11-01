@@ -80,7 +80,8 @@ public fun main(arguments: Array<String>) {
     val (reopenExit, reopenPassed, reopenErrors) = play(fresh, "reopen")
     if (!Relaunch.wanted(reopenExit, 0) || reopenPassed.isEmpty() || reopenErrors.isNotEmpty()) exitProcess(1)
     val (restartedExit, restartedPassed, restartedErrors) = play(fresh, "restarted")
-    exitProcess(if (restartedExit == 0 && restartedPassed.isNotEmpty() && restartedErrors.isEmpty()) 0 else 1)
+    // It opens Plain without the mods, then Island after the removal of one of them.
+    exitProcess(if (restartedExit == 0 && restartedPassed.size == 2 && restartedErrors.isEmpty()) 0 else 1)
 }
 
 private fun installClient(directories: ClientDirectories) =
