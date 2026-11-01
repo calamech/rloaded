@@ -18,7 +18,6 @@ import java.time.Duration;
 import java.util.function.Consumer;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.fabricmc.loader.api.FabricLoader;
@@ -60,7 +59,6 @@ public final class JoinServer {
   /** Registers the join on the server side. */
   public static void register() {
     ServerLifecycleEvents.SERVER_STARTING.register(JoinServer::start);
-    ServerTickEvents.END_SERVER_TICK.register(server -> endExpiredJoins());
     ServerConfigurationConnectionEvents.DISCONNECT.register(
         (listener, server) -> deadlines.end(listener));
     ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.addPhaseOrdering(
@@ -153,8 +151,18 @@ public final class JoinServer {
     listener.addTask(new InstallTask(listener));
   }
 
-  private static void endExpiredJoins() {
-    for (ServerConfigurationPacketListenerImpl listener : deadlines.expired()) {
+  /**
+   * Disconnects the players whose join ran out of time. Called each time the server ticks its
+   * connections, which it also does while it pauses for having no player in its list: a joining
+   * player is not in it yet.
+   */
+  public static void connectionsTicked() {
+    JoinDeadlines<ServerConfigurationPacketListenerImpl> current = deadlines;
+    // Set when a dedicated server starts; a singleplayer world has no joins to time out.
+    if (current == null) {
+      return;
+    }
+    for (ServerConfigurationPacketListenerImpl listener : current.expired()) {
       // The game's own "lost connection" line can lose the reason (ADR 0056): say it here.
       LOGGER.warn(
           "{} stopped answering while installing the server's mods and was disconnected",

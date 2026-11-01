@@ -20,6 +20,7 @@ import java.net.URI
 import java.nio.file.Path
 import java.time.Duration
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.appendText
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
@@ -34,7 +35,7 @@ import kotlin.system.exitProcess
  * the base set joins it, accepts the trust screen, downloads both mods from a fake Modrinth, loads them
  * before the world exists, and uses them in the world without a restart. That client is slow, but keeps
  * reporting progress, so the server keeps waiting for it; a second client whose downloads stall is
- * disconnected when the join timeout runs out.
+ * disconnected when the join timeout runs out, although the server paused before they joined.
  *
  * The project owner accepted the Minecraft EULA for the server directory this check creates.
  *
@@ -71,6 +72,9 @@ public fun main(arguments: Array<String>) {
     val port = ServerSocket(0).use { it.localPort }
     val serverDirectory = run.resolve("server")
     prepareServer(serverDirectory, port)
+    // Players in the configuration phase are not in the player list: the server pauses before they
+    // join, and the stalled player's deadline must still run out.
+    serverDirectory.resolve("server.properties").appendText("pause-when-empty-seconds=$PAUSE_SECONDS\n")
     serverDirectory
         .resolve("rloaded")
         .createDirectories()
@@ -117,14 +121,14 @@ private fun passed(
     val serverLoaded = listOf("content-basic", "mixin-loaded-class").filter { "\t- $it " in serverLog }
     println(
         "Join check: $joined; $cached jars in the cache; trust store written: ${"\"key\"" in trust}; " +
-            "server loaded $serverLoaded; stalled player: $disconnected",
+            "server loaded $serverLoaded; paused: ${PAUSED in serverLog}; stalled player: $disconnected",
     )
     return cached == modCount && "\"key\"" in trust && serverLoaded.size == modCount &&
         joined.startsWith(
             "joined after the install screen",
         ) &&
         disconnected.startsWith("disconnected: ") &&
-        TIMED_OUT in serverLog
+        serverLog.indexOf(PAUSED) in 0..<serverLog.indexOf(TIMED_OUT)
 }
 
 /** A player of the join check, with its own game and launcher data. */
@@ -150,6 +154,8 @@ private class JoinPlayer(
 }
 
 private const val TIMEOUT_SECONDS = 20
+private const val PAUSE_SECONDS = 1
+private const val PAUSED = "Server empty for $PAUSE_SECONDS seconds, pausing"
 private const val TRUST_SECONDS = 25
 private const val FILE_DELAY_SECONDS = 12L
 private val FILE_DELAY: Duration = Duration.ofSeconds(FILE_DELAY_SECONDS)
