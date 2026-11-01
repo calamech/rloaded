@@ -90,11 +90,12 @@ public enum class LiveGame {
         }
 }
 
-/** Where an admitted add lands: the running [game] first, then its lockfile. */
+/** Where an admitted add lands: the running [game] first, then its lockfile; every add is recorded in [audit]. */
 public data class AddTarget(
     val lockfile: LockfileLocation,
     val live: LiveApply,
     val game: LiveGame,
+    val audit: AuditLog,
 )
 
 /** A mod an add wrote to the lockfile. */
@@ -198,6 +199,13 @@ public sealed interface AddRefusal {
         override val reason: String get() = "the server loaded them but rloaded/lockfile.json cannot record them: $error"
     }
 
+    /** The request could not be written to the audit log, so the add did not start. */
+    public data class NotAudited(
+        val error: AuditError,
+    ) : AddRefusal {
+        override val reason: String get() = "the audit log ${error.file.fileName} cannot be written: ${error.reason}"
+    }
+
     /** The mods failed on the staging server, or it could not judge them. */
     public data class StagingRefused(
         val failure: StagingFailure,
@@ -211,7 +219,8 @@ public sealed interface AddRefusal {
  * resolves it, refuses versions Modrinth's records rule out (reputation, compatibility database),
  * downloads the files into [store], refuses any jar the rules or the game refuse, tries the jars the
  * game would load on a staging server, loads them into the running game, then writes every entry
- * to the lockfile in one step. The only writer of the lockfile; one add runs at a time.
+ * to the lockfile in one step. The only writer of the lockfile and of the audit log, where every add
+ * is recorded before it starts; one add runs at a time.
  */
 public class AdmissionService(
     private val resolver: Resolver,
@@ -221,10 +230,32 @@ public class AdmissionService(
     private val target: AddTarget,
     private val clock: Clock,
 ) {
+    /** Where adds are recorded, also those a surface refuses before asking for them. */
+    public val audit: AuditLog = target.audit
     private val running = Mutex()
 
-    /** Adds [project] at [version], or its newest release when null, recording [addedBy]. */
+    /** Adds [project] at [version], or its newest release when null, for [actor]. */
     public suspend fun add(
+        project: String,
+        version: String?,
+        actor: AddActor,
+    ): Outcome<List<AddedMod>, AddRefusal> =
+        when (val requested = audit.requested(actor, project, version)) {
+            is Outcome.Err -> {
+                Outcome.Err(AddRefusal.NotAudited(requested.error))
+            }
+
+            is Outcome.Ok -> {
+                val outcome = admit(project, version, actor.label)
+                when (outcome) {
+                    is Outcome.Ok -> requested.value.added(outcome.value)
+                    is Outcome.Err -> requested.value.refused(outcome.error.problem(), outcome.error.reason)
+                }
+                outcome
+            }
+        }
+
+    private suspend fun admit(
         project: String,
         version: String?,
         addedBy: String,
@@ -254,8 +285,8 @@ public class AdmissionService(
     public fun addAsync(
         project: String,
         version: String?,
-        addedBy: String,
-    ): CompletableFuture<Outcome<List<AddedMod>, AddRefusal>> = CoroutineScope(Dispatchers.IO).future { add(project, version, addedBy) }
+        actor: AddActor,
+    ): CompletableFuture<Outcome<List<AddedMod>, AddRefusal>> = CoroutineScope(Dispatchers.IO).future { add(project, version, actor) }
 
     private fun lockfile(): Outcome<Lockfile, AddRefusal> =
         if (Files.exists(target.lockfile.path)) {
@@ -269,12 +300,6 @@ public class AdmissionService(
             .failures(versions)
             .mapError<List<RecordFailure>, ModrinthError, AddRefusal> { AddRefusal.ProjectRecords(it) }
             .flatMap { failures -> if (failures.isEmpty()) Outcome.Ok(versions) else Outcome.Err(AddRefusal.Unsuitable(failures)) }
-
-    private class Downloaded(
-        val version: ModrinthVersion,
-        val file: ModrinthFile,
-        val jar: Path,
-    )
 
     private suspend fun download(versions: List<ModrinthVersion>): Outcome<List<Downloaded>, AddRefusal> =
         versions
@@ -331,18 +356,6 @@ public class AdmissionService(
             .mapError<Unit, String, AddRefusal> { AddRefusal.NotApplied(it) }
             .map { admitted.map { it.mod } }
 
-    private fun entry(
-        mod: Downloaded,
-        side: Side,
-    ): Outcome<AddedMod, AddRefusal> =
-        try {
-            val file = mod.file
-            val entry = ModEntry(mod.version.projectId, mod.version.id, file.fileName, file.sha512, file.size, side)
-            Outcome.Ok(AddedMod(entry, mod.version.versionNumber))
-        } catch (e: IllegalArgumentException) {
-            Outcome.Err(AddRefusal.Unlistable(mod.version.id, e.message ?: "invalid entry"))
-        }
-
     private fun write(
         current: Lockfile,
         added: List<AddedMod>,
@@ -359,6 +372,12 @@ public class AdmissionService(
     }
 }
 
+private class Downloaded(
+    val version: ModrinthVersion,
+    val file: ModrinthFile,
+    val jar: Path,
+)
+
 private class Admitted(
     val jar: Path,
     val mod: AddedMod,
@@ -369,3 +388,15 @@ private fun loadedJars(
     admitted: List<Admitted>,
     game: LiveGame,
 ): List<Path> = admitted.filter { game.loads(it.mod.entry.side) }.map { it.jar }
+
+private fun entry(
+    mod: Downloaded,
+    side: Side,
+): Outcome<AddedMod, AddRefusal> =
+    try {
+        val file = mod.file
+        val entry = ModEntry(mod.version.projectId, mod.version.id, file.fileName, file.sha512, file.size, side)
+        Outcome.Ok(AddedMod(entry, mod.version.versionNumber))
+    } catch (e: IllegalArgumentException) {
+        Outcome.Err(AddRefusal.Unlistable(mod.version.id, e.message ?: "invalid entry"))
+    }

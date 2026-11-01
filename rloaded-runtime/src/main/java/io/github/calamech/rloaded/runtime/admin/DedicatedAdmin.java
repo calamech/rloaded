@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.runtime.admin;
 
+import io.github.calamech.rloaded.admin.AddActor;
 import io.github.calamech.rloaded.admin.AddedMod;
 import io.github.calamech.rloaded.admin.AdmissionService;
 import java.util.List;
@@ -53,8 +54,8 @@ final class DedicatedAdmin implements ModsChannel.Target {
   }
 
   @Override
-  public String addedBy(ServerPlayer player) {
-    return player.getName().getString();
+  public AddActor actor(ServerPlayer player) {
+    return new AddActor.DedicatedPlayer(player.getName().getString(), player.getUUID());
   }
 
   @Override

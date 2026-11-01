@@ -2,8 +2,10 @@ package io.github.calamech.rloaded.runtime.admin;
 
 import io.github.calamech.rloaded.admin.AddTarget;
 import io.github.calamech.rloaded.admin.AdmissionService;
+import io.github.calamech.rloaded.admin.AuditLog;
 import io.github.calamech.rloaded.admin.CompatDatabase;
 import io.github.calamech.rloaded.admin.JarRules;
+import io.github.calamech.rloaded.admin.LockfileLocation;
 import io.github.calamech.rloaded.admin.RecordChecks;
 import io.github.calamech.rloaded.admin.ReputationRules;
 import io.github.calamech.rloaded.admin.Resolver;
@@ -22,11 +24,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
+import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import net.minecraft.SharedConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Builds the admission service of a dedicated server or a singleplayer world. */
 public final class Admissions {
+  private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
+
   private Admissions() {}
 
   /**
@@ -50,6 +57,21 @@ public final class Admissions {
         new JarRules(Admission.classifier(), Admissions::gameRefusal, staging),
         target,
         clock);
+  }
+
+  /**
+   * The audit log next to the lockfile at {@code lockfile}; an add's outcome it cannot take is
+   * logged as an error.
+   */
+  public static AuditLog auditLog(LockfileLocation lockfile) {
+    return new AuditLog(
+        lockfile.getPath().resolveSibling("audit.log"),
+        Clock.systemUTC(),
+        error -> {
+          LOGGER.error(
+              "An add's outcome is missing from {}: {}", error.getFile(), error.getReason());
+          return Unit.INSTANCE;
+        });
   }
 
   /**

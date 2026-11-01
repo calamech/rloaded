@@ -2,6 +2,7 @@ package io.github.calamech.rloaded.runtime.admin;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import io.github.calamech.rloaded.admin.AddActor;
 import io.github.calamech.rloaded.admin.AddRefusal;
 import io.github.calamech.rloaded.admin.AddTarget;
 import io.github.calamech.rloaded.admin.AddedMod;
@@ -116,7 +117,7 @@ public final class AdminCommands {
         false);
     CompletableFuture<?> _ =
         service(server)
-            .addAsync(project, version, "console")
+            .addAsync(project, version, AddActor.Console.INSTANCE)
             .whenComplete(
                 (outcome, error) -> server.execute(() -> report(source, project, outcome, error)));
     return 1;
@@ -186,7 +187,11 @@ public final class AdminCommands {
               rules,
               () -> compat.current(),
               staging,
-              new AddTarget(ServerLockfile.of(server), live, LiveGame.DEDICATED_SERVER));
+              new AddTarget(
+                  ServerLockfile.of(server),
+                  live,
+                  LiveGame.DEDICATED_SERVER,
+                  Admissions.auditLog(ServerLockfile.of(server))));
     }
     return service;
   }
