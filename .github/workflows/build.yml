@@ -60,6 +60,18 @@ jobs:
         run: ./gradlew :rloaded-game-tests:stagingTest --stacktrace
       - name: Restart after a failed live add
         run: ./gradlew :rloaded-game-tests:restartTest --stacktrace
+      # A JVM that crashes leaves its report and its compiler replay in the run directory, which
+      # the runner deletes: keep them to read them later (#114).
+      - name: Keep JVM crash reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jvm-crash-${{ github.job }}
+          path: |
+            rloaded-game-tests/build/**/hs_err_pid*.log
+            rloaded-game-tests/build/**/replay_pid*.log
+          if-no-files-found: ignore
+          retention-days: 14
 
   client-game-test:
     name: client-game-test
@@ -103,3 +115,15 @@ jobs:
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:recoveryTest --stacktrace
       - name: Add from the launcher to an open singleplayer world
         run: xvfb-run --auto-servernum ./gradlew :rloaded-game-tests:singleplayerTest --stacktrace
+      # A JVM that crashes leaves its report and its compiler replay in the run directory, which
+      # the runner deletes: keep them to read them later (#114).
+      - name: Keep JVM crash reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jvm-crash-${{ github.job }}
+          path: |
+            rloaded-game-tests/build/**/hs_err_pid*.log
+            rloaded-game-tests/build/**/replay_pid*.log
+          if-no-files-found: ignore
+          retention-days: 14
