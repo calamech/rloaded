@@ -129,10 +129,10 @@ public final class SingleplayerAdmin implements ModsChannel.Target {
     return server.isSingleplayerOwner(player.nameAndId());
   }
 
-  // Removals apply when a server starts; worlds do not apply them yet.
+  // Removals apply when the world opens next.
   @Override
   public boolean removals() {
-    return false;
+    return true;
   }
 
   @Override
