@@ -25,7 +25,7 @@ Checked on 2026-11-01 by `ManifestSigningTest` and `JoinTest` (a manifest signed
 ## Consequences
 
 - The join takes one more round trip between the hello and the manifest: the client's hello was already sent at once, so the cost is the server's answer time.
-- The server signs one manifest per join instead of reusing the bytes; Ed25519 signing takes well under a millisecond.
+- The server signs one manifest per join instead of signing the lockfile once.
 - Clients and servers of protocol 1 cannot join each other; no release has shipped with protocol 1.
 
 ## Enforcement
