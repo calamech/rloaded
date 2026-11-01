@@ -56,5 +56,11 @@
   "rloaded.mods.refused.failed": "It failed to load. The game restarts without it.",
   "rloaded.mods.refused.storage": "The world's list of mods cannot be saved.",
   "key.rloaded.mods": "Open the Mods screen",
-  "key.category.rloaded.rloaded": "Rloaded"
+  "key.category.rloaded.rloaded": "Rloaded",
+  "rloaded.world.installing": "Installing this world's mods…",
+  "rloaded.world.failed": "This world cannot open",
+  "rloaded.world.unreadable": "Its list of mods (rloaded/lockfile.json in the world's folder) cannot be read.",
+  "rloaded.world.no_launcher": "It has mods: start the game from the Rloaded launcher to play it.",
+  "rloaded.world.not_installed": "Its mods cannot be downloaded. Check your connection and try again.",
+  "rloaded.world.not_loaded": "One of its mods cannot be loaded in this game."
 }

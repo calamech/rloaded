@@ -20,6 +20,7 @@ import io.github.calamech.rloaded.protocol.ModEntry;
 import io.github.calamech.rloaded.protocol.Outcome;
 import io.github.calamech.rloaded.protocol.Side;
 import io.github.calamech.rloaded.runtime.AgentBridge;
+import io.github.calamech.rloaded.runtime.LoadedMods;
 import io.github.calamech.rloaded.runtime.ModrinthAccess;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddFailure;
@@ -30,7 +31,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents;
@@ -66,9 +66,6 @@ public final class JoinClient {
   /** The toast that names the mods an add brought while the player was in the world. */
   public static final SystemToast.SystemToastId ADDED_TOAST = new SystemToast.SystemToastId();
 
-  /** Project ids this game loaded during the session, with their version ids. */
-  private static final Map<String, String> LOADED = new ConcurrentHashMap<>();
-
   private static ClientJoin current;
   // Whether the player was in the world on this connection before: the configuration is then an
   // add.
@@ -101,7 +98,8 @@ public final class JoinClient {
     ClientLoginConnectionEvents.INIT.register(
         (listener, client) -> {
           inSession = false;
-          if (addedInSession) {
+          // Opening a singleplayer world decided before the world loaded (WorldGate).
+          if (addedInSession && client.getSingleplayerServer() == null) {
             LOGGER.info(
                 "Mods were added while this game played: it restarts before it joins a server again");
             GameRelaunch.request(client);
@@ -121,8 +119,8 @@ public final class JoinClient {
   }
 
   /**
-   * Records that this game loaded mods into the world it has open: like an add on a server, it
-   * restarts before it joins a world or a server again.
+   * Records that this game loaded mods for a singleplayer world: like an add on a server, it
+   * restarts before it joins a server.
    */
   public static void loadedInWorld() {
     addedInSession = true;
@@ -138,7 +136,7 @@ public final class JoinClient {
     }
     ended = false;
     relaunch = false;
-    current = new ClientJoin(store, Map.copyOf(LOADED), rloadedVersion());
+    current = new ClientJoin(store, LoadedMods.snapshot(), rloadedVersion());
     switch (current.serverHello(payload.bytes())) {
       case Outcome.Ok<?> ok -> sender.sendPacket(new JoinPayloads.Hello((byte[]) ok.getValue()));
       case Outcome.Err<?> err ->
@@ -293,7 +291,8 @@ public final class JoinClient {
     } finally {
       LateKeyMappings.close(client);
     }
-    mods.forEach(mod -> LOADED.put(mod.getEntry().getProjectId(), mod.getEntry().getVersionId()));
+    mods.forEach(
+        mod -> LoadedMods.record(mod.getEntry().getProjectId(), mod.getEntry().getVersionId()));
     if (inSession) {
       addedInSession = true;
     }
@@ -387,7 +386,7 @@ public final class JoinClient {
   }
 
   private static void sendFailure(PacketSender sender, String failingMod, String report) {
-    relaunch = inSession || !LOADED.isEmpty();
+    relaunch = inSession || !LoadedMods.snapshot().isEmpty();
     String bounded = report.length() > MAX_REPORT ? report.substring(0, MAX_REPORT) : report;
     sender.sendPacket(
         new JoinPayloads.Result(

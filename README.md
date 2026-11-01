@@ -39,7 +39,7 @@ You need a JDK 17 or newer to start Gradle. Gradle then downloads the JetBrains 
 ./gradlew :rloaded-server-bootstrap:serverJar    # rloaded-server-bootstrap/build/libs/rloaded-server.jar
 ```
 
-In a singleplayer world started from the launcher, the pause menu has a Mods button: it searches Modrinth and installs a mod in the open world while you play. Each world lists its mods in `<world>/rloaded/lockfile.json`.
+In a singleplayer world started from the launcher, the pause menu has a Mods button: it searches Modrinth and installs a mod in the open world while you play. Each world lists its mods in `<world>/rloaded/lockfile.json`; opening the world later installs them first, and a game that holds other mods starts again to open it.
 
 The launcher keeps its data in `~/Library/Application Support/Rloaded` on macOS, `%APPDATA%\Rloaded` on Windows and `$XDG_DATA_HOME/rloaded` on Linux.
 
