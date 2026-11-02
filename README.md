@@ -4,7 +4,7 @@ Rloaded lets friends play on a Minecraft server where the admin adds Fabric mods
 
 > **Status:** early development. The launcher starts Minecraft 26.3 with Fabric on the JetBrains Runtime, and the server jar starts a Fabric server the same way. Mods can be added from the server console while players are connected.
 
-Design decisions are recorded in [docs/adr](docs/adr/).
+To install the launcher or the server, see [docs/install.md](docs/install.md). Design decisions are recorded in [docs/adr](docs/adr/).
 
 ## What is in the repository
 
