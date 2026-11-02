@@ -20,7 +20,7 @@ ktor = "3.6.0"
 loom = "1.19.3"
 minecraft = "26.3"
 # The version of Rloaded itself: the launcher, the runtime mod and the releases.
-rloaded = "0.1.0"
+rloaded = "1.0.0"
 serialization = "1.11.0"
 slf4j = "2.0.19"
 spotless = "8.10.4"
