@@ -16,4 +16,12 @@
     <string name="failure_metadata">The game version information could not be read. Try again later.</string>
     <string name="failure_storage">A file could not be written to the data folder. Check the free disk space and its permissions.</string>
     <string name="failure_launch">The game could not start. The launcher log has the details.</string>
+    <string name="update_available">Rloaded %1$s is available. Download and install it now? The launcher starts again once it is installed.</string>
+    <string name="update_install">Install</string>
+    <string name="update_not_now">Not now</string>
+    <string name="update_downloading">Downloading Rloaded %1$s…</string>
+    <string name="update_installing">Installing the update; the launcher starts again in a moment.</string>
+    <string name="update_failure_download">The update could not be downloaded. Check your connection and try again.</string>
+    <string name="update_failure_location">The launcher cannot update itself from here. Move Rloaded to your Applications folder, start it from there and try again.</string>
+    <string name="update_failure_install">The update could not be installed. The launcher log has the details.</string>
 </resources>

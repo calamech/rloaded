@@ -71,11 +71,20 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Rloaded"
             packageVersion = rloadedVersion
+            // A per-user install needs no administrator rights, so the launcher can update itself. The
+            // upgrade code stays the same across versions, so a newer installer replaces the old one.
+            windows {
+                perUserInstall = true
+                upgradeUuid = "9c3d6a0e-5f1b-4c7e-9a2d-3e8b7f4c1a65"
+                menu = true
+                shortcut = true
+            }
         }
     }
 }
 
-// The screen and the entry point are checked by hand; LauncherState, behind them, is unit tested.
+// The screen and the entry point are checked by hand; LauncherState and UpdateState, behind them, are
+// unit tested. GitHubUpdates only joins the update steps of launcher-core, which are tested there.
 kover {
     reports {
         filters {
@@ -84,6 +93,7 @@ kover {
                     "io.github.calamech.rloaded.launcher.app.LauncherWindowKt*",
                     "io.github.calamech.rloaded.launcher.app.ComposableSingletons*",
                     "io.github.calamech.rloaded.launcher.app.MainKt*",
+                    "io.github.calamech.rloaded.launcher.app.GitHubUpdates",
                     "io.github.calamech.rloaded.launcher.app.resources.*",
                 )
             }
