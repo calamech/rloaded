@@ -22,6 +22,31 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 }
 
+// The launcher reads its own version from a resource, to tell it to the game and to compare it with
+// the latest release.
+val rloadedVersion = libs.versions.rloaded.get()
+val versionResource =
+    tasks.register("versionResource") {
+        val output = layout.buildDirectory.dir("generated/version")
+        val written = rloadedVersion
+        inputs.property("version", written)
+        outputs.dir(output)
+        doLast {
+            output
+                .get()
+                .file("io/github/calamech/rloaded/launcher/app/version.txt")
+                .asFile
+                .apply { parentFile.mkdirs() }
+                .writeText(written)
+        }
+    }
+sourceSets.main {
+    resources.srcDir(versionResource)
+}
+tasks.test {
+    systemProperty("rloaded.catalog-version", rloadedVersion)
+}
+
 // The launcher carries the agent and the runtime mod, and writes them to its data directory at startup.
 tasks.processResources {
     from(agentJar) {
@@ -45,7 +70,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Rloaded"
-            packageVersion = "0.1.0"
+            packageVersion = rloadedVersion
         }
     }
 }
