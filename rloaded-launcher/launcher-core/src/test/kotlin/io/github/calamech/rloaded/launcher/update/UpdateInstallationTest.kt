@@ -30,7 +30,14 @@ class UpdateInstallationTest {
         val command = ok(UpdateInstallation(OperatingSystem.MACOS, dir.resolve("work")).command(Path.of("/u/up.dmg"), launcher, 42))
 
         assertEquals(
-            listOf("/bin/sh", dir.resolve("work/install-macos.sh").toString(), "42", "/u/up.dmg", bundle.toString(), "/usr/bin/open"),
+            listOf(
+                "/bin/sh",
+                dir.resolve("work/install-macos.sh").toString(),
+                "42",
+                Path.of("/u/up.dmg").toString(),
+                bundle.toString(),
+                "/usr/bin/open",
+            ),
             command,
         )
     }
@@ -71,7 +78,7 @@ class UpdateInstallationTest {
     fun `installs with pkexec and dpkg on Linux, and with msiexec through PowerShell on Windows`() {
         val linux = ok(UpdateInstallation(OperatingSystem.LINUX, dir).command(Path.of("/u/up.deb"), Path.of("/opt/rloaded/bin/Rloaded"), 7))
         assertEquals(listOf("pkexec", "dpkg", "-i"), linux.takeLast(3))
-        assertEquals(listOf("7", "/u/up.deb", "/opt/rloaded/bin/Rloaded"), linux.subList(2, 5))
+        assertEquals(listOf("7", Path.of("/u/up.deb").toString(), Path.of("/opt/rloaded/bin/Rloaded").toString()), linux.subList(2, 5))
 
         val windows = ok(UpdateInstallation(OperatingSystem.WINDOWS, dir).command(Path.of("up.msi"), Path.of("Rloaded.exe"), 7))
         assertEquals(listOf("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"), windows.take(5))
