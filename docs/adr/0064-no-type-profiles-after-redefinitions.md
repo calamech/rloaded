@@ -40,7 +40,7 @@ With the option, on 2026-11-02: the standalone program finished 5 runs out of 5,
 ## Consequences
 
 - The server spends more time per tick. On the warm server workload above, macOS ARM64, 4 alternating runs each: 9.7 ms per tick while chunks generate and 8.4 ms after, without the option; 12.7 ms and 11.4 ms with it (+30 % and +36 %). The cost on players' frame rate is not measured yet.
-- The option goes when a JetBrains Runtime fixes the bug and passes `redefinitionTest` without it (#114).
+- The option goes when a JetBrains Runtime fixes the bug and passes `redefinitionTest` without it (#114). The bug is reported to JetBrains with the standalone program: https://github.com/JetBrains/JetBrainsRuntime/issues/658.
 
 ## Enforcement
 
