@@ -4,6 +4,8 @@ import io.github.calamech.rloaded.admin.CompatDatabase
 import io.github.calamech.rloaded.admin.CompatStatus
 import io.github.calamech.rloaded.admin.LocalCompat
 import io.github.calamech.rloaded.admin.staging.StagingSettings
+import io.github.calamech.rloaded.bootstrap.RolloutSection
+import io.github.calamech.rloaded.bootstrap.ServerConfig
 import io.github.calamech.rloaded.core.mojang.LaunchFeatures
 import io.github.calamech.rloaded.launcher.ClientDirectories
 import io.github.calamech.rloaded.launcher.Relaunch
@@ -11,6 +13,7 @@ import io.github.calamech.rloaded.launcher.ServerAddress
 import io.github.calamech.rloaded.protocol.Outcome
 import java.net.ServerSocket
 import java.nio.file.Path
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
@@ -29,10 +32,14 @@ import kotlin.system.exitProcess
  * the version as broken in `rloaded/compat-local.json`, and say so in its log. The players are plain
  * games joining by quick play, as players' games are, not client game tests.
  *
+ * The console then adds content-basic, whose file comes to the player's game after the server's join
+ * timeout: the server disconnects the game, which must stop and ask to be started again too. The
+ * fresh game gets the file at once and must join the server.
+ *
  * The project owner accepted the Minecraft EULA for the server directory this check creates.
  *
- * Arguments: client cache, server cache, run directory, agent jar, runtime mod jar, then the jar to
- * serve as fails-on-client-once.
+ * Arguments: client cache, server cache, run directory, agent jar, runtime mod jar, then the jars to
+ * serve as fails-on-client-once and content-basic.
  */
 @OptIn(ExperimentalPathApi::class)
 public fun main(arguments: Array<String>) {
@@ -40,7 +47,9 @@ public fun main(arguments: Array<String>) {
     val (clientCache, serverCache, run) = paths
     val agent = paths[AGENT_ARGUMENT]
     val runtime = paths[RUNTIME_MOD_ARGUMENT]
-    val mod = FakeMod(PROJECT, VERSION, "Fails on client once", paths[SERVED_ARGUMENT])
+    val served = paths.drop(SERVED_ARGUMENT)
+    val mod = FakeMod(PROJECT, VERSION, "Fails on client once", served.single { "failsOnClientOnce" in it.fileName.toString() })
+    val slow = FakeMod(SLOW_PROJECT, "cbVersion", "Content basic", served.single { "contentBasic" in it.fileName.toString() })
     val directories = ClientDirectories(clientCache)
     val (server, client) = installServerAndClient(serverCache, directories, setOf(LaunchFeatures.QUICK_PLAY_MULTIPLAYER))
     if (run.exists()) run.deleteRecursively()
@@ -48,14 +57,18 @@ public fun main(arguments: Array<String>) {
     Runtime.getRuntime().addShutdownHook(Thread { processes.forEach { it.destroyForcibly() } })
     val deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(CHECK_TIMEOUT_MINUTES)
 
-    // The check ends the process, which stops the fake Modrinth with it.
-    val modrinth = FakeModrinth(listOf(mod))
+    // The check ends the process, which stops the fake Modrinths with it. The player's game gets
+    // content-basic late the first time it asks.
+    val modrinth = FakeModrinth(listOf(mod, slow))
+    val playerModrinth = FakeModrinth(listOf(mod, slow.copy(fileDelay = SLOW_FILE, delayedRequests = 1)))
     val port = ServerSocket(0).use { it.localPort }
     val serverDirectory = run.resolve("server")
     prepareServer(serverDirectory, port)
     val launcherData = ClientDirectories(run.resolve("player").resolve("launcher-data"))
     trustServer(serverDirectory, launcherData, "server")
-    val serverProperties = mapOf(MODRINTH_PROPERTY to modrinth.url, StagingSettings.ENABLED_PROPERTY to "false")
+    val serverProperties =
+        mapOf(MODRINTH_PROPERTY to modrinth.url, StagingSettings.ENABLED_PROPERTY to "false") +
+            ServerConfig(rollout = RolloutSection(TIMEOUT_SECONDS)).gameProperties()
     val serverProcess = startServer(server, agent, listOf(runtime), serverDirectory, serverProperties)
     processes += serverProcess
     waitForPort(port, serverProcess, deadline)
@@ -65,10 +78,10 @@ public fun main(arguments: Array<String>) {
     val marker = run.resolve("player").createDirectories().resolve("fail-once")
     marker.writeText("fail once\n")
     val launch = ClientLaunch(client, directories, launcherData, agent, runtime, emptyList())
-    val properties = mapOf(MODRINTH_PROPERTY to modrinth.url, FAIL_ONCE_PROPERTY to marker.toString())
+    val properties = mapOf(MODRINTH_PROPERTY to playerModrinth.url, FAIL_ONCE_PROPERTY to marker.toString())
     val game = run.resolve("player").resolve("game")
-    val first = startClient(launch, game, PLAYER, ServerAddress(LOOPBACK, port), properties)
-    processes += first
+    val startGame = { startClient(launch, game, PLAYER, ServerAddress(LOOPBACK, port), properties).also { processes += it } }
+    val first = startGame()
     until("$PLAYER joins") { joins(serverLog) == 1 }
     serverProcess.outputWriter().run {
         write("rloaded add $PROJECT\n")
@@ -79,12 +92,11 @@ public fun main(arguments: Array<String>) {
     println("Recovery check: the game exited with code $firstExit; fail-once marker left: ${marker.exists()}")
     if (!Relaunch.wanted(firstExit, 0)) failCheck("the game did not ask to be started again")
 
-    val second = startClient(launch, game, PLAYER, ServerAddress(LOOPBACK, port), properties)
-    processes += second
+    val second = startGame()
     until("$PLAYER joins again") { joins(serverLog) == 2 }
     // The game left during the add's configuration phase, for real: the chat says so once.
     val leaves = serverLog.readText().lines().count { "$PLAYER left the game" in it }
-    second.destroy()
+    timesOutAndJoinsAgain(serverProcess, serverLog, until, second, startGame)
     stopServer(serverProcess)
 
     val log = serverLog.readText()
@@ -93,6 +105,31 @@ public fun main(arguments: Array<String>) {
     println("Recovery check: failure in the server log: $reported; recorded as $recorded; left the game $leaves times before joining again")
     val passed = listOf(!marker.exists(), reported, recorded == CompatStatus.BROKEN, leaves == 1).all { it }
     exitProcess(if (passed) 0 else 1)
+}
+
+/**
+ * Adds content-basic, which reaches [game] after the join timeout: the server must disconnect the
+ * game, which must ask to be started again, and the fresh game must join.
+ */
+private fun timesOutAndJoinsAgain(
+    server: Process,
+    serverLog: Path,
+    until: Until,
+    game: Process,
+    startGame: () -> Process,
+) {
+    val joinsBefore = joins(serverLog)
+    server.outputWriter().run {
+        write("rloaded add $SLOW_PROJECT\n")
+        flush()
+    }
+    until("the server disconnects $PLAYER's game, which took too long") { TIMED_OUT in serverLog.readText() }
+    until("$PLAYER's game exits again") { !game.isAlive }
+    println("Recovery check: after the join timeout the game exited with code ${game.exitValue()}")
+    if (!Relaunch.wanted(game.exitValue(), 1)) failCheck("the game did not ask to be started again after the join timeout")
+    val fresh = startGame()
+    until("$PLAYER joins with content-basic") { joins(serverLog) == joinsBefore + 1 }
+    fresh.destroy()
 }
 
 private fun joins(serverLog: Path): Int =
@@ -141,7 +178,15 @@ private const val PROJECT = "focProject"
 private const val VERSION = "focVersion"
 private const val MODRINTH_PROPERTY = "rloaded.test.modrinth"
 private const val FAIL_ONCE_PROPERTY = "rloaded.test.fail-once"
+private const val SLOW_PROJECT = "cbProject"
 private const val POLL_MILLIS = 500L
+private const val TIMEOUT_SECONDS = 15
+
+// Past the join timeout, and below the client's 30 seconds of silence allowed on a socket, so the
+// download itself does not fail.
+private const val SLOW_FILE_SECONDS = 22L
+private val SLOW_FILE: Duration = Duration.ofSeconds(SLOW_FILE_SECONDS)
+private const val TIMED_OUT = "$PLAYER stopped answering while installing the server's mods and was disconnected"
 
 // A step takes well under a minute in local; the first launch installs nothing.
 private const val STEP_MINUTES = 4L
