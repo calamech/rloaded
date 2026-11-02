@@ -119,6 +119,13 @@ kover {
                     "io.github.calamech.rloaded.gametests.FakeModrinth*",
                     "io.github.calamech.rloaded.gametests.FakeMod",
                 )
+                // The probe runs in a JVM of its own, which this check starts and expects to abort.
+                classes(
+                    "io.github.calamech.rloaded.gametests.RedefinitionMainKt*",
+                    "io.github.calamech.rloaded.gametests.ProbeRun",
+                    "io.github.calamech.rloaded.gametests.RedefinitionProbeKt*",
+                    "io.github.calamech.rloaded.gametests.Probe*",
+                )
             }
         }
     }
@@ -155,6 +162,23 @@ tasks.register<JavaExec>("gameTest") {
             refusedFile.singleFile.absolutePath,
             hotAddFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         ) + modFiles.files.map { it.absolutePath }
+    }
+}
+
+// Runs a small program on the pinned runtime that the JIT compiler aborts after a class redefinition
+// unless type profiles are off (#114). Not part of check: it downloads the runtime, so CI runs it in
+// the game test job.
+tasks.register<JavaExec>("redefinitionTest") {
+    description = "Checks that the options games and servers get keep the JIT compiler from aborting after a redefinition."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "io.github.calamech.rloaded.gametests.RedefinitionMainKt"
+    val cache = layout.buildDirectory.dir("game-test/cache")
+    val run = layout.buildDirectory.dir("redefinition-test/run")
+    val agentFile = files(agentJar)
+    inputs.files(agentFile).withPropertyName("agent")
+    argumentProviders.add {
+        listOf(cache.get().asFile.absolutePath, run.get().asFile.absolutePath, agentFile.singleFile.absolutePath)
     }
 }
 

@@ -32,6 +32,7 @@ class ServerLaunchTest {
                 "/jbr/bin/java",
                 "-Xmx2048M",
                 "-XX:+AllowEnhancedClassRedefinition",
+                "-XX:-UseTypeProfile",
                 "-javaagent:/data/agent.jar",
                 "-Dfabric.addMods=/mods/fabric-api.jar${File.pathSeparator}/data/rloaded-runtime.jar",
                 "-Drloaded.client-timeout-seconds=120",
