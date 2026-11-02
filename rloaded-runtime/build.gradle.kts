@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.github.calamech.rloaded"
-version = "0.1.0"
+version = libs.versions.rloaded.get()
 
 // Minecraft 26.3 needs Java 25.
 java {

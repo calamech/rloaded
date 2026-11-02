@@ -24,8 +24,6 @@ import java.time.Instant
 import kotlin.io.path.createDirectories
 import kotlin.system.exitProcess
 
-private const val LAUNCHER_VERSION = "0.1.0-dev"
-
 /** Entry point of the launcher: wires the launcher to its window. */
 public fun main() {
     val platform =
@@ -48,7 +46,7 @@ public fun main() {
             directories,
             writeBundled(directories, "agent", "rloaded-agent.jar"),
             writeBundled(directories, "runtime", "rloaded-runtime.jar"),
-            LAUNCHER_VERSION,
+            LauncherVersion.current,
         )
     application {
         Window(
