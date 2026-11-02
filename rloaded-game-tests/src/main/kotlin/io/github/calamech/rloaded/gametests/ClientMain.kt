@@ -52,6 +52,7 @@ public fun main(arguments: Array<String>) {
     if (run.exists()) run.deleteRecursively()
     run.createDirectories()
     run.resolve("eula.txt").writeText("eula=true\n")
+    run.resolve("options.txt").writeText(MUTED_OPTIONS)
     val profile = (OfflineProfile.of(PLAYER) as? Outcome.Ok)?.value ?: fail("invalid player name $PLAYER")
     val settings = LaunchSettings(profile, run, null, agent, runtimeMod, "client-game-test", directories.mods, directories.trustStore)
     val command =

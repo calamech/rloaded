@@ -14,8 +14,11 @@ internal val ADDED_BLOCKS = listOf("rloaded-gametest:sync_a", "rloaded-gametest:
 /** The address the server listens on and the clients join. */
 internal const val LOOPBACK = "127.0.0.1"
 
+/** Test games play no sound: on a developer's machine, several of them run at once. */
+internal const val MUTED_OPTIONS = "soundCategory_master:0.0\n"
+
 // A first launch shows an accessibility screen, which would hold the client before it joins.
-internal const val CLIENT_OPTIONS = "onboardAccessibility:false\npauseOnLostFocus:false\nrenderDistance:2\n"
+internal const val CLIENT_OPTIONS = "onboardAccessibility:false\npauseOnLostFocus:false\nrenderDistance:2\n$MUTED_OPTIONS"
 
 /** The properties that turn the check on in the game test mod, on the server and on clients. */
 internal fun checkProperties(
