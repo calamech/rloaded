@@ -1,5 +1,6 @@
 package io.github.calamech.rloaded.launcher
 
+import io.github.calamech.rloaded.core.runtime.RuntimeOptions
 import io.github.calamech.rloaded.core.runtime.RuntimePins
 import io.github.calamech.rloaded.protocol.Outcome
 import io.github.calamech.rloaded.protocol.flatMap
@@ -71,14 +72,13 @@ public object ClientCommand {
                     installed.loggingConfig?.let { "path" to it.toString() },
                 )
         val rloaded =
-            listOf(
-                "-Xmx${settings.maxMemoryMiB}M",
-                "-XX:+AllowEnhancedClassRedefinition",
-                "-javaagent:${settings.agentJar}",
-                "-Dfabric.addMods=${(installed.mods + listOf(settings.runtimeMod)).joinToString(File.pathSeparator)}",
-                "-Drloaded.mod-store=${settings.modStore}",
-                "-Drloaded.trust-store=${settings.trustStore}",
-            )
+            listOf("-Xmx${settings.maxMemoryMiB}M") + RuntimeOptions.ALL +
+                listOf(
+                    "-javaagent:${settings.agentJar}",
+                    "-Dfabric.addMods=${(installed.mods + listOf(settings.runtimeMod)).joinToString(File.pathSeparator)}",
+                    "-Drloaded.mod-store=${settings.modStore}",
+                    "-Drloaded.trust-store=${settings.trustStore}",
+                )
         val logging = listOfNotNull(installed.game.logging?.argument)
         return (installed.game.jvmArguments + logging).traverse { fill(it, values) }.flatMap { jvm ->
             installed.game.gameArguments.traverse { fill(it, values) }.map { game ->

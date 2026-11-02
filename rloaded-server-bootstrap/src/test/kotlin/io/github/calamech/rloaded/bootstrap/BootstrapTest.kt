@@ -122,7 +122,7 @@ class BootstrapTest {
             val agent = Path.of(command.single { it.startsWith("-javaagent:") }.removePrefix("-javaagent:"))
             val classpath = command[command.indexOf("-cp") + 1].split(File.pathSeparator).map { Path.of(it).readText() }
             assertTrue(Path.of(command.first()).endsWith(Path.of("jbr", "Contents", "Home", "bin", "java")))
-            assertEquals(listOf("-Xmx4096M", "-XX:+AllowEnhancedClassRedefinition"), command.subList(1, 3))
+            assertEquals(listOf("-Xmx4096M", "-XX:+AllowEnhancedClassRedefinition", "-XX:-UseTypeProfile"), command.subList(1, 4))
             assertTrue("-Drloaded.client-timeout-seconds=120" in command)
             assertTrue("-Drloaded.reputation.min-version-age-hours=72" in command)
             assertTrue("-Drloaded.staging.enabled=true" in command)

@@ -114,6 +114,7 @@ class GameInstallerTest {
                     installed.java.toString(),
                     "-Xmx4096M",
                     "-XX:+AllowEnhancedClassRedefinition",
+                    "-XX:-UseTypeProfile",
                     "-javaagent:${Path.of("/agent.jar")}",
                     "-Dfabric.addMods=${installed.mods.single()}${File.pathSeparator}${Path.of("/rloaded.jar")}",
                     "-Drloaded.mod-store=${directories.mods}",

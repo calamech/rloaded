@@ -30,13 +30,11 @@ public data class ServerLaunch(
 ) {
     /** The command line that starts the server. */
     public fun command(): List<String> =
-        listOf(
-            java,
-            "-Xmx${maxMemoryMiB}M",
-            "-XX:+AllowEnhancedClassRedefinition",
-            "-javaagent:$agent",
-            "-Dfabric.addMods=${mods.joinToString(File.pathSeparator)}",
-        ) + properties.map { (name, value) -> "-D$name=$value" } +
+        listOf(java, "-Xmx${maxMemoryMiB}M") + RuntimeOptions.ALL +
+            listOf(
+                "-javaagent:$agent",
+                "-Dfabric.addMods=${mods.joinToString(File.pathSeparator)}",
+            ) + properties.map { (name, value) -> "-D$name=$value" } +
             listOf("-cp", classpath.joinToString(File.pathSeparator), mainClass, "nogui")
 
     /** This launch, telling the server that [file] describes it. */
