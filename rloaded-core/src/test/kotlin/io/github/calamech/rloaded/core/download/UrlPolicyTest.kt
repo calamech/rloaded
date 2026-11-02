@@ -20,6 +20,18 @@ class UrlPolicyTest {
     }
 
     @Test
+    fun `allows the launcher's releases on GitHub, and nothing of GitHub for game files`() {
+        assertNull(UrlPolicy.UPDATES.refusalReason("https://api.github.com/repos/calamech/rloaded/releases/latest"))
+        assertNull(UrlPolicy.UPDATES.refusalReason("https://github.com/calamech/rloaded/releases/download/v1.0.0/SHA256SUMS"))
+        assertNull(UrlPolicy.UPDATES.refusalReason("https://release-assets.githubusercontent.com/github-production-release-asset/1"))
+        assertEquals(
+            "https://cdn.modrinth.com:443 is not an allowed origin",
+            UrlPolicy.UPDATES.refusalReason("https://cdn.modrinth.com/data/a"),
+        )
+        assertEquals("https://github.com:443 is not an allowed origin", UrlPolicy.PRODUCTION.refusalReason("https://github.com/x"))
+    }
+
+    @Test
     fun `refuses URLs it cannot read`() {
         assertEquals("not a valid URL", UrlPolicy.PRODUCTION.refusalReason("https://bad host/"))
         assertEquals("no scheme", UrlPolicy.PRODUCTION.refusalReason("/relative"))

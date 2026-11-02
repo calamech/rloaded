@@ -67,6 +67,18 @@ public class UrlPolicy(
                 ).map { Origin("https", it, HTTPS_PORT) }.toSet(),
             )
 
+        /**
+         * The hosts the launcher reads its own releases from, over HTTPS only: GitHub's API, its
+         * release download links, and the host those links redirect to (seen 2026-11-02). Kept apart
+         * from [PRODUCTION], so a mod or game file never comes from GitHub.
+         */
+        public val UPDATES: UrlPolicy =
+            UrlPolicy(
+                setOf("api.github.com", "github.com", "release-assets.githubusercontent.com")
+                    .map { Origin("https", it, HTTPS_PORT) }
+                    .toSet(),
+            )
+
         private const val HTTP_PORT = 80
         private const val HTTPS_PORT = 443
 
