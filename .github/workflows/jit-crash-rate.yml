@@ -1,0 +1,64 @@
+name: jit-crash-rate
+
+# Measures how often the game test server's JVM crashes in the JIT compiler after class
+# redefinitions (#114). Runs the game tests many times on Linux x64 and keeps every crash report.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: measure (${{ matrix.variant }} ${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+        variant: [all]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RUNS: "6"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: jetbrains
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-read-only: true
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: rloaded-game-tests/build/game-test/cache
+          key: game-test-${{ hashFiles('rloaded-core/src/main/resources/io/github/calamech/rloaded/core/runtime/runtime-pins.json') }}
+      - name: Run the game tests ${{ env.RUNS }} times
+        run: |
+          mkdir -p out
+          run_dir=rloaded-game-tests/build/game-test/run
+          for i in $(seq 1 "$RUNS"); do
+            start=$(date +%s)
+            if ./gradlew :rloaded-game-tests:gameTest --rerun > "out/run-$i.log" 2>&1; then
+              result=pass
+            elif ls "$run_dir"/hs_err_pid*.log > /dev/null 2>&1; then
+              result=crash
+              for f in "$run_dir"/hs_err_pid*.log "$run_dir"/replay_pid*.log; do
+                [ -e "$f" ] && cp "$f" "out/run-$i-$(basename "$f")"
+              done
+            else
+              result=fail
+            fi
+            [ "$result" = pass ] && rm "out/run-$i.log"
+            echo "${{ matrix.variant }} ${{ matrix.shard }} $i $result $(( $(date +%s) - start ))s" | tee -a out/results.txt
+          done
+          cat out/results.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: results-${{ matrix.variant }}-${{ matrix.shard }}
+          path: out
+          retention-days: 14

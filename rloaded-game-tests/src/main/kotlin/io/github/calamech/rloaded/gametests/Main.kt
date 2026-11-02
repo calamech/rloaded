@@ -60,7 +60,8 @@ public fun main(arguments: Array<String>) {
             "fabric-api.gametest.report-file" to report.toString(),
             "rloaded.hot-add-mods" to hotAddMods,
             "rloaded.staging-refused-mod" to stagingRefused,
-        )
+        ) + System.getenv("GAME_TEST_FILTER").orEmpty().let { if (it.isEmpty()) emptyMap() else mapOf("fabric-api.gametest.filter" to it) }
+    val extraJvm = System.getenv("GAME_TEST_JVM").orEmpty().split(" ").filter { it.isNotEmpty() }
     val gameTestLaunch =
         described.copy(
             mods = described.mods + testMods.map { it.toString() },
@@ -68,7 +69,7 @@ public fun main(arguments: Array<String>) {
                 described.properties + testProperties,
         )
     val exit =
-        ProcessBuilder(gameTestLaunch.command())
+        ProcessBuilder(gameTestLaunch.command().let { listOf(it[0]) + extraJvm + it.drop(1) })
             .directory(run.toFile())
             .inheritIO()
             .start()
