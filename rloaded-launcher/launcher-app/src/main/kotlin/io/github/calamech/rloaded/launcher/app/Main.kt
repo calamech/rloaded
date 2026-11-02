@@ -40,6 +40,8 @@ public fun main() {
     val directories = ClientDirectories(DataDirectory.of(platform.os, System.getenv(), Path.of(System.getProperty("user.home"))))
     val log = directories.root.resolve("logs/launcher.log")
     val http = KtorHttp(UrlPolicy.PRODUCTION, HttpSettings())
+    val updatesHttp = KtorHttp(UrlPolicy.UPDATES, HttpSettings())
+    val updatePorts = GitHubUpdates(updatesHttp, platform, directories.root.resolve("updates"), log)
     val launcher =
         Launcher(
             GameInstaller(http, directories, platform, RuntimePins.CURRENT),
@@ -52,6 +54,7 @@ public fun main() {
         Window(
             onCloseRequest = {
                 http.close()
+                updatesHttp.close()
                 exitApplication()
             },
             title = "Rloaded",
@@ -59,7 +62,15 @@ public fun main() {
         ) {
             val scope = rememberCoroutineScope()
             val state = remember { LauncherState(launcher::play, scope) { append(log, it) } }
-            LauncherWindow(state)
+            val updates =
+                remember {
+                    UpdateState(updatePorts, scope, { append(log, it) }) {
+                        http.close()
+                        updatesHttp.close()
+                        exitApplication()
+                    }.also { it.check() }
+                }
+            LauncherWindow(state, updates)
         }
     }
 }

@@ -2,11 +2,13 @@ package io.github.calamech.rloaded.launcher.app
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,18 +36,31 @@ import io.github.calamech.rloaded.launcher.app.resources.status_installing
 import io.github.calamech.rloaded.launcher.app.resources.status_playing
 import io.github.calamech.rloaded.launcher.app.resources.status_ready
 import io.github.calamech.rloaded.launcher.app.resources.status_stopped
+import io.github.calamech.rloaded.launcher.app.resources.update_available
+import io.github.calamech.rloaded.launcher.app.resources.update_downloading
+import io.github.calamech.rloaded.launcher.app.resources.update_failure_download
+import io.github.calamech.rloaded.launcher.app.resources.update_failure_install
+import io.github.calamech.rloaded.launcher.app.resources.update_failure_location
+import io.github.calamech.rloaded.launcher.app.resources.update_install
+import io.github.calamech.rloaded.launcher.app.resources.update_installing
+import io.github.calamech.rloaded.launcher.app.resources.update_not_now
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /** The launcher window: a player name, a server address and a Play button. */
 @Suppress("ktlint:standard:function-naming") // Composable functions are named like types.
 @Composable
-public fun LauncherWindow(state: LauncherState) {
+public fun LauncherWindow(
+    state: LauncherState,
+    updates: UpdateState,
+) {
     val status by state.status.collectAsState()
+    val offer by updates.offer.collectAsState()
     var playerName by remember { mutableStateOf("Dev") }
     var server by remember { mutableStateOf("localhost") }
     MaterialTheme {
         Column(Modifier.padding(24.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            UpdateBanner(offer, canInstall = state.canPlay, onInstall = updates::accept, onNotNow = updates::decline)
             OutlinedTextField(
                 value = playerName,
                 onValueChange = { playerName = it },
@@ -73,6 +88,39 @@ public fun LauncherWindow(state: LauncherState) {
         }
     }
 }
+
+// Installing quits the launcher, so it waits while the game runs.
+@Suppress("ktlint:standard:function-naming") // Composable functions are named like types.
+@Composable
+private fun UpdateBanner(
+    offer: UpdateOffer,
+    canInstall: Boolean,
+    onInstall: () -> Unit,
+    onNotNow: () -> Unit,
+) {
+    val text =
+        when (offer) {
+            UpdateOffer.None -> return
+            is UpdateOffer.Available -> stringResource(Res.string.update_available, offer.version.toString())
+            is UpdateOffer.Downloading -> stringResource(Res.string.update_downloading, offer.version.toString())
+            UpdateOffer.Installing -> stringResource(Res.string.update_installing)
+            is UpdateOffer.Failed -> stringResource(updateMessage(offer.reason))
+        }
+    Text(text)
+    if (offer is UpdateOffer.Available || offer is UpdateOffer.Failed) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onInstall, enabled = canInstall) { Text(stringResource(Res.string.update_install)) }
+            OutlinedButton(onClick = onNotNow) { Text(stringResource(Res.string.update_not_now)) }
+        }
+    }
+}
+
+private fun updateMessage(reason: UpdateFailure): StringResource =
+    when (reason) {
+        UpdateFailure.DOWNLOAD -> Res.string.update_failure_download
+        UpdateFailure.LOCATION -> Res.string.update_failure_location
+        UpdateFailure.INSTALL -> Res.string.update_failure_install
+    }
 
 @Composable
 private fun statusText(status: Status): String =
