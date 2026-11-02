@@ -1,0 +1,112 @@
+name: release
+
+# Builds the launcher's installers and the server jar. On a version tag, publishes them as a GitHub
+# release with their SHA-256 sums and the release notes; on a pull request that changes how they are
+# built, only builds them.
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/release-version.sh
+      - gradle/libs.versions.toml
+      - rloaded-launcher/launcher-app/build.gradle.kts
+      - rloaded-server-bootstrap/build.gradle.kts
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    name: installer (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macos-arm64, os: macos-15, task: packageDmg, format: dmg }
+          - { name: macos-x64, os: macos-15-intel, task: packageDmg, format: dmg }
+          - { name: windows-x64, os: windows-2025, task: packageMsi, format: msi }
+          - { name: linux-x64, os: ubuntu-24.04, task: packageDeb, format: deb }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: jetbrains
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Build the installer
+        run: ./gradlew :rloaded-launcher:launcher-app:${{ matrix.task }} --stacktrace
+      # The two macOS installers would have the same name: each gets its platform in its name.
+      - name: Name the installer
+        run: |
+          version=$(scripts/release-version.sh)
+          mkdir out
+          cp rloaded-launcher/launcher-app/build/compose/binaries/main/${{ matrix.format }}/*.${{ matrix.format }} \
+            "out/Rloaded-${version}-${{ matrix.name }}.${{ matrix.format }}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-${{ matrix.name }}
+          path: out
+          if-no-files-found: error
+          retention-days: 7
+
+  server:
+    name: server jar
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: jetbrains
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Build the server jar
+        run: ./gradlew :rloaded-server-bootstrap:serverJar --stacktrace
+      - name: Name the server jar
+        run: |
+          mkdir out
+          cp rloaded-server-bootstrap/build/libs/rloaded-server.jar out/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: server
+          path: out
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish
+    needs: [installer, server]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: out
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(scripts/release-version.sh "$TAG")
+          notes="docs/releases/${version}.md"
+          test -f "$notes" || { echo "release notes $notes are missing"; exit 1; }
+          (cd out && sha256sum -- * > SHA256SUMS)
+          gh release create "$TAG" out/* --title "Rloaded ${version}" --notes-file "$notes" --verify-tag
