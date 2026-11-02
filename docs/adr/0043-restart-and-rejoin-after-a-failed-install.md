@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-31
+- Amended: 2026-11-02, a game that loses the connection during an add before it answered restarts too, the join timeout included (ADR 0063)
 
 ## Context
 

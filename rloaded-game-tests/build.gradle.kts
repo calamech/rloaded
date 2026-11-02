@@ -75,9 +75,11 @@ dependencies {
         isTransitive = false
         capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-fails-in-running-server") }
     }
-    recoveryServedMods("io.github.calamech.rloaded:rloaded-runtime") {
-        isTransitive = false
-        capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-fails-on-client-once") }
+    for (mod in listOf("fails-on-client-once", "content-basic")) {
+        recoveryServedMods("io.github.calamech.rloaded:rloaded-runtime") {
+            isTransitive = false
+            capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }
+        }
     }
     for (mod in listOf("content-basic", "mixin-field-init", "keybind-and-tab", "late-item")) {
         addServedMods("io.github.calamech.rloaded:rloaded-runtime") {
@@ -371,7 +373,7 @@ tasks.register<JavaExec>("soakTest") {
 // A player's game fails to load a mod added while it plays: it must ask to be started again, and the
 // fresh game must join with the mod. Needs a display, like clientGameTest, and runs in the same CI job.
 tasks.register<JavaExec>("recoveryTest") {
-    description = "Checks that a game that fails to load an added mod starts again and joins the server."
+    description = "Checks that a game that fails to load an added mod, or times out, starts again and joins the server."
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass = "io.github.calamech.rloaded.gametests.RecoveryMainKt"
@@ -380,10 +382,10 @@ tasks.register<JavaExec>("recoveryTest") {
     val run = layout.buildDirectory.dir("recovery-test/run")
     val agentFile = files(agentJar)
     val runtimeFile = files(runtimeModJar)
-    val servedFile = files(recoveryServedModJars)
+    val servedFiles = files(recoveryServedModJars)
     inputs.files(agentFile).withPropertyName("agent")
     inputs.files(runtimeFile).withPropertyName("runtimeMod")
-    inputs.files(servedFile).withPropertyName("servedMod")
+    inputs.files(servedFiles).withPropertyName("servedMods")
     argumentProviders.add {
         listOf(
             clientCache.get().asFile.absolutePath,
@@ -391,8 +393,7 @@ tasks.register<JavaExec>("recoveryTest") {
             run.get().asFile.absolutePath,
             agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
-            servedFile.singleFile.absolutePath,
-        )
+        ) + servedFiles.files.map { it.absolutePath }
     }
 }
 

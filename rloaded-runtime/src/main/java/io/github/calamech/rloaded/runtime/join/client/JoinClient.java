@@ -58,8 +58,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>When the install fails in a game that already played on the server or loaded its mods, a fresh
  * game may succeed where this one failed: once disconnected, the game stops and asks the launcher
- * to start it again, which joins the server again. A fresh game that fails never asks, so this does
- * not loop.
+ * to start it again, which joins the server again. The same happens when the connection ends during
+ * an add before the game answered, as when the server's join timeout disconnects a game that took
+ * too long. A fresh game that fails never asks, so this does not loop.
  */
 public final class JoinClient {
   private static final Logger LOGGER = LoggerFactory.getLogger("Rloaded");
@@ -77,7 +78,9 @@ public final class JoinClient {
   private static volatile boolean inSession;
   // Set when the player leaves or the server ends the join: what is still in flight is dropped.
   private static volatile boolean ended;
-  // Set when an install failed in a game that already had the server's world or mods.
+  // Whether losing the connection now restarts the game: from the server's hello until the game
+  // answers during an add, and after an install failed in a game that already had the server's
+  // world or mods.
   private static volatile boolean relaunch;
   // Set once this game loaded mods while it was in a world. When the game leaves the server, Fabric
   // API resets the synchronized registries to how they were at the connection's first
@@ -155,7 +158,7 @@ public final class JoinClient {
       return;
     }
     ended = false;
-    relaunch = false;
+    relaunch = inSession;
     current = new ClientJoin(store, LoadedMods.snapshot(), rloadedVersion(), address);
     switch (current.serverHello(payload.bytes())) {
       case Outcome.Ok<?> ok -> sender.sendPacket(new JoinPayloads.Hello((byte[]) ok.getValue()));
@@ -253,9 +256,16 @@ public final class JoinClient {
 
   private static void leave(Minecraft client, PacketSender sender, Screen previous) {
     ended = true;
+    relaunch = false;
     client.gui.setScreen(previous);
     sender.sendPacket(
         new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.RefusedByUser.INSTANCE)));
+  }
+
+  private static void loaded(PacketSender sender) {
+    relaunch = false;
+    sender.sendPacket(
+        new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE)));
   }
 
   private static void install(
@@ -265,8 +275,7 @@ public final class JoinClient {
       List<ModEntry> entries,
       Map<String, String> titles) {
     if (entries.isEmpty()) {
-      sender.sendPacket(
-          new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE)));
+      loaded(sender);
       return;
     }
     Screen previous = client.gui.screen();
@@ -340,8 +349,7 @@ public final class JoinClient {
         sender,
         reloaded -> {
           client.gui.setScreen(previous);
-          sender.sendPacket(
-              new JoinPayloads.Result(ClientJoin.Companion.result(InstallResult.Loaded.INSTANCE)));
+          loaded(sender);
           if (inSession) {
             announce(client, mods);
           }

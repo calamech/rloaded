@@ -7,18 +7,24 @@ import java.net.URLDecoder
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.fileSize
 import kotlin.io.path.name
 import kotlin.io.path.readBytes
 
-/** A mod the fake Modrinth serves: its ids, its title, its jar, and how long its file takes to come. */
+/**
+ * A mod the fake Modrinth serves: its ids, its title, its jar, how long its file takes to come, and
+ * for how many of the first requests of the file.
+ */
 internal data class FakeMod(
     val projectId: String,
     val versionId: String,
     val title: String,
     val jar: Path,
     val fileDelay: Duration = Duration.ZERO,
+    val delayedRequests: Int = Int.MAX_VALUE,
 ) {
     val sha512: String get() = MessageDigest.getInstance("SHA-512").digest(jar.readBytes()).toHexString()
     val size: Long get() = jar.fileSize()
@@ -40,6 +46,7 @@ internal class FakeModrinth(
 
     // A thread per request, so a delayed file does not hold back the others.
     private val executor = Executors.newCachedThreadPool()
+    private val fileRequests = ConcurrentHashMap<String, AtomicInteger>()
 
     /** The base URL clients use instead of Modrinth's. */
     val url: String get() = "http://$LOOPBACK:${server.address.port}"
@@ -81,7 +88,9 @@ internal class FakeModrinth(
         }
         server.createContext("/cdn/") { exchange ->
             val mod = mods.find { exchange.requestURI.path == "/cdn/${it.jar.name}" }
-            Thread.sleep(mod?.fileDelay ?: Duration.ZERO)
+            if (mod != null && fileRequests.computeIfAbsent(mod.projectId) { AtomicInteger() }.getAndIncrement() < mod.delayedRequests) {
+                Thread.sleep(mod.fileDelay)
+            }
             val body = mod?.jar?.readBytes() ?: ByteArray(0)
             exchange.sendResponseHeaders(if (mod == null) NOT_FOUND else OK, if (body.isEmpty()) -1 else body.size.toLong())
             exchange.responseBody.use { it.write(body) }
