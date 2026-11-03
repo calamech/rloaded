@@ -5,6 +5,7 @@ import io.github.calamech.rloaded.core.mojang.MetadataError
 import io.github.calamech.rloaded.core.runtime.ExtractionError
 import io.github.calamech.rloaded.core.runtime.InstallError
 import io.github.calamech.rloaded.launcher.InstallFailure
+import io.github.calamech.rloaded.launcher.LastPlayed
 import io.github.calamech.rloaded.launcher.LaunchFailure
 import io.github.calamech.rloaded.launcher.OfflineProfile
 import io.github.calamech.rloaded.launcher.Relaunch
@@ -57,7 +58,11 @@ class LauncherStateTest {
         runTest {
             var calls = 0
             val state =
-                LauncherState({ _, _, _ -> Outcome.Err(LaunchFailure.Start(StartFailure("unused"))).also { calls++ } }, backgroundScope) {}
+                LauncherState(
+                    { _, _, _ -> Outcome.Err(LaunchFailure.Start(StartFailure("unused"))).also { calls++ } },
+                    backgroundScope,
+                    {},
+                ) {}
 
             state.play("x", "localhost")
 
@@ -66,9 +71,27 @@ class LauncherStateTest {
         }
 
     @Test
+    fun `remembers what was typed once a game starts, and nothing that was refused`() =
+        runTest {
+            val remembered = mutableListOf<LastPlayed>()
+            val state =
+                LauncherState(
+                    { _, _, _ -> Outcome.Err(LaunchFailure.Start(StartFailure("unused"))) },
+                    backgroundScope,
+                    { remembered += it },
+                ) {}
+
+            state.play("x", "friends.example.org")
+            state.play("Alice", "host:99999")
+            state.play("Alice", "friends.example.org:25566")
+
+            assertEquals(listOf(LastPlayed("Alice", "friends.example.org:25566")), remembered)
+        }
+
+    @Test
     fun `refuses an invalid server address`() =
         runTest {
-            val state = LauncherState({ _, _, _ -> Outcome.Err(LaunchFailure.Start(StartFailure("unused"))) }, backgroundScope) {}
+            val state = LauncherState({ _, _, _ -> Outcome.Err(LaunchFailure.Start(StartFailure("unused"))) }, backgroundScope, {}) {}
 
             state.play("Dev", "host:99999")
 
@@ -89,7 +112,7 @@ class LauncherStateTest {
                     progressed.complete(Unit)
                     release.await()
                     Outcome.Ok(process)
-                }, backgroundScope) {}
+                }, backgroundScope, {}) {}
 
             state.play("Dev", "localhost:25566")
             progressed.await()
@@ -113,7 +136,7 @@ class LauncherStateTest {
                 LauncherState({ _, server, _ ->
                     servers += server
                     Outcome.Ok(FakeProcess(exits.removeFirst()).also { it.destroy() })
-                }, backgroundScope) { logged += it }
+                }, backgroundScope, {}) { logged += it }
 
             state.play("Dev", "localhost:25566")
 
@@ -130,7 +153,7 @@ class LauncherStateTest {
                 LauncherState({ _, _, _ ->
                     launches++
                     Outcome.Ok(FakeProcess(75).also { it.destroy() })
-                }, backgroundScope) {}
+                }, backgroundScope, {}) {}
 
             state.play("Dev", "localhost:25566")
 
@@ -146,7 +169,7 @@ class LauncherStateTest {
                 LauncherState({ _, address, _ ->
                     server = address
                     Outcome.Err(LaunchFailure.Start(StartFailure("stop here")))
-                }, backgroundScope) {}
+                }, backgroundScope, {}) {}
 
             state.play("Dev", "  ")
 
@@ -157,7 +180,7 @@ class LauncherStateTest {
     fun `logs the details of a failure and shows its reason`() =
         runTest(UnconfinedTestDispatcher()) {
             val state =
-                LauncherState({ _, _, _ -> Outcome.Err(LaunchFailure.Start(StartFailure("exec format error"))) }, backgroundScope) {
+                LauncherState({ _, _, _ -> Outcome.Err(LaunchFailure.Start(StartFailure("exec format error"))) }, backgroundScope, {}) {
                     logged +=
                         it
                 }

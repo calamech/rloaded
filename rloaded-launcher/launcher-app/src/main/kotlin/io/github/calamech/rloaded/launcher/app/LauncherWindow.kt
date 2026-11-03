@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.calamech.rloaded.launcher.LastPlayed
 import io.github.calamech.rloaded.launcher.app.resources.Res
 import io.github.calamech.rloaded.launcher.app.resources.failure_downloads
 import io.github.calamech.rloaded.launcher.app.resources.failure_launch
@@ -47,17 +48,18 @@ import io.github.calamech.rloaded.launcher.app.resources.update_not_now
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-/** The launcher window: a player name, a server address and a Play button. */
+/** The launcher window: a player name, a server address and a Play button, filled as last played. */
 @Suppress("ktlint:standard:function-naming") // Composable functions are named like types.
 @Composable
 public fun LauncherWindow(
     state: LauncherState,
     updates: UpdateState,
+    lastPlayed: LastPlayed,
 ) {
     val status by state.status.collectAsState()
     val offer by updates.offer.collectAsState()
-    var playerName by remember { mutableStateOf("Dev") }
-    var server by remember { mutableStateOf("localhost") }
+    var playerName by remember { mutableStateOf(lastPlayed.playerName) }
+    var server by remember { mutableStateOf(lastPlayed.server) }
     MaterialTheme {
         Column(Modifier.padding(24.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             UpdateBanner(offer, canInstall = state.canPlay, onInstall = updates::accept, onNotNow = updates::decline)
