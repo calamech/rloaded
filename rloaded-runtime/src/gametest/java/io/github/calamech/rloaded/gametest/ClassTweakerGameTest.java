@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.gametest;
 
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
+import io.github.calamech.rloaded.runtime.engine.StartedEvents;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Modifier;
@@ -54,7 +55,7 @@ public final class ClassTweakerGameTest {
       put(zip, INIT + ".class", initializer());
     }
 
-    List<String> loaded = HotAdd.load(List.of(jar), Agent.instrumentation());
+    List<String> loaded = HotAdd.load(List.of(jar), Agent.instrumentation(), StartedEvents.NONE);
 
     helper.assertValueEqual(loaded, List.of("widens-logger"), "loaded mods");
     helper.assertTrue(

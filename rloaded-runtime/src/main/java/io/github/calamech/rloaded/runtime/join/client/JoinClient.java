@@ -321,7 +321,8 @@ public final class JoinClient {
     try {
       HotAdd.load(
           mods.stream().map(InstalledMod::getJar).toList(),
-          AgentBridge.instrumentation().orElseThrow());
+          AgentBridge.instrumentation().orElseThrow(),
+          ClientStartedEvents.of(client));
     } catch (HotAddRefusal refusal) {
       fail(sender, projectOf(mods, refusal.jar()), refusal.getMessage());
       return;

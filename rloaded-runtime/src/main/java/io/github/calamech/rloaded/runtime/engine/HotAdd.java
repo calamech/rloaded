@@ -35,8 +35,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 
 /**
  * Loads mod jars into a game that already started, replaying for them what Fabric does at startup:
- * register the mods with the loader, apply their mixins, then run their entrypoints with the
- * registries open.
+ * register the mods with the loader, apply their mixins, run their entrypoints with the registries
+ * open, then call the listeners they registered for events that already fired.
  *
  * <p>Runs on the game thread. A refusal happens before anything of the mods is registered; any
  * failure after that leaves the game in a state only a restart cleans, and is thrown as an
@@ -48,10 +48,15 @@ public final class HotAdd {
   /**
    * Loads the mods in {@code jars}.
    *
+   * @param jars the mod jars
+   * @param instrumentation the agent's instrumentation
+   * @param started the events that already fired in this game, whose listeners from these mods are
+   *     called once, in the order the events fired
    * @return the ids of the loaded mods, in the order their entrypoints ran
    * @throws HotAddRefusal if a jar is not a mod this method can load; nothing was changed then
    */
-  public static List<String> load(List<Path> jars, Instrumentation instrumentation)
+  public static List<String> load(
+      List<Path> jars, Instrumentation instrumentation, StartedEvents started)
       throws HotAddRefusal {
     List<ModJar> ordered = new ArrayList<>();
     try {
@@ -79,8 +84,29 @@ public final class HotAdd {
     } catch (ReflectiveOperationException | UnmodifiableClassException | IOException e) {
       throw new IllegalStateException("cannot register the mods " + ids(ordered), e);
     }
-    runEntrypoints(ordered);
+    List<Late> late = runEntrypoints(ordered, started);
+    callLate(ordered, late);
     return ids(ordered);
+  }
+
+  /** A listener a mod registered for an event that already fired. */
+  private record Late(String modId, StartedEvents.Call call) {}
+
+  // Like the events themselves: each event calls its listeners before the next event fires.
+  private static void callLate(List<ModJar> mods, List<Late> late) {
+    List<String> order = ids(mods);
+    List<Late> byEvent =
+        late.stream().sorted(Comparator.comparingInt(listener -> listener.call().event())).toList();
+    for (Late listener : byEvent) {
+      try {
+        listener.call().call().run();
+      } catch (RuntimeException | AssertionError e) {
+        throw new HotAddFailure(
+            mods.get(order.indexOf(listener.modId())).path(),
+            listener.modId(),
+            new IllegalStateException("when told " + listener.call().what(), e));
+      }
+    }
   }
 
   /**
@@ -222,30 +248,46 @@ public final class HotAdd {
     ordered.add(id);
   }
 
-  private static void runEntrypoints(List<ModJar> mods) {
+  private static List<Late> runEntrypoints(List<ModJar> mods, StartedEvents started) {
     List<Registry<?>> registries = new ArrayList<>();
     BuiltInRegistries.REGISTRY.forEach(registries::add);
     registries.forEach(RegistryThaw::thaw);
+    List<Late> late = new ArrayList<>();
     try {
-      run(mods, "main", ModInitializer.class, ModInitializer::onInitialize);
+      run(mods, "main", ModInitializer.class, ModInitializer::onInitialize, started, late);
       if (LoaderBridge.environment() == EnvType.CLIENT) {
-        run(mods, "client", ClientModInitializer.class, ClientModInitializer::onInitializeClient);
+        run(
+            mods,
+            "client",
+            ClientModInitializer.class,
+            ClientModInitializer::onInitializeClient,
+            started,
+            late);
       } else {
         run(
             mods,
             "server",
             DedicatedServerModInitializer.class,
-            DedicatedServerModInitializer::onInitializeServer);
+            DedicatedServerModInitializer::onInitializeServer,
+            started,
+            late);
       }
     } finally {
       registries.forEach(RegistryThaw::freeze);
     }
+    return late;
   }
 
   // The game checks its registries with assertions: a mod that breaks them fails like one that
   // throws. Either names the mod.
+  // Each entrypoint is watched on its own, so a late listener is known to belong to its mod.
   private static <T> void run(
-      List<ModJar> mods, String key, Class<T> type, Consumer<T> initializer) {
+      List<ModJar> mods,
+      String key,
+      Class<T> type,
+      Consumer<T> initializer,
+      StartedEvents started,
+      List<Late> late) {
     List<String> order = ids(mods);
     List<EntrypointContainer<T>> containers =
         FabricLoader.getInstance().getEntrypointContainers(key, type).stream()
@@ -255,12 +297,14 @@ public final class HotAdd {
                     container -> order.indexOf(container.getProvider().getMetadata().getId())))
             .toList();
     for (EntrypointContainer<T> container : containers) {
+      String id = container.getProvider().getMetadata().getId();
+      StartedEvents.Snapshot before = started.snapshot();
       try {
         initializer.accept(container.getEntrypoint());
       } catch (RuntimeException | AssertionError e) {
-        String id = container.getProvider().getMetadata().getId();
         throw new HotAddFailure(mods.get(order.indexOf(id)).path(), id, e);
       }
+      started.registeredSince(before).forEach(call -> late.add(new Late(id, call)));
     }
   }
 
