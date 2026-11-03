@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-29
+- Amended: 2026-11-03, the fields start empty and then show the player name and server of the last game started, kept in `last-played.json` of the data folder; they were filled with a development name and `localhost`, which sent a player to whatever answered on port 25565
 
 ## Context
 

@@ -14,6 +14,7 @@ import io.github.calamech.rloaded.core.runtime.RuntimePins
 import io.github.calamech.rloaded.launcher.ClientDirectories
 import io.github.calamech.rloaded.launcher.DataDirectory
 import io.github.calamech.rloaded.launcher.GameInstaller
+import io.github.calamech.rloaded.launcher.LastPlayed
 import io.github.calamech.rloaded.launcher.Launcher
 import io.github.calamech.rloaded.protocol.Outcome
 import java.nio.file.Files
@@ -61,7 +62,15 @@ public fun main() {
             state = rememberWindowState(width = 480.dp, height = 460.dp),
         ) {
             val scope = rememberCoroutineScope()
-            val state = remember { LauncherState(launcher::play, scope) { append(log, it) } }
+            val lastPlayed = remember { lastPlayed(directories, log) }
+            val state =
+                remember {
+                    LauncherState(
+                        launcher::play,
+                        scope,
+                        { typed -> (typed.write(directories.lastPlayed) as? Outcome.Err)?.let { append(log, it.error) } },
+                    ) { append(log, it) }
+                }
             val updates =
                 remember {
                     UpdateState(updatePorts, scope, { append(log, it) }) {
@@ -70,10 +79,26 @@ public fun main() {
                         exitApplication()
                     }.also { it.check() }
                 }
-            LauncherWindow(state, updates)
+            LauncherWindow(state, updates, lastPlayed)
         }
     }
 }
+
+// A file that cannot be read leaves the fields empty; the log says why.
+private fun lastPlayed(
+    directories: ClientDirectories,
+    log: Path,
+): LastPlayed =
+    when (val read = LastPlayed.read(directories.lastPlayed)) {
+        is Outcome.Ok -> {
+            read.value
+        }
+
+        is Outcome.Err -> {
+            append(log, read.error)
+            LastPlayed.NONE
+        }
+    }
 
 // The agent and the runtime mod ship inside the launcher, so they always match its version.
 private fun writeBundled(

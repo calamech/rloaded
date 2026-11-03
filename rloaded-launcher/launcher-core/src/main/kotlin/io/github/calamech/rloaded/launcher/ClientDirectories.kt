@@ -28,6 +28,9 @@ public class ClientDirectories(
     /** The servers the player trusts, by key. */
     public val trustStore: Path get() = root.resolve("trust.json")
 
+    /** The player name and the server last played with. */
+    public val lastPlayed: Path get() = root.resolve("last-played.json")
+
     /** The game directory of a server or a world: options, saves and logs. */
     public fun profile(name: String): Path = root.resolve("profiles").resolve(name)
 }

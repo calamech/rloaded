@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.launcher.app
 
 import io.github.calamech.rloaded.launcher.InstallFailure
+import io.github.calamech.rloaded.launcher.LastPlayed
 import io.github.calamech.rloaded.launcher.LaunchFailure
 import io.github.calamech.rloaded.launcher.OfflineProfile
 import io.github.calamech.rloaded.launcher.Relaunch
@@ -79,6 +80,8 @@ public fun interface PlayAction {
 public class LauncherState(
     private val action: PlayAction,
     private val scope: CoroutineScope,
+    /** Keeps what the player typed once it starts a game, so the window shows it next time. */
+    private val remember: (LastPlayed) -> Unit,
     private val log: (String) -> Unit,
 ) {
     private val mutableStatus = MutableStateFlow<Status>(Status.Ready)
@@ -105,6 +108,7 @@ public class LauncherState(
                 is Outcome.Ok -> parsed.value
                 is Outcome.Err -> return fail(FailureReason.SERVER_ADDRESS)
             }
+        remember(LastPlayed(playerName, serverText))
         mutableStatus.value = Status.Installing(0, 0)
         scope.launch { run(profile, server) }
     }
