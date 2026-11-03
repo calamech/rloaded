@@ -3,6 +3,7 @@ package io.github.calamech.rloaded.gametest.client;
 import io.github.calamech.rloaded.gametest.Agent;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
+import io.github.calamech.rloaded.runtime.engine.StartedEvents;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -80,7 +81,7 @@ public final class HotAddClientGameTest implements FabricClientGameTest {
 
   private static List<String> load(List<Path> jars) {
     try {
-      return HotAdd.load(jars, Agent.instrumentation());
+      return HotAdd.load(jars, Agent.instrumentation(), StartedEvents.NONE);
     } catch (HotAddRefusal | ReflectiveOperationException e) {
       throw new AssertionError("the test mods did not load", e);
     }

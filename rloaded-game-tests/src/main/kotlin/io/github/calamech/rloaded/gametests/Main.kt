@@ -26,8 +26,8 @@ import kotlin.system.exitProcess
  * The project owner accepted the Minecraft EULA for the run directory, which staging servers copy.
  *
  * Arguments: cache directory, run directory, report file, agent jar, runtime mod jar, the jar that
- * staging must refuse, the jars the tests load while the server runs (joined with the path
- * separator), then the test mod jars the server starts with.
+ * staging must refuse, the late-lifecycle test mod, the jars the tests load while the server runs
+ * (joined with the path separator), then the test mod jars the server starts with.
  */
 @OptIn(kotlin.io.path.ExperimentalPathApi::class)
 public fun main(arguments: Array<String>) {
@@ -38,6 +38,7 @@ public fun main(arguments: Array<String>) {
     val agent = paths[AGENT_ARGUMENT]
     val runtime = Path.of(arguments[RUNTIME_ARGUMENT])
     val stagingRefused = arguments[RUNTIME_ARGUMENT + 1]
+    val lateLifecycle = arguments[RUNTIME_ARGUMENT + 2]
     val hotAddMods = arguments[FIXED_ARGUMENTS - 1]
     val testMods = arguments.drop(FIXED_ARGUMENTS).map { Path.of(it) }
     val platform = (Platforms.current() as? Outcome.Ok)?.value ?: fail("unsupported platform")
@@ -60,6 +61,7 @@ public fun main(arguments: Array<String>) {
             "fabric-api.gametest.report-file" to report.toString(),
             "rloaded.hot-add-mods" to hotAddMods,
             "rloaded.staging-refused-mod" to stagingRefused,
+            "rloaded.late-lifecycle-mod" to lateLifecycle,
         )
     val gameTestLaunch =
         described.copy(
@@ -91,7 +93,7 @@ public fun main(arguments: Array<String>) {
 private const val MAX_MEMORY_MIB = 2048
 private const val AGENT_ARGUMENT = 3
 private const val RUNTIME_ARGUMENT = 4
-private const val FIXED_ARGUMENTS = 7
+private const val FIXED_ARGUMENTS = 8
 
 private fun fail(message: String): Nothing {
     println("Game tests could not run: $message")

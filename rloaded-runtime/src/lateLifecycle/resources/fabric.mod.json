@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "late-lifecycle",
+  "version": "${version}",
+  "name": "Late lifecycle (Rloaded test mod)",
+  "license": "MIT",
+  "environment": "*",
+  "mixins": ["late-lifecycle.mixins.json"],
+  "entrypoints": {
+    "main": ["io.github.calamech.rloaded.testmods.latelifecycle.LateLifecycle"],
+    "client": ["io.github.calamech.rloaded.testmods.latelifecycle.LateLifecycleClient"]
+  },
+  "depends": {
+    "minecraft": "26.3",
+    "fabric-api": "*"
+  }
+}

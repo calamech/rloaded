@@ -7,6 +7,7 @@ import io.github.calamech.rloaded.runtime.AgentBridge;
 import io.github.calamech.rloaded.runtime.engine.DataReload;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
+import io.github.calamech.rloaded.runtime.engine.StartedEvents;
 import java.io.File;
 import java.lang.instrument.Instrumentation;
 import java.nio.file.Path;
@@ -116,7 +117,8 @@ public final class StagingDryRun {
     }
     Snapshot before = Snapshot.take();
     try {
-      List<String> mods = HotAdd.load(candidates, instrumentation.get());
+      List<String> mods =
+          HotAdd.load(candidates, instrumentation.get(), StartedEvents.server(server));
       report = StagingReport.Companion.of(mods);
       content = before.added();
       reload(server);

@@ -1,7 +1,9 @@
 package io.github.calamech.rloaded.gametest;
 
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -25,8 +27,12 @@ public final class GameTestContent implements ModInitializer {
   static final BlockEntityType<FragileBlockEntity> FRAGILE_BLOCK_ENTITY =
       new BlockEntityType<>(FragileBlockEntity::new, Set.of(FRAGILE));
 
+  /** How many times this mod, there from the start, was told the server started. */
+  static final AtomicInteger SERVER_STARTED_CALLS = new AtomicInteger();
+
   @Override
   public void onInitialize() {
+    ServerLifecycleEvents.SERVER_STARTED.register(server -> SERVER_STARTED_CALLS.incrementAndGet());
     Registry.register(BuiltInRegistries.BLOCK, FRAGILE_ID, FRAGILE);
     Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, FRAGILE_ID, FRAGILE_BLOCK_ENTITY);
     PingTraffic.register();

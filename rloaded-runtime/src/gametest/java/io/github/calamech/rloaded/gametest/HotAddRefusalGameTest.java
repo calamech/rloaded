@@ -2,6 +2,7 @@ package io.github.calamech.rloaded.gametest;
 
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
+import io.github.calamech.rloaded.runtime.engine.StartedEvents;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -168,7 +169,7 @@ public final class HotAddRefusalGameTest {
     }
     String actual;
     try {
-      actual = "loaded " + HotAdd.load(List.of(jar), Agent.instrumentation());
+      actual = "loaded " + HotAdd.load(List.of(jar), Agent.instrumentation(), StartedEvents.NONE);
     } catch (HotAddRefusal e) {
       actual = e.getMessage();
     }

@@ -26,7 +26,8 @@ import kotlin.system.exitProcess
  * content-basic and mixin-field-init, served by a fake Modrinth; then Alice, made an operator,
  * adds keybind-and-tab from her Mods screen, while Bob, who is not one, has no Mods button and is
  * refused when he asks anyway. Before the adds the console summons an armor stand; between them it
- * gives each player content-basic's block. Then late-item comes, the players leave, and join again
+ * gives each player content-basic's block. Then late-lifecycle comes, which sets up its state when
+ * the server and the game started, as Xaero's Minimap does, then late-item, the players leave, and join again
  * from the same game, which must restart first; the fresh game joins with both items in the
  * player's inventory. Fails unless both players got each mod without leaving their connection, the
  * server says every player got them each time, every entity of the server has mixin-field-init's
@@ -35,7 +36,8 @@ import kotlin.system.exitProcess
  * check creates.
  *
  * Arguments: client cache, server cache, run directory, agent jar, runtime mod jar, then the client
- * mod jars and the jars to serve as content-basic, mixin-field-init and keybind-and-tab, each list
+ * mod jars and the jars to serve as content-basic, mixin-field-init, keybind-and-tab, late-item and
+ * late-lifecycle, each list
  * joined with the path separator.
  */
 public fun main(arguments: Array<String>) {
@@ -51,6 +53,7 @@ public fun main(arguments: Array<String>) {
                 served.single { "keybindAndTab" in it.fileName.toString() },
             ),
             FakeMod("liProject", "liVersion", "Late item", served.single { "lateItem" in it.fileName.toString() }),
+            FakeMod("llProject", "llVersion", "Late lifecycle", served.single { "lateLifecycle" in it.fileName.toString() }),
         )
     val passed =
         runAddCheck(
@@ -233,6 +236,8 @@ private fun steps(players: List<AddPlayer>): List<Pair<String, List<String>>> =
         "mixin-field-init" to listOf("rloaded add mfiProject"),
         "keybind-and-tab" to emptyList(),
         "no-access" to emptyList(),
+        // Needs to be told the server and the game started, or the players' ticks fail.
+        "late-lifecycle" to listOf("rloaded add llProject"),
         // An item added once the players' games have synchronized their items with the server.
         "late-item" to listOf("rloaded add liProject"),
         "late-item-given" to players.map { "give ${it.name} late-item:late_item" },
@@ -338,6 +343,7 @@ private val AUDITED =
         "Alice kbtProject: marked",
         "Alice kbtProject: kept",
         "Bob kbtProject: refused NOT_ALLOWED",
+        "console llProject: added",
         "console liProject: added",
     )
 

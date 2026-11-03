@@ -1,6 +1,7 @@
 package io.github.calamech.rloaded.gametest;
 
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
+import io.github.calamech.rloaded.runtime.engine.StartedEvents;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -35,7 +36,7 @@ public final class HotAddGameTest {
     List<String> loaded;
     List<String> errors;
     try (ErrorLog log = ErrorLog.open()) {
-      loaded = HotAdd.load(paths, Agent.instrumentation());
+      loaded = HotAdd.load(paths, Agent.instrumentation(), StartedEvents.NONE);
       errors = log.lines();
     }
 

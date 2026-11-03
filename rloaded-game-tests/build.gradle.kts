@@ -12,6 +12,8 @@ val hotAddMods = configurations.dependencyScope("hotAddMods")
 val hotAddModJars = configurations.resolvable("hotAddModJars") { extendsFrom(hotAddMods.get()) }
 val joinClientMods = configurations.dependencyScope("joinClientMods")
 val joinClientModJars = configurations.resolvable("joinClientModJars") { extendsFrom(joinClientMods.get()) }
+val lateLifecycleMod = configurations.dependencyScope("lateLifecycleMod")
+val lateLifecycleModJar = configurations.resolvable("lateLifecycleModJar") { extendsFrom(lateLifecycleMod.get()) }
 val stagingRefusedMods = configurations.dependencyScope("stagingRefusedMods")
 val stagingRefusedModJars = configurations.resolvable("stagingRefusedModJars") { extendsFrom(stagingRefusedMods.get()) }
 val addServedMods = configurations.dependencyScope("addServedMods")
@@ -44,6 +46,10 @@ dependencies {
             isTransitive = false
             capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }
         }
+    }
+    lateLifecycleMod("io.github.calamech.rloaded:rloaded-runtime") {
+        isTransitive = false
+        capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-late-lifecycle") }
     }
     stagingRefusedMods("io.github.calamech.rloaded:rloaded-runtime") {
         isTransitive = false
@@ -81,7 +87,7 @@ dependencies {
             capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }
         }
     }
-    for (mod in listOf("content-basic", "mixin-field-init", "keybind-and-tab", "late-item")) {
+    for (mod in listOf("content-basic", "mixin-field-init", "keybind-and-tab", "late-item", "late-lifecycle")) {
         addServedMods("io.github.calamech.rloaded:rloaded-runtime") {
             isTransitive = false
             capabilities { requireCapability("io.github.calamech.rloaded:rloaded-runtime-$mod") }
@@ -146,11 +152,13 @@ tasks.register<JavaExec>("gameTest") {
     val modFiles = files(testModJars)
     val hotAddFiles = files(hotAddModJars)
     val refusedFile = files(stagingRefusedModJars)
+    val lateLifecycleFile = files(lateLifecycleModJar)
     inputs.files(agentFile).withPropertyName("agent")
     inputs.files(runtimeFile).withPropertyName("runtimeMod")
     inputs.files(modFiles).withPropertyName("testMods")
     inputs.files(hotAddFiles).withPropertyName("hotAddMods")
     inputs.files(refusedFile).withPropertyName("stagingRefusedMod")
+    inputs.files(lateLifecycleFile).withPropertyName("lateLifecycleMod")
     outputs.file(report)
     argumentProviders.add {
         listOf(
@@ -160,6 +168,7 @@ tasks.register<JavaExec>("gameTest") {
             agentFile.singleFile.absolutePath,
             runtimeFile.singleFile.absolutePath,
             refusedFile.singleFile.absolutePath,
+            lateLifecycleFile.singleFile.absolutePath,
             hotAddFiles.files.joinToString(File.pathSeparator) { it.absolutePath },
         ) + modFiles.files.map { it.absolutePath }
     }

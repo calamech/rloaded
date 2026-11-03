@@ -14,6 +14,7 @@ import io.github.calamech.rloaded.runtime.LoadedMods;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
 import io.github.calamech.rloaded.runtime.engine.LateKeyMappings;
+import io.github.calamech.rloaded.runtime.join.client.ClientStartedEvents;
 import io.github.calamech.rloaded.runtime.join.client.GameRelaunch;
 import io.github.calamech.rloaded.runtime.join.client.JoinClient;
 import java.io.IOException;
@@ -207,7 +208,9 @@ public final class WorldGate {
     try {
       HotAdd.load(
           mods.stream().map(InstalledMod::getJar).toList(),
-          AgentBridge.instrumentation().orElseThrow());
+          AgentBridge.instrumentation().orElseThrow(),
+          // The world's server starts after this: it calls the mods' listeners itself.
+          ClientStartedEvents.of(client));
     } catch (HotAddRefusal refusal) {
       LOGGER.error("A mod of {} cannot be loaded: {}", levelId, refusal.getMessage());
       fail(client, onCancel, Component.translatable("rloaded.world.not_loaded"));

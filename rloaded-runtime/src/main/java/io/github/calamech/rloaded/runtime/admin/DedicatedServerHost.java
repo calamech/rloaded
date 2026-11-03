@@ -4,6 +4,7 @@ import io.github.calamech.rloaded.core.lockfile.Lockfile;
 import io.github.calamech.rloaded.runtime.AgentBridge;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
+import io.github.calamech.rloaded.runtime.engine.StartedEvents;
 import io.github.calamech.rloaded.runtime.join.JoinServer;
 import java.nio.file.Path;
 import java.util.List;
@@ -31,7 +32,9 @@ final class DedicatedServerHost implements LiveAdd.Host {
   @Override
   public CompletableFuture<Optional<String>> load(List<Path> jars) {
     try {
-      List<String> loaded = HotAdd.load(jars, AgentBridge.instrumentation().orElseThrow());
+      List<String> loaded =
+          HotAdd.load(
+              jars, AgentBridge.instrumentation().orElseThrow(), StartedEvents.server(server));
       LOGGER.info("Loaded {} into the running server", loaded);
       return CompletableFuture.completedFuture(Optional.empty());
     } catch (HotAddRefusal e) {

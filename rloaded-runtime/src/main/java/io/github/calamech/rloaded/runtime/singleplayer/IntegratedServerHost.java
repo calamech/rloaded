@@ -8,6 +8,8 @@ import io.github.calamech.rloaded.runtime.admin.LiveAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
 import io.github.calamech.rloaded.runtime.engine.LateKeyMappings;
+import io.github.calamech.rloaded.runtime.engine.StartedEvents;
+import io.github.calamech.rloaded.runtime.join.client.ClientStartedEvents;
 import io.github.calamech.rloaded.runtime.join.client.GameRelaunch;
 import io.github.calamech.rloaded.runtime.join.client.JoinClient;
 import java.nio.file.Path;
@@ -17,6 +19,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.server.IntegratedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,12 +76,20 @@ final class IntegratedServerHost implements LiveAdd.Host {
   /** The ids of the loaded mods, or why none was loaded. */
   private record Loaded(List<String> ids, Optional<String> refusal) {}
 
+  // The game started, then the world's server did.
+  private StartedEvents started() {
+    StartedEvents started = ClientStartedEvents.of(client);
+    IntegratedServer server = client.getSingleplayerServer();
+    return server == null ? started : started.then(StartedEvents.server(server));
+  }
+
   // A refusal comes back as a value; a failure after the mods started loading is thrown.
   private Loaded loadOnClientThread(List<Path> jars) {
     LateKeyMappings.open();
     try {
       return new Loaded(
-          HotAdd.load(jars, AgentBridge.instrumentation().orElseThrow()), Optional.empty());
+          HotAdd.load(jars, AgentBridge.instrumentation().orElseThrow(), started()),
+          Optional.empty());
     } catch (HotAddRefusal refusal) {
       return new Loaded(List.of(), Optional.of(refusal.getMessage()));
     } finally {

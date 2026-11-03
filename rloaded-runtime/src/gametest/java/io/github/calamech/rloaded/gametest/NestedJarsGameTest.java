@@ -2,6 +2,7 @@ package io.github.calamech.rloaded.gametest;
 
 import io.github.calamech.rloaded.runtime.engine.HotAdd;
 import io.github.calamech.rloaded.runtime.engine.HotAddRefusal;
+import io.github.calamech.rloaded.runtime.engine.StartedEvents;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -49,7 +50,7 @@ public final class NestedJarsGameTest {
             mod("nested-outer", jars("META-INF/jars/library.jar", "META-INF/jars/older.jar")),
             Map.of("META-INF/jars/library.jar", library, "META-INF/jars/older.jar", older)));
 
-    List<String> loaded = HotAdd.load(List.of(outer), Agent.instrumentation());
+    List<String> loaded = HotAdd.load(List.of(outer), Agent.instrumentation(), StartedEvents.NONE);
 
     helper.assertValueEqual(
         loaded.stream().sorted().toList(),
@@ -105,7 +106,7 @@ public final class NestedJarsGameTest {
 
   private static String refusal(Path jar) throws ReflectiveOperationException {
     try {
-      return "loaded " + HotAdd.load(List.of(jar), Agent.instrumentation());
+      return "loaded " + HotAdd.load(List.of(jar), Agent.instrumentation(), StartedEvents.NONE);
     } catch (HotAddRefusal e) {
       return e.getMessage();
     }

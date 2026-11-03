@@ -27,7 +27,8 @@
       "io.github.calamech.rloaded.gametest.NestedJarsGameTest",
       "io.github.calamech.rloaded.gametest.NestedLibrariesGameTest",
       "io.github.calamech.rloaded.gametest.PaletteBoundaryGameTest",
-      "io.github.calamech.rloaded.gametest.RegistryThawGameTest"
+      "io.github.calamech.rloaded.gametest.RegistryThawGameTest",
+      "io.github.calamech.rloaded.gametest.StartedEventsGameTest"
     ]
   },
   "depends": {
